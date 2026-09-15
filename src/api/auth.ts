@@ -1,8 +1,9 @@
 import api from "@/config/axios";
+import Cookies from 'js-cookie';
 
 export interface LoginDto {
   username: string;
-  password: string; 
+  password: string;
 }
 
 export interface LoginResponse {
@@ -10,19 +11,23 @@ export interface LoginResponse {
   username?: string;
   token: string;
   expiredTime: number;
-  role?: string | null; // role_code từ JWT: 'ADMIN', 'SHOPOWNER', ...
+  role?: string | null;
 }
 
 export async function login(data: LoginDto) {
-  const res = await api.post('/auth/login', data) as LoginResponse;
-  if (typeof window !== 'undefined') {
-    localStorage.setItem('access_token', res.token);
+  const res: LoginResponse = await api.post('/auth/login', data);
+  if (res.token && res.role) {
+    Cookies.set('access_token', res.token, { expires: res.expiredTime / (1000 * 60 * 60 * 24), sameSite: 'lax' });
+    Cookies.set('role', res.role, { expires: res.expiredTime / (1000 * 60 * 60 * 24), sameSite: 'lax' });
+    Cookies.set('username', res.username!, { expires: res.expiredTime / (1000 * 60 * 60 * 24), sameSite: 'lax' });
+    Cookies.set('user_id', res.user_id!.toString(), { expires: res.expiredTime / (1000 * 60 * 60 * 24), sameSite: 'lax' });
   }
-  return res;
 }
 
 export async function logout(): Promise<void> {
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem('access_token');
-  }
+  Cookies.remove('access_token');
+  Cookies.remove('role');
+  Cookies.remove('username');
+  Cookies.remove('user_id');
+  window.location.href = '/login';
 }
