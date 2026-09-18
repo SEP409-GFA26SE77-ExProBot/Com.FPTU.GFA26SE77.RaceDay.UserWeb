@@ -1,5 +1,6 @@
-import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from "axios";
+import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { BASE_URL } from "./global-config";
+import Cookies from 'js-cookie';
 
 const api = axios.create({
     baseURL: BASE_URL,
@@ -12,7 +13,7 @@ const api = axios.create({
 api.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
         if (typeof window !== 'undefined') {
-            const token = localStorage.getItem('access_token');
+            const token = Cookies.get('access_token');
             if (token && config.headers) {
                 config.headers.Authorization = `Bearer ${token}`;
             }
@@ -35,14 +36,18 @@ api.interceptors.response.use(
             switch (status) {
                 case 401:
                     // Xử lý khi hết hạn phiên đăng nhập hoặc chưa đăng thực
+                    Cookies.remove('access_token');
+                    
                     if (typeof window !== 'undefined') {
-                        localStorage.removeItem('access_token');
-                        // Chuyển hướng về login nếu cần
-                        window.location.href = '/login';
+                        const currentPath = window.location.pathname;
+                        if (currentPath !== '/login') {
+                            window.location.href = `/login?from=${encodeURIComponent(currentPath)}`;
+                        }
                     }
                     break;
                 case 403:
                     console.error('Không có quyền truy cập.');
+                    window.location.href = '/403';
                     break;
                 case 500:
                     console.error('Lỗi máy chủ nội bộ.');
