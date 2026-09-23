@@ -1,9 +1,19 @@
 import api from "@/config/axios";
 import Cookies from 'js-cookie';
 
+const PUBLIC_API = '/api/v1/iam'
+
 export interface LoginDto {
   username: string;
   password: string;
+}
+
+export interface RegisterDto {
+  username: string;
+  email: string;
+  password: string;
+  fullName: string;
+  phone?: string;
 }
 
 export interface LoginResponse {
@@ -12,6 +22,10 @@ export interface LoginResponse {
   token: string;
   expiredTime: number;
   role?: string | null;
+}
+
+export async function register(data: RegisterDto): Promise<void> {
+  await api.post('/auth/register', data);
 }
 
 export async function login(data: LoginDto) {
