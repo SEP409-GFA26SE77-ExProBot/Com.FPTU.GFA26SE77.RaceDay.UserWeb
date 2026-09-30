@@ -13,14 +13,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "RaceDay – Running Events Registration Platform",
-  description: "Discover and register for running events, marathons, and trail runs across Vietnam. Your next race starts here.",
+  title: "RaceDay – Nền tảng đăng ký giải chạy",
+  description:
+    "Khám phá và đăng ký giải chạy, marathon và trail trên khắp Việt Nam. Giải tiếp theo của bạn bắt đầu tại đây.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
-      lang="en"
+      lang="vi"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>

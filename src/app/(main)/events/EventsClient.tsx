@@ -1,121 +1,149 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { type RaceEvent, getEventsByPage } from "@/data/mock-events";
+import { useMemo, useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { MOCK_EVENTS, type RaceEvent } from "@/data/mock-events";
 import EventCard from "@/components/events/EventCard";
 import EventCardSkeleton from "@/components/events/EventCardSkeleton";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import { Search, X, Flag } from "lucide-react";
+import { PAGE_SHELL } from "@/lib/page-shell";
+import PageLoading from "@/components/ui/PageLoading";
+import Pagination from "@/components/ui/Pagination";
+import { usePagedList } from "@/hooks/usePagedList";
 
 const PAGE_SIZE = 6;
 
-export default function EventsClient() {
-  const [events, setEvents] = useState<RaceEvent[]>([]);
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [hasMore, setHasMore] = useState(true);
-  const [totalCount, setTotalCount] = useState(0);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [activeFilter, setActiveFilter] = useState<string>("all");
+const STATUS_FILTERS = [
+  { key: "all", label: "Tất cả" },
+  { key: "registration-open", label: "Đang mở" },
+  { key: "upcoming", label: "Sắp mở" },
+  { key: "sold-out", label: "Hết slot" },
+] as const;
 
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  const isLoadingRef = useRef(false);
+const TYPE_FILTERS = [
+  { key: "trail", label: "Trail" },
+  { key: "ultra", label: "Ultra" },
+  { key: "núi", label: "Núi" },
+  { key: "đường-phố", label: "Đường phố" },
+  { key: "chạy-đêm", label: "Chạy đêm" },
+  { key: "biển", label: "Biển / Đảo" },
+] as const;
 
-  const filters = [
-    { key: "all", label: "All Events" },
-    { key: "registration-open", label: "Open" },
-    { key: "upcoming", label: "Coming Soon" },
-    { key: "trail", label: "Trail" },
-    { key: "road", label: "Road" },
-    { key: "night-run", label: "Night Run" },
-  ];
+type StatusKey = (typeof STATUS_FILTERS)[number]["key"];
+type TypeKey = (typeof TYPE_FILTERS)[number]["key"] | "all";
 
-  const loadEvents = useCallback(
-    async (pageNum: number, reset: boolean = false) => {
-      if (isLoadingRef.current) return;
-      isLoadingRef.current = true;
-      setLoading(true);
-
-      try {
-        const result = await getEventsByPage(pageNum, PAGE_SIZE);
-        setEvents((prev) => (reset ? result.events : [...prev, ...result.events]));
-        setHasMore(result.hasMore);
-        setTotalCount(result.totalCount);
-        setPage(pageNum);
-      } finally {
-        setLoading(false);
-        isLoadingRef.current = false;
-      }
-    },
-    []
+function FilterChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all border ${
+        active
+          ? "bg-orange-500 text-white border-orange-600 shadow-sm shadow-orange-500/25"
+          : "bg-white text-foreground/70 border-border hover:border-orange-400/50 hover:text-foreground"
+      }`}
+    >
+      {children}
+    </button>
   );
+}
 
-  // Initial load
-  useEffect(() => {
-    loadEvents(1, true);
-  }, [loadEvents]);
-
-  // IntersectionObserver for infinite scroll
-  useEffect(() => {
-    const sentinel = sentinelRef.current;
-    if (!sentinel) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0];
-        if (entry.isIntersecting && hasMore && !isLoadingRef.current) {
-          loadEvents(page + 1);
-        }
-      },
-      { rootMargin: "200px" }
-    );
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [hasMore, page, loadEvents]);
-
-  // Filter events client-side
-  const filteredEvents = events.filter((event) => {
+function filterEvents(
+  events: RaceEvent[],
+  searchQuery: string,
+  statusFilter: StatusKey,
+  typeFilter: TypeKey
+) {
+  return events.filter((event) => {
     const matchesSearch =
       searchQuery === "" ||
       event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       event.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
       event.city.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesFilter =
-      activeFilter === "all" ||
-      event.status === activeFilter ||
-      event.tags.some((t) => t.toLowerCase().replace(/\s+/g, "-") === activeFilter);
+    const matchesStatus = statusFilter === "all" || event.status === statusFilter;
 
-    return matchesSearch && matchesFilter;
+    const matchesType =
+      typeFilter === "all" ||
+      event.tags.some((t) => {
+        const key = t.toLowerCase().replace(/\s+/g, "-");
+        if (typeFilter === "biển") return /biển|đảo|ven biển|island/i.test(t);
+        return key === typeFilter;
+      });
+
+    return matchesSearch && matchesStatus && matchesType;
   });
+}
+
+export default function EventsClient() {
+  const searchParams = useSearchParams();
+  const tagFromUrl = searchParams.get("tag") || "";
+
+  const [boot, setBoot] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusKey>("all");
+  const [typeFilter, setTypeFilter] = useState<TypeKey>("all");
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setBoot(false), 700);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    if (!tagFromUrl) return;
+    const isStatus = STATUS_FILTERS.some((f) => f.key === tagFromUrl);
+    if (isStatus) setStatusFilter(tagFromUrl as StatusKey);
+    else setTypeFilter(tagFromUrl as TypeKey);
+  }, [tagFromUrl]);
+
+  const filtered = useMemo(
+    () => filterEvents(MOCK_EVENTS, searchQuery, statusFilter, typeFilter),
+    [searchQuery, statusFilter, typeFilter]
+  );
+
+  const resetKey = `${searchQuery}|${statusFilter}|${typeFilter}`;
+  const pager = usePagedList(filtered, PAGE_SIZE, resetKey);
+
+  if (boot) {
+    return (
+      <PageLoading
+        title="Đang tải danh sách giải…"
+        description="RaceDay đang lấy các giải đang mở và sắp diễn ra."
+        icon={Flag}
+      />
+    );
+  }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-      {/* Page header */}
-      <div className="mb-8">
+    <div className={`${PAGE_SHELL} py-7 sm:py-8`}>
+      <div className="mb-6 rounded-2xl border border-orange-500/15 bg-gradient-to-br from-orange-50/80 via-white to-amber-50/40 p-5 sm:p-6">
         <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
-          Discover Events
+          Khám phá giải chạy
         </h1>
-        <p className="mt-2 text-muted-foreground max-w-2xl">
-          Find your next running challenge. Browse upcoming races, trail runs, and marathons
-          across Vietnam.
+        <p className="mt-1.5 text-muted-foreground max-w-3xl text-sm sm:text-base">
+          Lọc theo trạng thái đăng ký và loại hình địa hình — mỗi giải một cung đường riêng.
         </p>
-      </div>
 
-      {/* Search & Filters */}
-      <div className="mb-8 space-y-4">
-        {/* Search bar */}
-        <div className="relative max-w-md">
+        <div className="mt-4 relative max-w-xl">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search events, locations..."
+            placeholder="Tìm giải, địa điểm..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-xl border border-border bg-background py-2.5 pl-10 pr-10 text-sm outline-none transition-all focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20 placeholder:text-muted-foreground"
+            className="w-full rounded-xl border border-border bg-white py-2.5 pl-10 pr-10 text-sm outline-none transition-all focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20"
           />
           {searchQuery && (
             <button
+              type="button"
               onClick={() => setSearchQuery("")}
               className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-muted text-muted-foreground"
             >
@@ -123,81 +151,94 @@ export default function EventsClient() {
             </button>
           )}
         </div>
+      </div>
 
-        {/* Filter pills */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <SlidersHorizontal className="h-4 w-4 text-muted-foreground mr-1" />
-          {filters.map((filter) => (
+      <div className="mb-6 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-4">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground sm:w-24 sm:pt-2 shrink-0">
+            Trạng thái
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {STATUS_FILTERS.map((f) => (
+              <FilterChip
+                key={f.key}
+                active={statusFilter === f.key}
+                onClick={() => setStatusFilter(f.key)}
+              >
+                {f.label}
+              </FilterChip>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-4">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground sm:w-24 sm:pt-2 shrink-0">
+            Loại hình
+          </span>
+          <div className="flex flex-wrap gap-2">
+            <FilterChip active={typeFilter === "all"} onClick={() => setTypeFilter("all")}>
+              Mọi loại
+            </FilterChip>
+            {TYPE_FILTERS.map((f) => (
+              <FilterChip
+                key={f.key}
+                active={typeFilter === f.key}
+                onClick={() => setTypeFilter(f.key)}
+              >
+                {f.label}
+              </FilterChip>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div
+        className={`list-fade ${pager.visible ? "list-fade-in" : "list-fade-out"} relative min-h-[280px]`}
+      >
+        {pager.turning ? (
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: Math.min(PAGE_SIZE, 6) }).map((_, i) => (
+              <EventCardSkeleton key={`sk-${i}`} />
+            ))}
+          </div>
+        ) : pager.pageItems.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <Search className="h-8 w-8 text-muted-foreground mb-3" />
+            <h3 className="text-lg font-semibold mb-1">Không tìm thấy giải</h3>
+            <p className="text-sm text-muted-foreground max-w-sm">
+              Thử đổi từ khóa hoặc bộ lọc.
+            </p>
             <button
-              key={filter.key}
-              onClick={() => setActiveFilter(filter.key)}
-              className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-all ${
-                activeFilter === filter.key
-                  ? "bg-orange-500 text-white shadow-md shadow-orange-500/25"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-              }`}
+              type="button"
+              onClick={() => {
+                setSearchQuery("");
+                setStatusFilter("all");
+                setTypeFilter("all");
+              }}
+              className="mt-4 rounded-full bg-orange-500 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-600"
             >
-              {filter.label}
+              Xóa bộ lọc
             </button>
-          ))}
-        </div>
-
-        {/* Results count */}
-        <p className="text-xs text-muted-foreground">
-          Showing {filteredEvents.length} of {totalCount} events
-        </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 list-stagger">
+            {pager.pageItems.map((event) => (
+              <EventCard key={event.id} event={event} />
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Events grid */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {filteredEvents.map((event) => (
-          <EventCard key={event.id} event={event} />
-        ))}
-
-        {/* Skeleton loading cards */}
-        {loading &&
-          Array.from({ length: PAGE_SIZE }).map((_, i) => (
-            <EventCardSkeleton key={`skeleton-${i}`} />
-          ))}
+      <div className="mt-8 border-t border-border/60 pt-5">
+        <Pagination
+          page={pager.page}
+          totalPages={pager.totalPages}
+          totalItems={pager.totalItems}
+          pageSize={PAGE_SIZE}
+          onChange={pager.goTo}
+          disabled={pager.turning}
+        />
       </div>
-
-      {/* Empty state */}
-      {!loading && filteredEvents.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted mb-4">
-            <Search className="h-8 w-8 text-muted-foreground" />
-          </div>
-          <h3 className="text-lg font-semibold text-foreground mb-1">
-            No events found
-          </h3>
-          <p className="text-sm text-muted-foreground max-w-sm">
-            Try adjusting your search or filter to find what you&apos;re looking for.
-          </p>
-          <button
-            onClick={() => {
-              setSearchQuery("");
-              setActiveFilter("all");
-            }}
-            className="mt-4 rounded-full bg-orange-500 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-600 transition-colors"
-          >
-            Clear Filters
-          </button>
-        </div>
-      )}
-
-      {/* Scroll sentinel for infinite scroll */}
-      {hasMore && <div ref={sentinelRef} className="h-4" />}
-
-      {/* End of list */}
-      {!hasMore && filteredEvents.length > 0 && (
-        <div className="flex items-center justify-center py-10">
-          <div className="flex items-center gap-3 text-muted-foreground">
-            <div className="h-px w-12 bg-border" />
-            <span className="text-sm font-medium">You&apos;ve seen all events</span>
-            <div className="h-px w-12 bg-border" />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

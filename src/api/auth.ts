@@ -59,7 +59,7 @@ export async function login(data: LoginDto) {
 
     const matchedUser = findMockUser(data.username);
     if (matchedUser && matchedUser.password !== data.password) {
-      throw new Error("Invalid password for this mock user.");
+      throw new Error("Mật khẩu không đúng cho tài khoản demo này.");
     }
 
     // Rethrow original error if not mock user

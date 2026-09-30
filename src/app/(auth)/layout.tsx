@@ -1,14 +1,13 @@
 import type { Metadata } from "next";
 import "./auth.css";
 
-
 export const metadata: Metadata = {
   title: {
-    default: "Sign In – RaceDay",
+    default: "Đăng nhập – RaceDay",
     template: "%s – RaceDay",
   },
   description:
-    "Sign in or create your RaceDay account to manage race events, track registrations, and more.",
+    "Đăng nhập hoặc tạo tài khoản RaceDay để quản lý giải chạy, theo dõi đăng ký và nhiều hơn nữa.",
 };
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {

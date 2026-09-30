@@ -32,7 +32,7 @@ function passwordStrength(pw: string): { level: number; label: string } {
   if (/[A-Z]/.test(pw)) score++;
   if (/[0-9]/.test(pw)) score++;
   if (/[^A-Za-z0-9]/.test(pw)) score++;
-  const labels = ["", "Weak", "Fair", "Good", "Strong"];
+  const labels = ["", "Yếu", "Trung bình", "Khá", "Mạnh"];
   return { level: score, label: labels[score] };
 }
 
@@ -53,12 +53,12 @@ export default function RegisterPage() {
   };
 
   const validate = () => {
-    if (!form.fullName.trim()) return "Full name is required.";
-    if (!form.username.trim()) return "Username is required.";
+    if (!form.fullName.trim()) return "Vui lòng nhập họ tên.";
+    if (!form.username.trim()) return "Vui lòng nhập tên đăng nhập.";
     if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
-      return "A valid email is required.";
-    if (form.password.length < 8) return "Password must be at least 8 characters.";
-    if (form.password !== form.confirmPassword) return "Passwords do not match.";
+      return "Vui lòng nhập email hợp lệ.";
+    if (form.password.length < 8) return "Mật khẩu phải có ít nhất 8 ký tự.";
+    if (form.password !== form.confirmPassword) return "Mật khẩu xác nhận không khớp.";
     return null;
   };
 
@@ -85,7 +85,7 @@ export default function RegisterPage() {
       const axiosErr = err as AxiosError<{ message?: string }>;
       const msg =
         axiosErr.response?.data?.message ??
-        "Registration failed. Please try again.";
+        "Đăng ký thất bại. Vui lòng thử lại.";
       setError(msg);
     } finally {
       setLoading(false);
@@ -121,24 +121,24 @@ export default function RegisterPage() {
           {success && (
             <div className="auth-success-overlay">
               <CheckCircle2 size={52} className="auth-success-icon" />
-              <p className="auth-success-title">Account Created!</p>
-              <p className="auth-success-subtitle">Redirecting to login…</p>
+              <p className="auth-success-title">Tạo tài khoản thành công!</p>
+              <p className="auth-success-subtitle">Đang chuyển tới đăng nhập…</p>
             </div>
           )}
 
           {/* Card header */}
           <div className="auth-card-header">
-            <h1 className="auth-title">Create account</h1>
-            <p className="auth-subtitle">Join the RaceDay community today</p>
+            <h1 className="auth-title">Tạo tài khoản</h1>
+            <p className="auth-subtitle">Tham gia cộng đồng RaceDay ngay hôm nay</p>
           </div>
 
           {/* Tabs */}
           <div className="auth-tabs">
             <Link href="/login" className="auth-tab" id="tab-login">
-              Sign In
+              Đăng nhập
             </Link>
             <Link href="/register" className="auth-tab auth-tab--active" id="tab-register">
-              Register
+              Đăng ký
             </Link>
           </div>
 
@@ -156,14 +156,14 @@ export default function RegisterPage() {
               {/* Full Name */}
               <div className="auth-field">
                 <label htmlFor="reg-fullname" className="auth-label">
-                  Full Name
+                  Họ tên
                 </label>
                 <input
                   id="reg-fullname"
                   name="fullName"
                   type="text"
                   autoComplete="name"
-                  placeholder="John Doe"
+                  placeholder="Nguyễn Văn An"
                   value={form.fullName}
                   onChange={handleChange}
                   className="auth-input"
@@ -174,14 +174,14 @@ export default function RegisterPage() {
               {/* Username */}
               <div className="auth-field">
                 <label htmlFor="reg-username" className="auth-label">
-                  Username
+                  Tên đăng nhập
                 </label>
                 <input
                   id="reg-username"
                   name="username"
                   type="text"
                   autoComplete="username"
-                  placeholder="johndoe"
+                  placeholder="nguyenvanan"
                   value={form.username}
                   onChange={handleChange}
                   className="auth-input"
@@ -199,7 +199,7 @@ export default function RegisterPage() {
                   name="email"
                   type="email"
                   autoComplete="email"
-                  placeholder="john@example.com"
+                  placeholder="email@example.com"
                   value={form.email}
                   onChange={handleChange}
                   className="auth-input"
@@ -210,14 +210,14 @@ export default function RegisterPage() {
               {/* Phone */}
               <div className="auth-field">
                 <label htmlFor="reg-phone" className="auth-label">
-                  Phone <span className="auth-label-optional">(optional)</span>
+                  Số điện thoại <span className="auth-label-optional">(tuỳ chọn)</span>
                 </label>
                 <input
                   id="reg-phone"
                   name="phone"
                   type="tel"
                   autoComplete="tel"
-                  placeholder="+84 xxx xxx xxx"
+                  placeholder="0901234567"
                   value={form.phone}
                   onChange={handleChange}
                   className="auth-input"
@@ -228,7 +228,7 @@ export default function RegisterPage() {
               {/* Password */}
               <div className="auth-field">
                 <label htmlFor="reg-password" className="auth-label">
-                  Password
+                  Mật khẩu
                 </label>
                 <div className="auth-input-wrapper">
                   <input
@@ -236,7 +236,7 @@ export default function RegisterPage() {
                     name="password"
                     type={showPw ? "text" : "password"}
                     autoComplete="new-password"
-                    placeholder="Min. 8 characters"
+                    placeholder="Tối thiểu 8 ký tự"
                     value={form.password}
                     onChange={handleChange}
                     className="auth-input auth-input--with-icon"
@@ -246,7 +246,7 @@ export default function RegisterPage() {
                     type="button"
                     className="auth-eye-btn"
                     onClick={() => setShowPw((v) => !v)}
-                    aria-label={showPw ? "Hide password" : "Show password"}
+                    aria-label={showPw ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
                     tabIndex={-1}
                   >
                     {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -277,7 +277,7 @@ export default function RegisterPage() {
               {/* Confirm Password */}
               <div className="auth-field">
                 <label htmlFor="reg-confirm-password" className="auth-label">
-                  Confirm Password
+                  Xác nhận mật khẩu
                 </label>
                 <div className="auth-input-wrapper">
                   <input
@@ -285,7 +285,7 @@ export default function RegisterPage() {
                     name="confirmPassword"
                     type={showConfirmPw ? "text" : "password"}
                     autoComplete="new-password"
-                    placeholder="Re-enter your password"
+                    placeholder="Nhập lại mật khẩu"
                     value={form.confirmPassword}
                     onChange={handleChange}
                     className={`auth-input auth-input--with-icon ${
@@ -304,7 +304,7 @@ export default function RegisterPage() {
                     className="auth-eye-btn"
                     onClick={() => setShowConfirmPw((v) => !v)}
                     aria-label={
-                      showConfirmPw ? "Hide password" : "Show password"
+                      showConfirmPw ? "Ẩn mật khẩu" : "Hiện mật khẩu"
                     }
                     tabIndex={-1}
                   >
@@ -324,18 +324,18 @@ export default function RegisterPage() {
               {loading ? (
                 <>
                   <Loader2 size={18} className="auth-spinner" />
-                  Creating account…
+                  Đang tạo tài khoản…
                 </>
               ) : (
-                "Create Account"
+                "Tạo tài khoản"
               )}
             </button>
           </form>
 
           <p className="auth-switch">
-            Already have an account?{" "}
+            Đã có tài khoản?{" "}
             <Link href="/login" className="auth-switch-link">
-              Sign in
+              Đăng nhập
             </Link>
           </p>
         </div>

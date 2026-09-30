@@ -3,10 +3,10 @@ import { Role } from "./interfaces/role";
 
 const ROLE_PERMISSIONS: Record<string, string[]> = {
     '/profile': [Role.ADMIN, Role.PHOTOGRAPHER, Role.RUNNER, Role.ORGANIZER, Role.STAFF, Role.COORDINATOR],
+    '/my-registrations': [Role.RUNNER, Role.ADMIN],
     '/event-admin': [Role.ADMIN, Role.COORDINATOR],
     '/staff-admin': [Role.ADMIN, Role.COORDINATOR],
-    '/scan-qr': [Role.COORDINATOR, Role.STAFF],
-    '/register-event': [Role.RUNNER]
+    '/scan-qr': [Role.COORDINATOR, Role.STAFF, Role.ADMIN],
 };
 
 const authRoutes = ['/login', '/register', '/forgot-password'];

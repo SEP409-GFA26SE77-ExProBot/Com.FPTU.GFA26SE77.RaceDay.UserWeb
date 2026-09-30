@@ -4,10 +4,8 @@ import { Flag, Globe, Heart, MessageCircle, Mail, Phone, MapPin } from "lucide-r
 export default function Footer() {
   return (
     <footer className="border-t border-border/60 bg-gradient-to-b from-background to-muted/30">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* Main footer content */}
+      <div className="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-8 py-12 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Brand column */}
           <div className="space-y-4">
             <Link href="/" className="group flex items-center gap-2.5">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 via-orange-600 to-red-600 text-white shadow-md shadow-orange-500/25">
@@ -18,10 +16,9 @@ export default function Footer() {
               </span>
             </Link>
             <p className="text-sm text-muted-foreground leading-relaxed max-w-xs">
-              Your premier platform for discovering and registering for running events across Vietnam.
-              From marathons to trail runs — find your next race.
+              Nền tảng khám phá và đăng ký giải chạy trên khắp Việt Nam — từ marathon đến
+              trail. Tìm cung đường tiếp theo của bạn tại đây.
             </p>
-            {/* Social links */}
             <div className="flex items-center gap-3 pt-2">
               {[
                 { icon: Globe, label: "Website" },
@@ -39,17 +36,17 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Quick links */}
           <div>
             <h4 className="text-sm font-bold text-foreground uppercase tracking-wider mb-4">
-              Explore
+              Khám phá
             </h4>
             <ul className="space-y-2.5">
               {[
-                { label: "All Events", href: "/events" },
-                { label: "Trail Runs", href: "/events?tag=trail" },
-                { label: "Marathons", href: "/events?tag=marathon" },
-                { label: "Results", href: "/results" },
+                { label: "Tất cả giải", href: "/events" },
+                { label: "Trail", href: "/events?tag=trail" },
+                { label: "Marathon", href: "/events?tag=marathon" },
+                { label: "Kết quả", href: "/results" },
+                { label: "Tìm ảnh", href: "/photos" },
               ].map((link) => (
                 <li key={link.href}>
                   <Link
@@ -63,17 +60,16 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Support */}
           <div>
             <h4 className="text-sm font-bold text-foreground uppercase tracking-wider mb-4">
-              Support
+              Hỗ trợ
             </h4>
             <ul className="space-y-2.5">
               {[
-                { label: "FAQ", href: "#" },
-                { label: "Contact Us", href: "#" },
-                { label: "Privacy Policy", href: "#" },
-                { label: "Terms of Service", href: "#" },
+                { label: "Câu hỏi thường gặp", href: "#" },
+                { label: "Liên hệ", href: "#" },
+                { label: "Chính sách bảo mật", href: "/privacy" },
+                { label: "Điều khoản sử dụng", href: "/terms" },
               ].map((link) => (
                 <li key={link.label}>
                   <Link
@@ -87,15 +83,16 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Contact */}
           <div>
             <h4 className="text-sm font-bold text-foreground uppercase tracking-wider mb-4">
-              Contact
+              Liên hệ
             </h4>
             <ul className="space-y-3">
               <li className="flex items-start gap-2.5 text-sm text-muted-foreground">
                 <MapPin className="h-4 w-4 text-orange-500 mt-0.5 shrink-0" />
-                <span>FPT University, Lot E2a-7, D1 Road, Long Thanh My, Thu Duc City, HCMC</span>
+                <span>
+                  Đại học FPT, Lô E2a-7, Đường D1, Long Thạnh Mỹ, TP. Thủ Đức, TP.HCM
+                </span>
               </li>
               <li className="flex items-center gap-2.5 text-sm text-muted-foreground">
                 <Mail className="h-4 w-4 text-orange-500 shrink-0" />
@@ -109,13 +106,12 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Bottom bar */}
         <div className="border-t border-border/60 py-6 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs text-muted-foreground">
-            © {new Date().getFullYear()} RaceDay. Built with ❤️ for runners in Vietnam.
+            © {new Date().getFullYear()} RaceDay. Xây dựng với ❤️ dành cho cộng đồng runner Việt Nam.
           </p>
           <p className="text-xs text-muted-foreground">
-            Inspired by{" "}
+            Tham khảo{" "}
             <a
               href="https://irace.vn"
               target="_blank"

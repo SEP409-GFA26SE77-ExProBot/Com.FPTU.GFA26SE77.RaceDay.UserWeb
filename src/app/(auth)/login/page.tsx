@@ -31,7 +31,7 @@ function LoginForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.username.trim() || !form.password.trim()) {
-      setError("Please fill in all fields.");
+      setError("Vui lòng điền đầy đủ thông tin.");
       return;
     }
     setLoading(true);
@@ -44,7 +44,7 @@ function LoginForm() {
       const msg =
         (err as Error).message ||
         axiosErr.response?.data?.message ||
-        "Invalid username or password. Please try again.";
+        "Tên đăng nhập hoặc mật khẩu không đúng. Vui lòng thử lại.";
       setError(msg);
     } finally {
       setLoading(false);
@@ -53,25 +53,21 @@ function LoginForm() {
 
   return (
     <div className="auth-card">
-      {/* Card header */}
       <div className="auth-card-header">
-        <h1 className="auth-title">Welcome back</h1>
-        <p className="auth-subtitle">Sign in to your RaceDay account</p>
+        <h1 className="auth-title">Chào mừng trở lại</h1>
+        <p className="auth-subtitle">Đăng nhập vào tài khoản RaceDay</p>
       </div>
 
-      {/* Tabs */}
       <div className="auth-tabs">
         <Link href="/login" className="auth-tab auth-tab--active" id="tab-login">
-          Sign In
+          Đăng nhập
         </Link>
         <Link href="/register" className="auth-tab" id="tab-register">
-          Register
+          Đăng ký
         </Link>
       </div>
 
-      {/* Form */}
       <form onSubmit={handleSubmit} className="auth-form" noValidate>
-        {/* Error */}
         {error && (
           <div className="auth-error" role="alert">
             <AlertCircle size={16} />
@@ -79,17 +75,16 @@ function LoginForm() {
           </div>
         )}
 
-        {/* Username */}
         <div className="auth-field">
           <label htmlFor="login-username" className="auth-label">
-            Username
+            Tên đăng nhập
           </label>
           <input
             id="login-username"
             name="username"
             type="text"
             autoComplete="username"
-            placeholder="Enter your username"
+            placeholder="Nhập tên đăng nhập"
             value={form.username}
             onChange={handleChange}
             className="auth-input"
@@ -97,14 +92,13 @@ function LoginForm() {
           />
         </div>
 
-        {/* Password */}
         <div className="auth-field">
           <div className="auth-label-row">
             <label htmlFor="login-password" className="auth-label">
-              Password
+              Mật khẩu
             </label>
             <Link href="/forgot-password" className="auth-forgot">
-              Forgot password?
+              Quên mật khẩu?
             </Link>
           </div>
           <div className="auth-input-wrapper">
@@ -113,7 +107,7 @@ function LoginForm() {
               name="password"
               type={showPassword ? "text" : "password"}
               autoComplete="current-password"
-              placeholder="Enter your password"
+              placeholder="Nhập mật khẩu"
               value={form.password}
               onChange={handleChange}
               className="auth-input auth-input--with-icon"
@@ -123,7 +117,7 @@ function LoginForm() {
               type="button"
               className="auth-eye-btn"
               onClick={() => setShowPassword((v) => !v)}
-              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
               tabIndex={-1}
             >
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -131,7 +125,6 @@ function LoginForm() {
           </div>
         </div>
 
-        {/* Submit */}
         <button
           id="btn-login-submit"
           type="submit"
@@ -141,19 +134,18 @@ function LoginForm() {
           {loading ? (
             <>
               <Loader2 size={18} className="auth-spinner" />
-              Signing in…
+              Đang đăng nhập…
             </>
           ) : (
-            "Sign In"
+            "Đăng nhập"
           )}
         </button>
       </form>
 
-      {/* Demo Accounts Section */}
       <div className="auth-demo-section">
         <div className="auth-demo-header">
           <Sparkles size={14} className="text-orange-400" />
-          <span>Quick Demo Accounts</span>
+          <span>Tài khoản demo nhanh</span>
         </div>
         <div className="auth-demo-grid">
           {MOCK_USERS.map((user) => (
@@ -162,7 +154,7 @@ function LoginForm() {
               type="button"
               onClick={() => handleQuickLogin(user.username, user.password)}
               className="auth-demo-chip"
-              title={`Fill credentials for ${user.fullName} (${user.role})`}
+              title={`Điền thông tin ${user.fullName} (${user.role})`}
             >
               <span className="auth-demo-role">{user.role}</span>
               <span className="auth-demo-user">{user.username}</span>
@@ -172,9 +164,9 @@ function LoginForm() {
       </div>
 
       <p className="auth-switch">
-        Don&apos;t have an account?{" "}
+        Chưa có tài khoản?{" "}
         <Link href="/register" className="auth-switch-link">
-          Register now
+          Đăng ký ngay
         </Link>
       </p>
     </div>
@@ -205,7 +197,7 @@ export default function LoginPage() {
           <span className="auth-brand-name">RaceDay</span>
         </div>
 
-        <Suspense fallback={<div className="auth-card p-8 text-center text-muted-foreground">Loading...</div>}>
+        <Suspense fallback={<div className="auth-card p-8 text-center text-muted-foreground">Đang tải...</div>}>
           <LoginForm />
         </Suspense>
       </div>
