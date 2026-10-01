@@ -7,6 +7,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     '/event-admin': [Role.ADMIN, Role.COORDINATOR],
     '/staff-admin': [Role.ADMIN, Role.COORDINATOR],
     '/scan-qr': [Role.COORDINATOR, Role.STAFF, Role.ADMIN],
+    '/organizer': [Role.ORGANIZER],
 };
 
 const authRoutes = ['/login', '/register', '/forgot-password'];

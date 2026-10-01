@@ -7,6 +7,7 @@ import { login } from "@/api/auth";
 import { MOCK_USERS } from "@/data/mock-users";
 import { Eye, EyeOff, Loader2, Flag, AlertCircle, Sparkles } from "lucide-react";
 import type { AxiosError } from "axios";
+import Cookies from "js-cookie";
 
 function LoginForm() {
   const router = useRouter();
@@ -38,7 +39,7 @@ function LoginForm() {
     setError(null);
     try {
       await login({ username: form.username, password: form.password });
-      router.push(fromPath);
+      router.push(Cookies.get("role") === "ORGANIZER" ? "/organizer" : fromPath);
     } catch (err) {
       const axiosErr = err as AxiosError<{ message?: string }>;
       const msg =

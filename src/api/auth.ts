@@ -27,7 +27,7 @@ export interface LoginResponse {
 
 export async function register(data: RegisterDto): Promise<void> {
   try {
-    await api.post('/auth/register', data);
+    await api.post(`${PUBLIC_API}/auth/register`, data);
   } catch (err) {
     // If backend is unreachable, simulate successful registration
     console.warn("API registration failed or offline, simulating registration:", err);
@@ -36,7 +36,7 @@ export async function register(data: RegisterDto): Promise<void> {
 
 export async function login(data: LoginDto) {
   try {
-    const res: LoginResponse = await api.post('/auth/login', data);
+    const res: LoginResponse = await api.post(`${PUBLIC_API}/auth/login`, data);
     if (res.token && res.role) {
       Cookies.set('access_token', res.token, { expires: res.expiredTime / (1000 * 60 * 60 * 24), sameSite: 'lax' });
       Cookies.set('role', res.role, { expires: res.expiredTime / (1000 * 60 * 60 * 24), sameSite: 'lax' });
@@ -49,7 +49,6 @@ export async function login(data: LoginDto) {
     const mockUser = authenticateMockUser(data.username, data.password);
     if (mockUser) {
       const mockToken = `mock-token-${mockUser.role.toLowerCase()}-${Date.now()}`;
-      const oneDayExpiry = 24 * 60 * 60 * 1000;
       Cookies.set('access_token', mockToken, { expires: 1, sameSite: 'lax' });
       Cookies.set('role', mockUser.role, { expires: 1, sameSite: 'lax' });
       Cookies.set('username', mockUser.username, { expires: 1, sameSite: 'lax' });
@@ -73,4 +72,4 @@ export async function logout(): Promise<void> {
   Cookies.remove('username');
   Cookies.remove('user_id');
   window.location.href = '/login';
-}
+}
