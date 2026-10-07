@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Role } from "./interfaces/role";
+import { ALL_ROLES, Role } from "./interfaces/role";
 
-const ROLE_PERMISSIONS: Record<string, string[]> = {
-    '/profile': [Role.ADMIN, Role.PHOTOGRAPHER, Role.RUNNER, Role.ORGANIZER, Role.STAFF, Role.COORDINATOR],
+const ROLE_PERMISSIONS: Record<string, (Role | string)[] | '*'> = {
+    '/profile': ALL_ROLES,
     '/event-admin': [Role.ADMIN, Role.COORDINATOR],
     '/staff-admin': [Role.ADMIN, Role.COORDINATOR],
     '/scan-qr': [Role.COORDINATOR, Role.STAFF],
-    '/register-event': [Role.RUNNER]
+    '/register-event': [Role.RUNNER],
 };
 
 const authRoutes = ['/login', '/register', '/forgot-password'];
@@ -16,15 +16,15 @@ export function proxy(request: NextRequest) {
     const token = request.cookies.get('access_token')?.value;
     const role = request.cookies.get('role')?.value;
 
-    const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route));
+    const isAuthRoute = authRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
 
-    // Đã có token mà vào trang login/register -> đá sang dashboard
+    // Đã có token mà vào trang login/register -> đá sang home
     if (isAuthRoute && token) {
         return NextResponse.redirect(new URL('/', request.url));
     }
 
     const matchedRoute = Object.keys(ROLE_PERMISSIONS).find((route) =>
-        pathname.startsWith(route)
+        pathname === route || pathname.startsWith(`${route}/`)
     );
 
     if (matchedRoute) {
@@ -37,7 +37,8 @@ export function proxy(request: NextRequest) {
 
         // 2.2. Đã đăng nhập nhưng Role không nằm trong danh sách cho phép
         const allowedRoles = ROLE_PERMISSIONS[matchedRoute];
-        if (!role || !allowedRoles.includes(role)) {
+        const isAllowed = allowedRoles === '*' || (!!role && allowedRoles.includes(role));
+        if (!isAllowed) {
             // Đá sang trang báo lỗi 403 Forbidden hoặc về trang chủ của role đó
             return NextResponse.redirect(new URL('/403', request.url));
         }
