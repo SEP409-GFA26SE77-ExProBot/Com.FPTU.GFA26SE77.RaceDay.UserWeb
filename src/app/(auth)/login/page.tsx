@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { login } from "@/api/auth";
@@ -8,7 +8,7 @@ import { Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
 import { getApiErrorMessage } from "@/lib/error";
 import { LoginDto } from "@/dto/auth.dto";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fromPath = searchParams.get("from") || "/";
@@ -23,6 +23,11 @@ export default function LoginPage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    setError(null);
+  };
+
+  const handleQuickLogin = (username: string, pass: string) => {
+    setForm({ username, password: pass });
     setError(null);
   };
 
@@ -156,3 +161,5 @@ export default function LoginPage() {
     </div>
   );
 }
+
+
