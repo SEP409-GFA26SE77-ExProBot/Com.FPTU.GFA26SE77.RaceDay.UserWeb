@@ -30,32 +30,14 @@ interface NavLink {
 }
 
 const NAV_LINKS: NavLink[] = [
-  { label: "Home", href: "/" },
-  { label: "Events", href: "/events", icon: Calendar },
-  { label: "Results", href: "/results", icon: Trophy },
+  { label: "Trang chủ", href: "/" },
+  { label: "Sự kiện", href: "/events", icon: Calendar },
+  { label: "Kết quả", href: "/results", icon: Trophy },
   {
-    label: "Register Race",
+    label: "Đăng ký sự kiện",
     href: "/register-event",
-    roles: [Role.RUNNER],
-  },
-  {
-    label: "Scan QR",
-    href: "/scan-qr",
-    icon: QrCode,
-    roles: [Role.COORDINATOR, Role.STAFF, Role.ADMIN],
-  },
-  {
-    label: "Event Admin",
-    href: "/event-admin",
-    icon: LayoutDashboard,
-    roles: [Role.ADMIN, Role.COORDINATOR],
-  },
-  {
-    label: "Staff Admin",
-    href: "/staff-admin",
-    icon: ShieldCheck,
-    roles: [Role.ADMIN, Role.COORDINATOR],
-  },
+    // roles: [Role.RUNNER],
+  }
 ];
 
 let cachedAuthRaw = "";
@@ -241,13 +223,13 @@ export default function Header() {
               {userMenuOpen && (
                 <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-xl border border-border bg-card p-1.5 shadow-xl ring-1 ring-black/5 animate-in fade-in-0 zoom-in-95">
                   <div className="px-3 py-2 border-b border-border/60">
-                    <p className="text-xs text-muted-foreground">Signed in as</p>
+                    <p className="text-xs text-muted-foreground">Đã đăng nhập với</p>
                     <p className="text-sm font-semibold text-foreground truncate">
                       {username}
                     </p>
                     {role && (
                       <p className="mt-0.5 text-[11px] font-medium text-muted-foreground uppercase">
-                        Role: {role}
+                        Vai trò: {role}
                       </p>
                     )}
                   </div>
@@ -259,7 +241,7 @@ export default function Header() {
                       onClick={closeMenus}
                     >
                       <User className="h-4 w-4 text-muted-foreground" />
-                      My Profile
+                      Hồ sơ của tôi
                     </Link>
 
                     {role === Role.RUNNER && (
@@ -269,7 +251,7 @@ export default function Header() {
                         onClick={closeMenus}
                       >
                         <Flag className="h-4 w-4 text-muted-foreground" />
-                        Join a Race
+                        Tham gia giải chạy
                       </Link>
                     )}
 
@@ -280,7 +262,7 @@ export default function Header() {
                         onClick={closeMenus}
                       >
                         <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
-                        Event Dashboard
+                        Bảng điều khiển sự kiện
                       </Link>
                     )}
 
@@ -291,7 +273,7 @@ export default function Header() {
                         onClick={closeMenus}
                       >
                         <QrCode className="h-4 w-4 text-muted-foreground" />
-                        Scan Check-in QR
+                        Quét QR Check-in
                       </Link>
                     )}
                   </div>
@@ -306,7 +288,7 @@ export default function Header() {
                       className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
                     >
                       <LogOut className="h-4 w-4" />
-                      Sign Out
+                      Đăng xuất
                     </button>
                   </div>
                 </div>
@@ -319,14 +301,14 @@ export default function Header() {
                 onClick={closeMenus}
                 className="rounded-full px-4 py-1.5 text-sm font-medium text-foreground/80 transition-colors hover:text-foreground hover:bg-muted/70"
               >
-                Sign In
+                Đăng nhập
               </Link>
               <Link
                 href="/register"
                 onClick={closeMenus}
                 className="group relative inline-flex items-center justify-center overflow-hidden rounded-full bg-gradient-to-r from-orange-500 to-red-600 px-4 py-1.5 text-sm font-semibold text-white shadow-md shadow-orange-500/20 transition-all duration-200 hover:shadow-orange-500/35 hover:scale-[1.02] active:scale-[0.98]"
               >
-                Get Started
+                Đăng ký ngay
               </Link>
             </div>
           )}
@@ -344,7 +326,7 @@ export default function Header() {
             onClick={() => setMobileMenuOpen((prev) => !prev)}
             className="inline-flex items-center justify-center rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-orange-500"
             aria-expanded={mobileMenuOpen}
-            aria-label="Toggle navigation menu"
+            aria-label="Mở danh mục điều hướng"
           >
             {mobileMenuOpen ? (
               <X className="h-6 w-6" />
@@ -368,7 +350,7 @@ export default function Header() {
                   <p className="text-sm font-semibold text-foreground">
                     {username}
                   </p>
-                  <p className="text-xs text-muted-foreground">Logged in</p>
+                  <p className="text-xs text-muted-foreground">Đã đăng nhập</p>
                 </div>
               </div>
               {role && (
@@ -419,7 +401,7 @@ export default function Header() {
                 }`}
               >
                 <User className="h-4 w-4" />
-                My Profile
+                Hồ sơ của tôi
               </Link>
             )}
           </nav>
@@ -435,7 +417,7 @@ export default function Header() {
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-destructive/10 px-4 py-2.5 text-sm font-semibold text-destructive hover:bg-destructive/20 transition-colors"
               >
                 <LogOut className="h-4 w-4" />
-                Sign Out
+                Đăng xuất
               </button>
             ) : (
               <div className="flex flex-col gap-2">
@@ -444,14 +426,14 @@ export default function Header() {
                   onClick={closeMenus}
                   className="flex w-full items-center justify-center rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-muted transition-colors"
                 >
-                  Sign In
+                  Đăng nhập
                 </Link>
                 <Link
                   href="/register"
                   onClick={closeMenus}
                   className="flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-orange-500 to-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-orange-500/25 transition-transform hover:scale-[1.01]"
                 >
-                  Get Started
+                  Đăng ký ngay
                 </Link>
               </div>
             )}
@@ -460,4 +442,4 @@ export default function Header() {
       )}
     </header>
   );
-}
+}

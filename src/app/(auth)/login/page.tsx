@@ -4,16 +4,19 @@ import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { login } from "@/api/auth";
-import { MOCK_USERS } from "@/data/mock-users";
-import { Eye, EyeOff, Loader2, Flag, AlertCircle, Sparkles } from "lucide-react";
-import type { AxiosError } from "axios";
+import { Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
+import { getApiErrorMessage } from "@/lib/error";
+import { LoginDto } from "@/dto/auth.dto";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fromPath = searchParams.get("from") || "/";
 
-  const [form, setForm] = useState({ username: "", password: "" });
+  const [form, setForm] = useState<{ username: string; password: string }>({
+    username: "",
+    password: "",
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,21 +34,21 @@ function LoginForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.username.trim() || !form.password.trim()) {
-      setError("Please fill in all fields.");
+      setError("Vui lòng điền đầy đủ tên đăng nhập và mật khẩu.");
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      await login({ username: form.username, password: form.password });
+      await login({ username: form.username.trim(), password: form.password });
       router.push(fromPath);
     } catch (err) {
-      const axiosErr = err as AxiosError<{ message?: string }>;
-      const msg =
-        (err as Error).message ||
-        axiosErr.response?.data?.message ||
-        "Invalid username or password. Please try again.";
-      setError(msg);
+      setError(
+        getApiErrorMessage(
+          err,
+          "Tên đăng nhập/email hoặc mật khẩu không chính xác."
+        )
+      );
     } finally {
       setLoading(false);
     }
@@ -55,17 +58,17 @@ function LoginForm() {
     <div className="auth-card">
       {/* Card header */}
       <div className="auth-card-header">
-        <h1 className="auth-title">Welcome back</h1>
-        <p className="auth-subtitle">Sign in to your RaceDay account</p>
+        <h1 className="auth-title">Chào mừng trở lại</h1>
+        <p className="auth-subtitle">Đăng nhập vào tài khoản RaceDay của bạn</p>
       </div>
 
       {/* Tabs */}
       <div className="auth-tabs">
         <Link href="/login" className="auth-tab auth-tab--active" id="tab-login">
-          Sign In
+          Đăng nhập
         </Link>
         <Link href="/register" className="auth-tab" id="tab-register">
-          Register
+          Đăng ký
         </Link>
       </div>
 
@@ -79,17 +82,17 @@ function LoginForm() {
           </div>
         )}
 
-        {/* Username */}
+        {/* Username / Email */}
         <div className="auth-field">
           <label htmlFor="login-username" className="auth-label">
-            Username
+            Tên đăng nhập
           </label>
           <input
             id="login-username"
             name="username"
             type="text"
             autoComplete="username"
-            placeholder="Enter your username"
+            placeholder="Nhập tên đăng nhập"
             value={form.username}
             onChange={handleChange}
             className="auth-input"
@@ -101,11 +104,8 @@ function LoginForm() {
         <div className="auth-field">
           <div className="auth-label-row">
             <label htmlFor="login-password" className="auth-label">
-              Password
+              Mật khẩu
             </label>
-            <Link href="/forgot-password" className="auth-forgot">
-              Forgot password?
-            </Link>
           </div>
           <div className="auth-input-wrapper">
             <input
@@ -113,7 +113,7 @@ function LoginForm() {
               name="password"
               type={showPassword ? "text" : "password"}
               autoComplete="current-password"
-              placeholder="Enter your password"
+              placeholder="Nhập mật khẩu của bạn"
               value={form.password}
               onChange={handleChange}
               className="auth-input auth-input--with-icon"
@@ -123,12 +123,15 @@ function LoginForm() {
               type="button"
               className="auth-eye-btn"
               onClick={() => setShowPassword((v) => !v)}
-              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
               tabIndex={-1}
             >
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </div>
+          <Link href="/forgot-password" className="auth-forgot">
+            Quên mật khẩu?
+          </Link>
         </div>
 
         {/* Submit */}
@@ -141,74 +144,20 @@ function LoginForm() {
           {loading ? (
             <>
               <Loader2 size={18} className="auth-spinner" />
-              Signing in…
+              Đang đăng nhập…
             </>
           ) : (
-            "Sign In"
+            "Đăng nhập"
           )}
         </button>
       </form>
 
-      {/* Demo Accounts Section */}
-      <div className="auth-demo-section">
-        <div className="auth-demo-header">
-          <Sparkles size={14} className="text-orange-400" />
-          <span>Quick Demo Accounts</span>
-        </div>
-        <div className="auth-demo-grid">
-          {MOCK_USERS.map((user) => (
-            <button
-              key={user.username}
-              type="button"
-              onClick={() => handleQuickLogin(user.username, user.password)}
-              className="auth-demo-chip"
-              title={`Fill credentials for ${user.fullName} (${user.role})`}
-            >
-              <span className="auth-demo-role">{user.role}</span>
-              <span className="auth-demo-user">{user.username}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
       <p className="auth-switch">
-        Don&apos;t have an account?{" "}
+        Chưa có tài khoản?{" "}
         <Link href="/register" className="auth-switch-link">
-          Register now
+          Đăng ký ngay
         </Link>
       </p>
-    </div>
-  );
-}
-
-export default function LoginPage() {
-  return (
-    <div className="auth-page">
-      {/* Background */}
-      <div className="auth-bg" />
-      <div className="auth-overlay" />
-
-      {/* Animated particles */}
-      <div className="auth-particles" aria-hidden="true">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <span key={i} className={`particle particle-${i + 1}`} />
-        ))}
-      </div>
-
-      {/* Content */}
-      <div className="auth-content">
-        {/* Brand */}
-        <div className="auth-brand">
-          <div className="auth-brand-icon">
-            <Flag size={28} />
-          </div>
-          <span className="auth-brand-name">RaceDay</span>
-        </div>
-
-        <Suspense fallback={<div className="auth-card p-8 text-center text-muted-foreground">Loading...</div>}>
-          <LoginForm />
-        </Suspense>
-      </div>
     </div>
   );
 }

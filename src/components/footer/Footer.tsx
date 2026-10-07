@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Flag, Globe, Heart, MessageCircle, Mail, Phone, MapPin } from "lucide-react";
+import { Flag, Globe, Heart, MessageCircle, Mail, MapPin } from "lucide-react";
 
 export default function Footer() {
   return (
@@ -18,8 +18,8 @@ export default function Footer() {
               </span>
             </Link>
             <p className="text-sm text-muted-foreground leading-relaxed max-w-xs">
-              Your premier platform for discovering and registering for running events across Vietnam.
-              From marathons to trail runs — find your next race.
+              Nền tảng hàng đầu để khám phá và đăng ký các sự kiện chạy bộ trên khắp Việt Nam.
+              Từ Marathon đến chạy địa hình — tìm giải chạy tiếp theo của bạn.
             </p>
             {/* Social links */}
             <div className="flex items-center gap-3 pt-2">
@@ -42,14 +42,14 @@ export default function Footer() {
           {/* Quick links */}
           <div>
             <h4 className="text-sm font-bold text-foreground uppercase tracking-wider mb-4">
-              Explore
+              Khám phá
             </h4>
             <ul className="space-y-2.5">
               {[
-                { label: "All Events", href: "/events" },
-                { label: "Trail Runs", href: "/events?tag=trail" },
-                { label: "Marathons", href: "/events?tag=marathon" },
-                { label: "Results", href: "/results" },
+                { label: "Tất cả sự kiện", href: "/events" },
+                { label: "Chạy địa hình (Trail)", href: "/events?tag=trail" },
+                { label: "Marathon", href: "/events?tag=marathon" },
+                { label: "Kết quả thi đấu", href: "/results" },
               ].map((link) => (
                 <li key={link.href}>
                   <Link
@@ -66,14 +66,14 @@ export default function Footer() {
           {/* Support */}
           <div>
             <h4 className="text-sm font-bold text-foreground uppercase tracking-wider mb-4">
-              Support
+              Hỗ trợ
             </h4>
             <ul className="space-y-2.5">
               {[
-                { label: "FAQ", href: "#" },
-                { label: "Contact Us", href: "#" },
-                { label: "Privacy Policy", href: "#" },
-                { label: "Terms of Service", href: "#" },
+                { label: "Câu hỏi thường gặp (FAQ)", href: "#" },
+                { label: "Liên hệ chúng tôi", href: "#" },
+                { label: "Chính sách bảo mật", href: "#" },
+                { label: "Điều khoản dịch vụ", href: "#" },
               ].map((link) => (
                 <li key={link.label}>
                   <Link
@@ -90,20 +90,16 @@ export default function Footer() {
           {/* Contact */}
           <div>
             <h4 className="text-sm font-bold text-foreground uppercase tracking-wider mb-4">
-              Contact
+              Liên hệ
             </h4>
             <ul className="space-y-3">
               <li className="flex items-start gap-2.5 text-sm text-muted-foreground">
                 <MapPin className="h-4 w-4 text-orange-500 mt-0.5 shrink-0" />
-                <span>FPT University, Lot E2a-7, D1 Road, Long Thanh My, Thu Duc City, HCMC</span>
+                <span>Đại học FPT, Lô E2a-7, Đường D1, Long Thạnh Mỹ, TP. Thủ Đức, TP.HCM</span>
               </li>
               <li className="flex items-center gap-2.5 text-sm text-muted-foreground">
                 <Mail className="h-4 w-4 text-orange-500 shrink-0" />
                 <span>support@raceday.vn</span>
-              </li>
-              <li className="flex items-center gap-2.5 text-sm text-muted-foreground">
-                <Phone className="h-4 w-4 text-orange-500 shrink-0" />
-                <span>+84 28 7300 1866</span>
               </li>
             </ul>
           </div>
@@ -112,18 +108,7 @@ export default function Footer() {
         {/* Bottom bar */}
         <div className="border-t border-border/60 py-6 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs text-muted-foreground">
-            © {new Date().getFullYear()} RaceDay. Built with ❤️ for runners in Vietnam.
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Inspired by{" "}
-            <a
-              href="https://irace.vn"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-orange-600 hover:underline font-medium"
-            >
-              iRace.vn
-            </a>
+            © {new Date().getFullYear()} RaceDay. Được phát triển với ❤️ dành cho cộng đồng chạy bộ Việt Nam.
           </p>
         </div>
       </div>
