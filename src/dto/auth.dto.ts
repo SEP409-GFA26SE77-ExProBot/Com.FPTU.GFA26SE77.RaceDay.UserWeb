@@ -52,4 +52,25 @@ export const ResendOtpSchema = z.object({
   email: z.string().email("Địa chỉ email không hợp lệ"),
 });
 
-export type ResendOtpDto = z.infer<typeof ResendOtpSchema>;
+export type ResendOtpDto = z.infer<typeof ResendOtpSchema>;
+
+export const ForgotPasswordSchema = z.object({
+  email: z.string().email("Địa chỉ email không hợp lệ"),
+});
+
+export type ForgotPasswordDto = z.infer<typeof ForgotPasswordSchema>;
+
+export const ResetPasswordSchema = z.object({
+  email: z.string().email("Địa chỉ email không hợp lệ"),
+  otp: z.string().length(6, "Mã OTP phải có đúng 6 chữ số"),
+  newPassword: z.string().min(8, "Mật khẩu mới phải có ít nhất 8 ký tự"),
+});
+
+export type ResetPasswordDto = z.infer<typeof ResetPasswordSchema>;
+
+export const ChangePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Vui lòng nhập mật khẩu hiện tại"),
+  newPassword: z.string().min(8, "Mật khẩu mới phải có ít nhất 8 ký tự"),
+});
+
+export type ChangePasswordDto = z.infer<typeof ChangePasswordSchema>;

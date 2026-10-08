@@ -1,7 +1,9 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import {
   Calendar,
   MapPin,
@@ -11,27 +13,70 @@ import {
   ChevronRight,
   Clock,
   Trophy,
+  Loader2,
 } from "lucide-react";
+import { RaceEventDto } from "@/dto/event.dto";
+import { getEventById } from "@/api/events";
 import {
-  getEventById,
   formatPrice,
   formatDate,
   getStatusLabel,
   getStatusColor,
-} from "@/data/mock-events";
+} from "@/lib/format";
+
+const DEFAULT_GRADIENT =
+  "linear-gradient(135deg, #f97316 0%, #ea580c 40%, #dc2626 100%)";
 
 export default function EventDetailPage() {
   const params = useParams();
-  const eventId = Number(params.id);
-  const event = getEventById(eventId);
+  const eventId = params.id as string;
 
-  if (!event) {
+  const [event, setEvent] = useState<RaceEventDto | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!eventId) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    getEventById(eventId)
+      .then((data) => {
+        if (!cancelled) setEvent(data);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(
+            err?.response?.data?.error || "Không thể tải thông tin giải."
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [eventId]);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 text-orange-500 animate-spin" />
+        <p className="mt-3 text-sm text-muted-foreground">Loading event…</p>
+      </div>
+    );
+  }
+
+  if (error || !event) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
         <div className="text-6xl mb-4">🏃</div>
         <h1 className="text-2xl font-bold text-foreground mb-2">Event Not Found</h1>
         <p className="text-muted-foreground mb-6">
-          The event you&apos;re looking for doesn&apos;t exist or has been removed.
+          {error || "The event you're looking for doesn't exist or has been removed."}
         </p>
         <Link
           href="/events"
@@ -44,25 +89,34 @@ export default function EventDetailPage() {
     );
   }
 
-  const progressPercent = Math.round(
-    (event.registeredCount / event.maxParticipants) * 100
+  const distances = event.distances || [];
+  const totalCapacity = distances.reduce((s, d) => s + d.capacity, 0);
+  const totalRegistered = distances.reduce(
+    (s, d) => s + (d.registeredCount ?? 0),
+    0
   );
+  const progressPercent = totalCapacity
+    ? Math.round((totalRegistered / totalCapacity) * 100)
+    : 0;
+
   const canRegister = event.status === "registration-open";
 
   return (
     <div>
       {/* Hero Banner */}
       <div className="relative h-64 sm:h-80 lg:h-96 overflow-hidden">
-        <div
-          className="absolute inset-0"
-          style={{ background: event.bannerGradient }}
-        />
+        {event.bannerImage ? (
+          <Image
+            src={event.bannerImage}
+            alt={event.name}
+            fill
+            className="object-cover"
+            priority
+          />
+        ) : (
+          <div className="absolute inset-0" style={{ background: DEFAULT_GRADIENT }} />
+        )}
         <div className="absolute inset-0 bg-black/30" />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-[120px] sm:text-[160px] opacity-20 select-none">
-            {event.bannerEmoji}
-          </span>
-        </div>
 
         {/* Breadcrumb */}
         <div className="absolute top-4 left-4 sm:top-6 sm:left-8">
@@ -90,8 +144,11 @@ export default function EventDetailPage() {
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-4 sm:px-8 pb-6 pt-16">
           <div className="mx-auto max-w-7xl">
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight">
-              {event.title}
+              {event.name}
             </h1>
+            {event.tagline && (
+              <p className="mt-1 text-sm text-white/70">{event.tagline}</p>
+            )}
             <div className="mt-2 flex flex-wrap items-center gap-3 text-white/80">
               <span className="inline-flex items-center gap-1 text-sm">
                 <Calendar className="h-3.5 w-3.5" />
@@ -116,89 +173,90 @@ export default function EventDetailPage() {
             <section>
               <h2 className="text-xl font-bold text-foreground mb-3">About This Event</h2>
               <p className="text-muted-foreground leading-relaxed">{event.description}</p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {event.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full bg-orange-500/10 text-orange-700 px-3 py-1 text-xs font-semibold"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
             </section>
 
             {/* Distances table */}
-            <section>
-              <h2 className="text-xl font-bold text-foreground mb-4">
-                Race Categories & Pricing
-              </h2>
-              <div className="rounded-xl border border-border overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-muted/50">
-                        <th className="text-left px-4 py-3 font-semibold text-foreground">
-                          Category
-                        </th>
-                        <th className="text-center px-4 py-3 font-semibold text-foreground">
-                          Distance
-                        </th>
-                        <th className="text-center px-4 py-3 font-semibold text-foreground">
-                          Price
-                        </th>
-                        <th className="text-center px-4 py-3 font-semibold text-foreground">
-                          Slots
-                        </th>
-                        <th className="text-center px-4 py-3 font-semibold text-foreground">
-                          Status
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {event.distances.map((d) => {
-                        const slotsLeft = d.maxSlots - d.registeredSlots;
-                        const soldOut = slotsLeft <= 0;
-                        return (
-                          <tr
-                            key={d.id}
-                            className="hover:bg-muted/30 transition-colors"
-                          >
-                            <td className="px-4 py-3 font-medium text-foreground">
-                              {d.label}
-                            </td>
-                            <td className="px-4 py-3 text-center text-muted-foreground">
-                              {d.km} km
-                            </td>
-                            <td className="px-4 py-3 text-center font-bold text-orange-600">
-                              {formatPrice(d.price)}
-                            </td>
-                            <td className="px-4 py-3 text-center text-muted-foreground">
-                              {d.registeredSlots}/{d.maxSlots}
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              {soldOut ? (
-                                <span className="rounded-full bg-red-500/10 text-red-600 px-2.5 py-0.5 text-xs font-semibold">
-                                  Sold Out
-                                </span>
-                              ) : slotsLeft < 20 ? (
-                                <span className="rounded-full bg-amber-500/10 text-amber-600 px-2.5 py-0.5 text-xs font-semibold">
-                                  {slotsLeft} left
-                                </span>
-                              ) : (
-                                <span className="rounded-full bg-emerald-500/10 text-emerald-600 px-2.5 py-0.5 text-xs font-semibold">
-                                  Available
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+            {distances.length > 0 && (
+              <section>
+                <h2 className="text-xl font-bold text-foreground mb-4">
+                  Race Categories & Pricing
+                </h2>
+                <div className="rounded-xl border border-border overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-muted/50">
+                          <th className="text-left px-4 py-3 font-semibold text-foreground">
+                            Category
+                          </th>
+                          <th className="text-center px-4 py-3 font-semibold text-foreground">
+                            Distance
+                          </th>
+                          <th className="text-center px-4 py-3 font-semibold text-foreground">
+                            Price
+                          </th>
+                          <th className="text-center px-4 py-3 font-semibold text-foreground">
+                            Slots
+                          </th>
+                          <th className="text-center px-4 py-3 font-semibold text-foreground">
+                            Status
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {distances.map((d) => {
+                          const registered = d.registeredCount ?? 0;
+                          const slotsLeft = d.capacity - registered;
+                          const soldOut = slotsLeft <= 0;
+                          return (
+                            <tr
+                              key={d.id}
+                              className="hover:bg-muted/30 transition-colors"
+                            >
+                              <td className="px-4 py-3 font-medium text-foreground">
+                                <div className="flex items-center gap-2">
+                                  {d.color && (
+                                    <span
+                                      className="inline-block h-3 w-3 rounded-full"
+                                      style={{ background: d.color }}
+                                    />
+                                  )}
+                                  {d.name || d.type}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-center text-muted-foreground">
+                                {d.distanceKm} km
+                              </td>
+                              <td className="px-4 py-3 text-center font-bold text-orange-600">
+                                {formatPrice(d.price)}
+                              </td>
+                              <td className="px-4 py-3 text-center text-muted-foreground">
+                                {registered}/{d.capacity}
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                {soldOut ? (
+                                  <span className="rounded-full bg-red-500/10 text-red-600 px-2.5 py-0.5 text-xs font-semibold">
+                                    Sold Out
+                                  </span>
+                                ) : slotsLeft < 20 ? (
+                                  <span className="rounded-full bg-amber-500/10 text-amber-600 px-2.5 py-0.5 text-xs font-semibold">
+                                    {slotsLeft} left
+                                  </span>
+                                ) : (
+                                  <span className="rounded-full bg-emerald-500/10 text-emerald-600 px-2.5 py-0.5 text-xs font-semibold">
+                                    Available
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-            </section>
+              </section>
+            )}
 
             {/* Event Info */}
             <section>
@@ -218,22 +276,24 @@ export default function EventDetailPage() {
                   {
                     icon: Building2,
                     label: "Organizer",
-                    value: event.organizer,
+                    value: event.organizer?.name || "—",
                   },
                   {
                     icon: Clock,
                     label: "Start Time",
-                    value: "5:00 AM (varies by category)",
+                    value: event.startTime || "TBA",
                   },
                   {
                     icon: Trophy,
                     label: "Awards",
-                    value: "Medals for all finishers",
+                    value: (event.rewards as Record<string, unknown>)?.finisherMedal
+                      ? "Medals for all finishers"
+                      : "See event details",
                   },
                   {
                     icon: Users,
                     label: "Capacity",
-                    value: `${event.maxParticipants.toLocaleString()} runners`,
+                    value: `${(event.totalRunners ?? totalCapacity).toLocaleString()} runners`,
                   },
                 ].map((item) => (
                   <div
@@ -267,7 +327,9 @@ export default function EventDetailPage() {
                     Starting from
                   </p>
                   <p className="text-3xl font-extrabold text-orange-600 mt-1">
-                    {formatPrice(Math.min(...event.distances.map((d) => d.price)))}
+                    {distances.length > 0
+                      ? formatPrice(Math.min(...distances.map((d) => d.price)))
+                      : "—"}
                   </p>
                 </div>
 
@@ -276,7 +338,7 @@ export default function EventDetailPage() {
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Users className="h-3 w-3" />
-                      {event.registeredCount.toLocaleString()} registered
+                      {totalRegistered.toLocaleString()} registered
                     </span>
                     <span>{progressPercent}% full</span>
                   </div>
@@ -307,11 +369,11 @@ export default function EventDetailPage() {
                     disabled
                     className="flex w-full items-center justify-center gap-2 rounded-xl bg-muted py-3 text-sm font-bold text-muted-foreground cursor-not-allowed"
                   >
-                    {event.status === "sold-out"
-                      ? "Sold Out"
-                      : event.status === "upcoming"
+                    {event.status === "approved"
                       ? "Registration Opens Soon"
-                      : "Registration Closed"}
+                      : event.status === "closed" || event.status === "completed"
+                      ? "Registration Closed"
+                      : "Registration Unavailable"}
                   </button>
                 )}
 
@@ -321,19 +383,31 @@ export default function EventDetailPage() {
               </div>
 
               {/* Organizer card */}
-              <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-red-500 text-white font-bold text-sm">
-                    {event.organizer.charAt(0)}
+              {event.organizer && (
+                <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-red-500 text-white font-bold text-sm">
+                      {event.organizer.name.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Organized by</p>
+                      <p className="text-sm font-semibold text-foreground">
+                        {event.organizer.name}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Organized by</p>
-                    <p className="text-sm font-semibold text-foreground">
-                      {event.organizer}
+                  {event.organizer.email && (
+                    <p className="text-xs text-muted-foreground">
+                      📧 {event.organizer.email}
                     </p>
-                  </div>
+                  )}
+                  {event.organizer.phone && (
+                    <p className="text-xs text-muted-foreground">
+                      📞 {event.organizer.phone}
+                    </p>
+                  )}
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

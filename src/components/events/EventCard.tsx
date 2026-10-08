@@ -1,29 +1,44 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import {
   Calendar,
   MapPin,
   Users,
   TrendingUp,
 } from "lucide-react";
+import { RaceEventListItemDto } from "@/dto/event.dto";
 import {
-  type RaceEvent,
   formatPrice,
   formatDate,
   getStatusLabel,
   getStatusColor,
-} from "@/data/mock-events";
+} from "@/lib/format";
 
 interface EventCardProps {
-  event: RaceEvent;
+  event: RaceEventListItemDto;
 }
 
+/** Default gradient when bannerImage is missing */
+const DEFAULT_GRADIENT =
+  "linear-gradient(135deg, #f97316 0%, #ea580c 40%, #dc2626 100%)";
+
 export default function EventCard({ event }: EventCardProps) {
-  const lowestPrice = Math.min(...event.distances.map((d) => d.price));
-  const progressPercent = Math.round(
-    (event.registeredCount / event.maxParticipants) * 100
+  const distances = event.distances || [];
+  const lowestPrice = distances.length
+    ? Math.min(...distances.map((d) => d.price))
+    : 0;
+
+  // Compute registered / capacity from distances
+  const totalCapacity = distances.reduce((s, d) => s + d.capacity, 0);
+  const totalRegistered = distances.reduce(
+    (s, d) => s + (d.registeredCount ?? 0),
+    0
   );
+  const progressPercent = totalCapacity
+    ? Math.round((totalRegistered / totalCapacity) * 100)
+    : 0;
 
   return (
     <Link
@@ -32,18 +47,21 @@ export default function EventCard({ event }: EventCardProps) {
     >
       {/* Banner */}
       <div className="relative h-48 overflow-hidden">
-        <div
-          className="absolute inset-0 transition-transform duration-500 group-hover:scale-110"
-          style={{ background: event.bannerGradient }}
-        />
+        {event.bannerImage ? (
+          <Image
+            src={event.bannerImage}
+            alt={event.name}
+            fill
+            className="object-cover transition-transform duration-500 group-hover:scale-110"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          />
+        ) : (
+          <div
+            className="absolute inset-0 transition-transform duration-500 group-hover:scale-110"
+            style={{ background: DEFAULT_GRADIENT }}
+          />
+        )}
         <div className="absolute inset-0 bg-black/20" />
-
-        {/* Emoji overlay */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-6xl opacity-40 transition-all duration-500 group-hover:scale-125 group-hover:opacity-60 select-none">
-            {event.bannerEmoji}
-          </span>
-        </div>
 
         {/* Status badge */}
         <div className="absolute top-3 left-3">
@@ -58,12 +76,12 @@ export default function EventCard({ event }: EventCardProps) {
 
         {/* Distance badges */}
         <div className="absolute bottom-3 left-3 right-3 flex flex-wrap gap-1.5">
-          {event.distances.map((d) => (
+          {distances.map((d) => (
             <span
               key={d.id}
               className="inline-flex items-center rounded-md bg-white/90 backdrop-blur-sm px-2 py-0.5 text-xs font-bold text-gray-800 shadow-sm"
             >
-              {d.km}K
+              {d.distanceKm}K
             </span>
           ))}
         </div>
@@ -73,7 +91,7 @@ export default function EventCard({ event }: EventCardProps) {
       <div className="p-4 space-y-3">
         {/* Title */}
         <h3 className="text-base font-bold text-foreground leading-snug line-clamp-2 group-hover:text-orange-600 transition-colors duration-200">
-          {event.title}
+          {event.name}
         </h3>
 
         {/* Date & Location */}
@@ -94,8 +112,8 @@ export default function EventCard({ event }: EventCardProps) {
             <div className="flex items-center gap-1 text-muted-foreground">
               <Users className="h-3 w-3" />
               <span>
-                {event.registeredCount.toLocaleString()} /{" "}
-                {event.maxParticipants.toLocaleString()}
+                {totalRegistered.toLocaleString()} /{" "}
+                {(event.totalRunners ?? totalCapacity).toLocaleString()}
               </span>
             </div>
             <span className="font-semibold text-foreground/80">
@@ -118,7 +136,7 @@ export default function EventCard({ event }: EventCardProps) {
           </div>
         </div>
 
-        {/* Price & Tags */}
+        {/* Price & Organizer */}
         <div className="flex items-center justify-between pt-1">
           <div className="flex items-center gap-1">
             <TrendingUp className="h-3.5 w-3.5 text-orange-500" />
@@ -127,16 +145,11 @@ export default function EventCard({ event }: EventCardProps) {
             </span>
             <span className="text-xs text-muted-foreground">~</span>
           </div>
-          <div className="flex gap-1">
-            {event.tags.slice(0, 2).map((tag) => (
-              <span
-                key={tag}
-                className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
+          {event.organizer?.name && (
+            <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground truncate max-w-[120px]">
+              {event.organizer.name}
+            </span>
+          )}
         </div>
       </div>
     </Link>

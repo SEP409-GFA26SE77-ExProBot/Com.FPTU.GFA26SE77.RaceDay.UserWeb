@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -12,11 +13,40 @@ import {
   Users,
   TrendingUp,
   ChevronRight,
+  Sparkles,
 } from "lucide-react";
-import { getFeaturedEvents, formatPrice, formatDate, getStatusLabel, getStatusColor } from "@/data/mock-events";
+import { getEvents } from "@/api/events";
+import { RaceEventListItemDto } from "@/dto/event.dto";
+import EventCard from "@/components/events/EventCard";
+import EventCardSkeleton from "@/components/events/EventCardSkeleton";
 
 export default function Home() {
-  const featuredEvents = getFeaturedEvents();
+  const [featuredEvents, setFeaturedEvents] = useState<RaceEventListItemDto[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadEvents() {
+      try {
+        const events = await getEvents();
+        if (isMounted) {
+          // Prioritize open events or first 4
+          const openEvents = events.filter(
+            (e) => e.status?.toLowerCase() === "registration-open" || e.status?.toLowerCase() === "published"
+          );
+          setFeaturedEvents(openEvents.length >= 4 ? openEvents.slice(0, 4) : events.slice(0, 4));
+        }
+      } catch {
+        if (isMounted) setFeaturedEvents([]);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+    loadEvents();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <div className="flex flex-col">
@@ -36,7 +66,7 @@ export default function Home() {
               style={{
                 width: `${20 + i * 15}px`,
                 height: `${20 + i * 15}px`,
-                background: `radial-gradient(circle, ${i % 2 === 0 ? '#f97316' : '#ef4444'}, transparent)`,
+                background: `radial-gradient(circle, ${i % 2 === 0 ? "#f97316" : "#ef4444"}, transparent)`,
                 top: `${15 + i * 14}%`,
                 left: `${10 + i * 16}%`,
                 animation: `float ${3 + i}s ease-in-out infinite alternate`,
@@ -52,21 +82,20 @@ export default function Home() {
             <div className="inline-flex items-center gap-2 rounded-full border border-orange-500/30 bg-orange-500/10 px-4 py-1.5 mb-6">
               <span className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
               <span className="text-xs font-semibold text-orange-400 uppercase tracking-wider">
-                24+ Events Open for Registration
+                Nền tảng giải chạy marathon hàng đầu Việt Nam
               </span>
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.1]">
-              Your Next Race{" "}
+              Hành Trình Chinh Phục{" "}
               <span className="bg-gradient-to-r from-orange-400 via-orange-500 to-red-500 bg-clip-text text-transparent">
-                Starts Here
+                Đường Đua Mới
               </span>
             </h1>
 
             <p className="mt-5 text-lg sm:text-xl text-gray-400 leading-relaxed max-w-2xl">
-              Discover and register for the best running events across Vietnam. 
-              From city marathons to mountain trails — find your perfect race and 
-              cross that finish line.
+              Khám phá và đăng ký các giải chạy marathon, trail đỉnh cao khắp Việt Nam. 
+              Thủ tục check-in thông minh qua mã QR, quản lý số BIB và thanh toán PayOS tức thì.
             </p>
 
             {/* CTA buttons */}
@@ -75,23 +104,23 @@ export default function Home() {
                 href="/events"
                 className="group inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-orange-500 to-red-600 px-7 py-3.5 text-sm font-bold text-white shadow-xl shadow-orange-500/25 transition-all duration-300 hover:shadow-orange-500/40 hover:scale-[1.03] active:scale-[0.98]"
               >
-                Browse Events
+                Khám phá giải chạy
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Link>
               <Link
                 href="#how-it-works"
                 className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-6 py-3.5 text-sm font-semibold text-white/80 backdrop-blur-sm transition-all hover:bg-white/10 hover:text-white hover:border-white/25"
               >
-                How It Works
+                Quy trình tham gia
               </Link>
             </div>
 
             {/* Stats mini row */}
             <div className="mt-12 flex flex-wrap gap-8 sm:gap-12">
               {[
-                { value: "24+", label: "Events", icon: Flag },
-                { value: "15K+", label: "Runners", icon: Users },
-                { value: "12", label: "Cities", icon: MapPin },
+                { value: "50+", label: "Giải chạy toàn quốc", icon: Flag },
+                { value: "20K+", label: "Vận động viên", icon: Users },
+                { value: "100%", label: "Tự động hóa PayOS", icon: Trophy },
               ].map((stat) => (
                 <div key={stat.label} className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/5 border border-white/10">
@@ -114,111 +143,45 @@ export default function Home() {
           <div className="flex items-end justify-between mb-10">
             <div>
               <p className="text-xs font-bold text-orange-500 uppercase tracking-widest mb-2">
-                Featured
+                Nổi bật
               </p>
               <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
-                Hot Events 🔥
+                Giải Chạy Đang Mở Đăng Ký 🔥
               </h2>
               <p className="mt-2 text-muted-foreground max-w-lg">
-                Registration is open — secure your spot before it&apos;s too late.
+                Đăng ký sớm để chọn cự ly yêu thích và nhận race kit đặc quyền.
               </p>
             </div>
             <Link
               href="/events"
               className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted transition-colors"
             >
-              View All
+              Xem tất cả
               <ChevronRight className="h-4 w-4" />
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {featuredEvents.map((event) => {
-              const lowestPrice = Math.min(...event.distances.map((d) => d.price));
-              const progressPercent = Math.round(
-                (event.registeredCount / event.maxParticipants) * 100
-              );
-
-              return (
-                <Link
-                  key={event.id}
-                  href={`/events/${event.id}`}
-                  className="group block rounded-2xl border border-border/60 bg-card overflow-hidden shadow-sm transition-all duration-300 hover:shadow-xl hover:shadow-orange-500/8 hover:-translate-y-1.5 hover:border-orange-500/30"
-                >
-                  {/* Banner */}
-                  <div className="relative h-40 overflow-hidden">
-                    <div
-                      className="absolute inset-0 transition-transform duration-500 group-hover:scale-110"
-                      style={{ background: event.bannerGradient }}
-                    />
-                    <div className="absolute inset-0 bg-black/20" />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-5xl opacity-40 group-hover:scale-125 transition-all duration-500 select-none">
-                        {event.bannerEmoji}
-                      </span>
-                    </div>
-                    <div className="absolute top-2.5 left-2.5">
-                      <span
-                        className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold backdrop-blur-md ${getStatusColor(event.status)}`}
-                      >
-                        {getStatusLabel(event.status)}
-                      </span>
-                    </div>
-                    <div className="absolute bottom-2.5 left-2.5 flex gap-1">
-                      {event.distances.slice(0, 3).map((d) => (
-                        <span
-                          key={d.id}
-                          className="rounded bg-white/85 backdrop-blur-sm px-1.5 py-0.5 text-[10px] font-bold text-gray-800"
-                        >
-                          {d.km}K
-                        </span>
-                      ))}
-                      {event.distances.length > 3 && (
-                        <span className="rounded bg-white/85 backdrop-blur-sm px-1.5 py-0.5 text-[10px] font-bold text-gray-800">
-                          +{event.distances.length - 3}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Content */}
-                  <div className="p-3.5 space-y-2.5">
-                    <h3 className="text-sm font-bold text-foreground leading-snug line-clamp-2 group-hover:text-orange-600 transition-colors">
-                      {event.title}
-                    </h3>
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Calendar className="h-3 w-3 text-orange-500" />
-                      <span>{formatDate(event.date)}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <MapPin className="h-3 w-3 text-orange-500" />
-                      <span className="truncate">{event.city}</span>
-                    </div>
-                    {/* Progress bar */}
-                    <div className="space-y-1">
-                      <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
-                        <div
-                          className="h-full rounded-full"
-                          style={{
-                            width: `${progressPercent}%`,
-                            background: progressPercent >= 80
-                              ? "linear-gradient(90deg, #ef4444, #dc2626)"
-                              : "linear-gradient(90deg, #f97316, #ea580c)",
-                          }}
-                        />
-                      </div>
-                      <div className="flex justify-between text-[10px] text-muted-foreground">
-                        <span>{progressPercent}% full</span>
-                        <span className="font-bold text-orange-600">
-                          {formatPrice(lowestPrice)}~
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+              {[...Array(4)].map((_, i) => (
+                <EventCardSkeleton key={i} />
+              ))}
+            </div>
+          ) : featuredEvents.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border p-12 text-center">
+              <Sparkles className="h-10 w-10 text-orange-500 mx-auto mb-3" />
+              <h3 className="text-lg font-bold text-foreground">Chưa có giải chạy nổi bật</h3>
+              <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
+                Hiện tại chưa có sự kiện nào. Hãy quay lại sau để cập nhật các giải chạy mới nhất.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+              {featuredEvents.map((event) => (
+                <EventCard key={event.id} event={event} />
+              ))}
+            </div>
+          )}
 
           {/* Mobile "View All" link */}
           <div className="mt-8 flex justify-center sm:hidden">
@@ -226,7 +189,7 @@ export default function Home() {
               href="/events"
               className="inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-orange-600 transition-colors"
             >
-              View All Events
+              Xem tất cả giải chạy
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -238,13 +201,13 @@ export default function Home() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-14">
             <p className="text-xs font-bold text-orange-500 uppercase tracking-widest mb-2">
-              Simple Process
+              Quy trình tham gia
             </p>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
-              How It Works
+              3 Bước Dễ Dàng Để Sẵn Sàng Chạy
             </h2>
             <p className="mt-3 text-muted-foreground max-w-md mx-auto">
-              Get from browsing to race day in just three simple steps.
+              Từ lúc đăng ký đến ngày thi đấu chỉ với vài cú nhấp chuột.
             </p>
           </div>
 
@@ -253,27 +216,27 @@ export default function Home() {
               {
                 step: 1,
                 icon: Search,
-                title: "Browse Events",
+                title: "Tìm kiếm giải chạy",
                 description:
-                  "Explore our curated collection of running events across Vietnam. Filter by distance, location, or date to find your perfect race.",
+                  "Chọn cự ly yêu thích (5K, 10K, 21K, 42K) và địa điểm thi đấu phù hợp từ danh sách giải chạy trên toàn quốc.",
                 color: "from-blue-500 to-cyan-500",
                 shadow: "shadow-blue-500/20",
               },
               {
                 step: 2,
                 icon: CreditCard,
-                title: "Register & Pay",
+                title: "Đăng ký & Thanh toán PayOS",
                 description:
-                  "Fill in your details, select your race category, and complete payment securely. Your spot is confirmed instantly.",
+                  "Điền thông tin VĐV, cỡ áo thi đấu và quét mã VietQR PayOS an toàn, kích hoạt ngay lập tức.",
                 color: "from-orange-500 to-red-500",
                 shadow: "shadow-orange-500/20",
               },
               {
                 step: 3,
                 icon: Trophy,
-                title: "Race Day!",
+                title: "Nhận BIB & Tỏa sáng",
                 description:
-                  "Show your QR code at check-in, collect your bib and race kit, and conquer the finish line. You've got this!",
+                  "Nhận mã QR vé điện tử, quét check-in nhận race kit và tự tin chinh phục vạch đích vào ngày thi đấu.",
                 color: "from-emerald-500 to-teal-500",
                 shadow: "shadow-emerald-500/20",
               },
@@ -310,19 +273,19 @@ export default function Home() {
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-14">
             <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Trusted by Runners Nationwide
+              Đồng Hành Cùng Cộng Đồng Runner
             </h2>
             <p className="mt-3 text-gray-400 max-w-md mx-auto">
-              Join thousands of runners who have discovered their passion through RaceDay.
+              Hàng ngàn chân chạy phong trào và chuyên nghiệp tin tưởng lựa chọn RaceDay.
             </p>
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { value: "24+", label: "Running Events", icon: Flag, suffix: "" },
-              { value: "15,000", label: "Registered Runners", icon: Users, suffix: "+" },
-              { value: "12", label: "Cities Covered", icon: MapPin, suffix: "" },
-              { value: "98", label: "Satisfaction Rate", icon: TrendingUp, suffix: "%" },
+              { value: "50+", label: "Giải chạy chất lượng", icon: Flag, suffix: "" },
+              { value: "20,000", label: "VĐV đăng ký", icon: Users, suffix: "+" },
+              { value: "25", label: "Tỉnh thành", icon: MapPin, suffix: "" },
+              { value: "99.8", label: "Giao dịch thành công", icon: TrendingUp, suffix: "%" },
             ].map(({ value, label, icon: Icon, suffix }) => (
               <div
                 key={label}
@@ -349,25 +312,24 @@ export default function Home() {
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.15),transparent_50%)]" />
             <div className="relative">
               <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight">
-                Ready to Lace Up?
+                Sẵn Sàng Thắt Dây Giày & Chinh Phục?
               </h2>
               <p className="mt-4 text-orange-100/80 max-w-xl mx-auto text-lg">
-                Don&apos;t wait — your next personal best is just a registration away. 
-                Find your race and start training today.
+                Đừng trì hoãn mục tiêu của bạn. Hãy ghi danh ngay hôm nay và bắt đầu hành trình phá vỡ kỷ lục cá nhân.
               </p>
               <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
                 <Link
                   href="/events"
                   className="inline-flex items-center gap-2 rounded-full bg-white px-7 py-3.5 text-sm font-bold text-orange-600 shadow-lg transition-all hover:shadow-xl hover:scale-[1.03] active:scale-[0.98]"
                 >
-                  Find Your Race
+                  Tìm giải chạy ngay
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link
                   href="/register"
                   className="inline-flex items-center gap-2 rounded-full border-2 border-white/30 px-7 py-3.5 text-sm font-bold text-white transition-all hover:bg-white/10 hover:border-white/50"
                 >
-                  Create Account
+                  Tạo tài khoản Runner
                 </Link>
               </div>
             </div>

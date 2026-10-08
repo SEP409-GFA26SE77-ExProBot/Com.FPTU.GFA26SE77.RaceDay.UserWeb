@@ -1,7 +1,14 @@
 import api from "@/config/axios";
-import { LoginDto, LoginResponse, RegisterDto, VerifyEmailDto } from "@/dto/auth.dto";
+import {
+  LoginDto,
+  LoginResponse,
+  RegisterDto,
+  VerifyEmailDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+  ChangePasswordDto,
+} from "@/dto/auth.dto";
 import Cookies from 'js-cookie';
-import { MOCK_ACCOUNTS } from "@/data/mock-users";
 
 const PUBLIC_API = 'api/v1/iam'
 
@@ -24,7 +31,25 @@ export async function login(data: LoginDto): Promise<LoginResponse> {
   };
   const res: LoginResponse = await api.post(`${PUBLIC_API}/auth/login`, loginPayload);
   const token = res.accessToken || res.token;
-  const role = res.role;
+  let role = res.role;
+  if (!role && token) {
+    try {
+      const parts = token.split('.');
+      if (parts.length >= 2) {
+        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+        const extracted =
+          payload.role ||
+          payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] ||
+          payload.roles?.[0] ||
+          (Array.isArray(payload.role) ? payload.role[0] : undefined);
+        if (typeof extracted === 'string') {
+          role = extracted.replace(/^ROLE_/i, '').trim().toUpperCase();
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
   const username = res.username || loginPayload.username;
   const userId = res.userId || res.user_id;
 
@@ -48,6 +73,17 @@ export async function resendVerificationOtp(email: string) {
   return res;
 }
 
+export async function forgotPassword(data: ForgotPasswordDto): Promise<void> {
+  await api.post(`${PUBLIC_API}/auth/forgot-password`, data);
+}
+
+export async function resetPassword(data: ResetPasswordDto): Promise<void> {
+  await api.post(`${PUBLIC_API}/auth/reset-password`, data);
+}
+
+export async function changePassword(data: ChangePasswordDto): Promise<void> {
+  await api.post(`${PUBLIC_API}/auth/change-password`, data);
+}
 
 export async function logout(): Promise<void> {
   Cookies.remove('access_token');

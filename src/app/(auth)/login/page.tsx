@@ -162,4 +162,17 @@ function LoginForm() {
   );
 }
 
-
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="auth-card flex items-center justify-center p-12 text-slate-400">
+          <Loader2 className="animate-spin text-orange-500 mr-2" size={24} />
+          <span>Đang tải trang đăng nhập…</span>
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
+  );
+}
