@@ -36,7 +36,6 @@ const NAV_LINKS: NavLink[] = [
   {
     label: "Đăng ký sự kiện",
     href: "/register-event",
-    // roles: [Role.RUNNER],
   }
 ];
 
@@ -50,14 +49,15 @@ let cachedAuthState = {
 function getAuthSnapshot() {
   const token = Cookies.get("access_token") || "";
   const username = Cookies.get("username") || "Racer";
-  const role = Cookies.get("role") || "";
+  const rawRole = Cookies.get("role") || "";
+  const role = rawRole ? rawRole.toUpperCase() : "";
   const raw = `${token}:${username}:${role}`;
   if (raw !== cachedAuthRaw) {
     cachedAuthRaw = raw;
     cachedAuthState = {
       isLoggedIn: Boolean(token),
       username: token ? username : null,
-      role: token ? role : null,
+      role: token && role ? role : null,
     };
   }
   return cachedAuthState;

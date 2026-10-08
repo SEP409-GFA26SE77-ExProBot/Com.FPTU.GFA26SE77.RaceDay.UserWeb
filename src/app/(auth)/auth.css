@@ -11,7 +11,7 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  font-family: var(--font-geist-sans, 'Inter', 'Helvetica Neue', Arial, sans-serif);
+  font-family: var(--font-inter, 'Inter', system-ui, -apple-system, sans-serif);
   padding: 2rem 1rem;
 }
 

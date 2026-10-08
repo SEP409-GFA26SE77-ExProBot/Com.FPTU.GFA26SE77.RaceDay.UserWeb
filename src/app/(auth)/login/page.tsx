@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { login } from "@/api/auth";
@@ -8,7 +8,7 @@ import { Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
 import { getApiErrorMessage } from "@/lib/error";
 import { LoginDto } from "@/dto/auth.dto";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fromPath = searchParams.get("from") || "/";
@@ -154,5 +154,20 @@ export default function LoginPage() {
         </Link>
       </p>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="auth-card flex items-center justify-center p-12 text-slate-400">
+          <Loader2 className="animate-spin text-orange-500 mr-2" size={24} />
+          <span>Đang tải trang đăng nhập…</span>
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

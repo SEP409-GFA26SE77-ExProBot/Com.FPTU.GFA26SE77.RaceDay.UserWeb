@@ -1,90 +1,65 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { type RaceEvent, getEventsByPage } from "@/data/mock-events";
+import { useState, useEffect } from "react";
+import { RaceEventListItemDto } from "@/dto/event.dto";
+import { getEvents } from "@/api/events";
 import EventCard from "@/components/events/EventCard";
 import EventCardSkeleton from "@/components/events/EventCardSkeleton";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 
-const PAGE_SIZE = 6;
-
 export default function EventsClient() {
-  const [events, setEvents] = useState<RaceEvent[]>([]);
-  const [page, setPage] = useState(1);
+  const [events, setEvents] = useState<RaceEventListItemDto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [hasMore, setHasMore] = useState(true);
-  const [totalCount, setTotalCount] = useState(0);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<string>("all");
-
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  const isLoadingRef = useRef(false);
 
   const filters = [
     { key: "all", label: "All Events" },
     { key: "registration-open", label: "Open" },
-    { key: "upcoming", label: "Coming Soon" },
-    { key: "trail", label: "Trail" },
-    { key: "road", label: "Road" },
-    { key: "night-run", label: "Night Run" },
+    { key: "approved", label: "Approved" },
+    { key: "pending", label: "Pending" },
   ];
 
-  const loadEvents = useCallback(
-    async (pageNum: number, reset: boolean = false) => {
-      if (isLoadingRef.current) return;
-      isLoadingRef.current = true;
-      setLoading(true);
-
-      try {
-        const result = await getEventsByPage(pageNum, PAGE_SIZE);
-        setEvents((prev) => (reset ? result.events : [...prev, ...result.events]));
-        setHasMore(result.hasMore);
-        setTotalCount(result.totalCount);
-        setPage(pageNum);
-      } finally {
-        setLoading(false);
-        isLoadingRef.current = false;
-      }
-    },
-    []
-  );
-
-  // Initial load
   useEffect(() => {
-    loadEvents(1, true);
-  }, [loadEvents]);
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
 
-  // IntersectionObserver for infinite scroll
-  useEffect(() => {
-    const sentinel = sentinelRef.current;
-    if (!sentinel) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0];
-        if (entry.isIntersecting && hasMore && !isLoadingRef.current) {
-          loadEvents(page + 1);
+    getEvents()
+      .then((data) => {
+        if (!cancelled) {
+          // API may return array or object with items — normalize
+          const list = Array.isArray(data) ? data : [];
+          setEvents(list);
         }
-      },
-      { rootMargin: "200px" }
-    );
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(
+            err?.response?.data?.error ||
+              "Không thể tải danh sách sự kiện. Vui lòng thử lại."
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [hasMore, page, loadEvents]);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Filter events client-side
   const filteredEvents = events.filter((event) => {
     const matchesSearch =
       searchQuery === "" ||
-      event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      event.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      event.city.toLowerCase().includes(searchQuery.toLowerCase());
+      event.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      event.location.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesFilter =
-      activeFilter === "all" ||
-      event.status === activeFilter ||
-      event.tags.some((t) => t.toLowerCase().replace(/\s+/g, "-") === activeFilter);
+      activeFilter === "all" || event.status === activeFilter;
 
     return matchesSearch && matchesFilter;
   });
@@ -144,9 +119,22 @@ export default function EventsClient() {
 
         {/* Results count */}
         <p className="text-xs text-muted-foreground">
-          Showing {filteredEvents.length} of {totalCount} events
+          Showing {filteredEvents.length} of {events.length} events
         </p>
       </div>
+
+      {/* Error state */}
+      {error && (
+        <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-6 text-center mb-8">
+          <p className="text-sm text-red-600 font-medium">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-3 rounded-full bg-orange-500 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-600 transition-colors"
+          >
+            Thử lại
+          </button>
+        </div>
+      )}
 
       {/* Events grid */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -156,13 +144,13 @@ export default function EventsClient() {
 
         {/* Skeleton loading cards */}
         {loading &&
-          Array.from({ length: PAGE_SIZE }).map((_, i) => (
+          Array.from({ length: 6 }).map((_, i) => (
             <EventCardSkeleton key={`skeleton-${i}`} />
           ))}
       </div>
 
       {/* Empty state */}
-      {!loading && filteredEvents.length === 0 && (
+      {!loading && filteredEvents.length === 0 && !error && (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted mb-4">
             <Search className="h-8 w-8 text-muted-foreground" />
@@ -182,20 +170,6 @@ export default function EventsClient() {
           >
             Clear Filters
           </button>
-        </div>
-      )}
-
-      {/* Scroll sentinel for infinite scroll */}
-      {hasMore && <div ref={sentinelRef} className="h-4" />}
-
-      {/* End of list */}
-      {!hasMore && filteredEvents.length > 0 && (
-        <div className="flex items-center justify-center py-10">
-          <div className="flex items-center gap-3 text-muted-foreground">
-            <div className="h-px w-12 bg-border" />
-            <span className="text-sm font-medium">You&apos;ve seen all events</span>
-            <div className="h-px w-12 bg-border" />
-          </div>
         </div>
       )}
     </div>

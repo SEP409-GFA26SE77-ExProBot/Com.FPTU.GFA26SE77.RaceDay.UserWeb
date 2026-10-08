@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -12,8 +12,13 @@ import {
   Shirt,
   HeartPulse,
   ChevronRight,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
-import { getEventById, formatPrice } from "@/data/mock-events";
+import { RaceEventDto, EventDistanceDto } from "@/dto/event.dto";
+import { getEventById, createRegistration } from "@/api/events";
+import { formatPrice, formatDate } from "@/lib/format";
+import { getApiErrorMessage } from "@/lib/error";
 
 interface FormData {
   fullName: string;
@@ -21,17 +26,27 @@ interface FormData {
   phone: string;
   gender: string;
   dateOfBirth: string;
-  tshirtSize: string;
-  emergencyContact: string;
+  idNumber: string;
+  heightCm: string;
+  weightKg: string;
+  bloodType: string;
+  shirtSize: string;
+  emergencyName: string;
   emergencyPhone: string;
-  selectedDistanceId: number | null;
+  selectedDistanceId: string | null;
+  liabilityAccepted: boolean;
 }
 
 export default function RegisterPage() {
   const params = useParams();
   const router = useRouter();
-  const eventId = Number(params.id);
-  const event = getEventById(eventId);
+  const eventId = params.id as string;
+
+  const [event, setEvent] = useState<RaceEventDto | null>(null);
+  const [pageLoading, setPageLoading] = useState(true);
+  const [pageError, setPageError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<FormData>({
     fullName: "",
@@ -39,19 +54,57 @@ export default function RegisterPage() {
     phone: "",
     gender: "",
     dateOfBirth: "",
-    tshirtSize: "",
-    emergencyContact: "",
+    idNumber: "",
+    heightCm: "",
+    weightKg: "",
+    bloodType: "",
+    shirtSize: "",
+    emergencyName: "",
     emergencyPhone: "",
     selectedDistanceId: null,
+    liabilityAccepted: false,
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
 
-  if (!event) {
+  // Fetch event
+  useEffect(() => {
+    if (!eventId) return;
+    let cancelled = false;
+    setPageLoading(true);
+
+    getEventById(eventId)
+      .then((data) => {
+        if (!cancelled) setEvent(data);
+      })
+      .catch((err) => {
+        if (!cancelled)
+          setPageError(err?.response?.data?.error || "Không thể tải thông tin giải.");
+      })
+      .finally(() => {
+        if (!cancelled) setPageLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [eventId]);
+
+  if (pageLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 text-orange-500 animate-spin" />
+        <p className="mt-3 text-sm text-muted-foreground">Loading…</p>
+      </div>
+    );
+  }
+
+  if (pageError || !event) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
         <div className="text-6xl mb-4">🏃</div>
         <h1 className="text-2xl font-bold text-foreground mb-2">Event Not Found</h1>
+        <p className="text-muted-foreground mb-6">{pageError}</p>
         <Link
           href="/events"
           className="inline-flex items-center gap-2 rounded-full bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-600 transition-colors"
@@ -63,7 +116,8 @@ export default function RegisterPage() {
     );
   }
 
-  const selectedDistance = event.distances.find(
+  const distances = event.distances || [];
+  const selectedDistance: EventDistanceDto | undefined = distances.find(
     (d) => d.id === formData.selectedDistanceId
   );
 
@@ -77,34 +131,68 @@ export default function RegisterPage() {
     if (!formData.phone.trim()) newErrors.phone = "Phone number is required";
     if (!formData.gender) newErrors.gender = "Please select your gender";
     if (!formData.dateOfBirth) newErrors.dateOfBirth = "Date of birth is required";
-    if (!formData.tshirtSize) newErrors.tshirtSize = "Please select T-shirt size";
-    if (!formData.emergencyContact.trim())
-      newErrors.emergencyContact = "Emergency contact is required";
+    if (!formData.emergencyName.trim())
+      newErrors.emergencyName = "Emergency contact is required";
     if (!formData.emergencyPhone.trim())
       newErrors.emergencyPhone = "Emergency phone is required";
     if (!formData.selectedDistanceId)
       newErrors.selectedDistanceId = "Please select a race category";
+    if (!formData.liabilityAccepted)
+      newErrors.liabilityAccepted = "You must accept the liability terms";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validate()) return;
+    if (!validate() || !formData.selectedDistanceId) return;
 
-    // Store registration data for payment page
-    const regData = {
-      ...formData,
-      eventId: event.id,
-      eventTitle: event.title,
-      distance: selectedDistance,
-    };
-    sessionStorage.setItem("registration_data", JSON.stringify(regData));
-    router.push(`/events/${event.id}/payment`);
+    setSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const registration = await createRegistration(eventId, {
+        distanceId: formData.selectedDistanceId,
+        fullName: formData.fullName.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        dateOfBirth: formData.dateOfBirth,
+        gender: formData.gender,
+        idNumber: formData.idNumber.trim() || undefined,
+        heightCm: formData.heightCm ? Number(formData.heightCm) : undefined,
+        weightKg: formData.weightKg ? Number(formData.weightKg) : undefined,
+        bloodType: formData.bloodType || undefined,
+        emergencyName: formData.emergencyName.trim(),
+        emergencyPhone: formData.emergencyPhone.trim(),
+        shirtSize: formData.shirtSize || undefined,
+        medicalCodes: ["none"],
+        liabilityAccepted: true,
+      });
+
+      // Store registration data for payment page, then navigate
+      sessionStorage.setItem(
+        "registration_data",
+        JSON.stringify({
+          registrationId: registration.id,
+          eventId: event.id,
+          eventTitle: event.name,
+          distance: selectedDistance,
+          fullName: formData.fullName.trim(),
+          email: formData.email.trim(),
+        })
+      );
+      router.push(`/events/${event.id}/payment?regId=${registration.id}`);
+    } catch (err) {
+      setSubmitError(
+        getApiErrorMessage(err, "Đăng ký thất bại. Vui lòng thử lại.")
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const updateField = (field: keyof FormData, value: string | number | null) => {
+  const updateField = (field: keyof FormData, value: string | boolean | null) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors((prev) => {
@@ -113,6 +201,7 @@ export default function RegisterPage() {
         return next;
       });
     }
+    setSubmitError(null);
   };
 
   const inputClass = (field: keyof FormData) =>
@@ -131,7 +220,7 @@ export default function RegisterPage() {
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
-          Back to {event.title}
+          Back to {event.name}
         </Link>
       </div>
 
@@ -140,13 +229,21 @@ export default function RegisterPage() {
         <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
           Register for Race
         </h1>
-        <p className="mt-1 text-muted-foreground">{event.title}</p>
+        <p className="mt-1 text-muted-foreground">{event.name}</p>
       </div>
 
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Form fields */}
           <div className="lg:col-span-2 space-y-6">
+            {/* API error */}
+            {submitError && (
+              <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+                <p className="text-sm text-red-600">{submitError}</p>
+              </div>
+            )}
+
             {/* Distance selection */}
             <section className="rounded-2xl border border-border bg-card p-6 space-y-4">
               <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
@@ -161,8 +258,9 @@ export default function RegisterPage() {
                 </p>
               )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {event.distances.map((d) => {
-                  const soldOut = d.registeredSlots >= d.maxSlots;
+                {distances.map((d) => {
+                  const registered = d.registeredCount ?? 0;
+                  const soldOut = registered >= d.capacity;
                   const isSelected = formData.selectedDistanceId === d.id;
                   return (
                     <button
@@ -195,9 +293,11 @@ export default function RegisterPage() {
                           </svg>
                         </div>
                       )}
-                      <p className="text-sm font-bold text-foreground">{d.label}</p>
+                      <p className="text-sm font-bold text-foreground">
+                        {d.name || d.type}
+                      </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {d.km} km • {d.maxSlots - d.registeredSlots} slots left
+                        {d.distanceKm} km • {d.capacity - registered} slots left
                       </p>
                       <p className="text-lg font-extrabold text-orange-600 mt-2">
                         {formatPrice(d.price)}
@@ -235,6 +335,7 @@ export default function RegisterPage() {
                     value={formData.fullName}
                     onChange={(e) => updateField("fullName", e.target.value)}
                     className={inputClass("fullName")}
+                    disabled={submitting}
                   />
                   {errors.fullName && (
                     <p className="mt-1 text-xs text-red-500">{errors.fullName}</p>
@@ -253,6 +354,7 @@ export default function RegisterPage() {
                     value={formData.email}
                     onChange={(e) => updateField("email", e.target.value)}
                     className={inputClass("email")}
+                    disabled={submitting}
                   />
                   {errors.email && (
                     <p className="mt-1 text-xs text-red-500">{errors.email}</p>
@@ -271,6 +373,7 @@ export default function RegisterPage() {
                     value={formData.phone}
                     onChange={(e) => updateField("phone", e.target.value)}
                     className={inputClass("phone")}
+                    disabled={submitting}
                   />
                   {errors.phone && (
                     <p className="mt-1 text-xs text-red-500">{errors.phone}</p>
@@ -286,11 +389,12 @@ export default function RegisterPage() {
                     value={formData.gender}
                     onChange={(e) => updateField("gender", e.target.value)}
                     className={inputClass("gender")}
+                    disabled={submitting}
                   >
                     <option value="">Select gender</option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Unknown">Other</option>
                   </select>
                   {errors.gender && (
                     <p className="mt-1 text-xs text-red-500">{errors.gender}</p>
@@ -308,22 +412,39 @@ export default function RegisterPage() {
                     value={formData.dateOfBirth}
                     onChange={(e) => updateField("dateOfBirth", e.target.value)}
                     className={inputClass("dateOfBirth")}
+                    disabled={submitting}
                   />
                   {errors.dateOfBirth && (
                     <p className="mt-1 text-xs text-red-500">{errors.dateOfBirth}</p>
                   )}
                 </div>
 
+                {/* ID Number */}
+                <div>
+                  <label className="block text-xs font-semibold text-foreground mb-1.5">
+                    ID / Passport Number
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="079098001234"
+                    value={formData.idNumber}
+                    onChange={(e) => updateField("idNumber", e.target.value)}
+                    className={inputClass("idNumber")}
+                    disabled={submitting}
+                  />
+                </div>
+
                 {/* T-shirt Size */}
                 <div>
                   <label className="block text-xs font-semibold text-foreground mb-1.5">
                     <Shirt className="inline h-3.5 w-3.5 mr-1 text-orange-500" />
-                    T-shirt Size *
+                    T-shirt Size
                   </label>
                   <select
-                    value={formData.tshirtSize}
-                    onChange={(e) => updateField("tshirtSize", e.target.value)}
-                    className={inputClass("tshirtSize")}
+                    value={formData.shirtSize}
+                    onChange={(e) => updateField("shirtSize", e.target.value)}
+                    className={inputClass("shirtSize")}
+                    disabled={submitting}
                   >
                     <option value="">Select size</option>
                     <option value="XS">XS</option>
@@ -333,9 +454,6 @@ export default function RegisterPage() {
                     <option value="XL">XL</option>
                     <option value="XXL">XXL</option>
                   </select>
-                  {errors.tshirtSize && (
-                    <p className="mt-1 text-xs text-red-500">{errors.tshirtSize}</p>
-                  )}
                 </div>
               </div>
             </section>
@@ -358,15 +476,14 @@ export default function RegisterPage() {
                   <input
                     type="text"
                     placeholder="Emergency contact name"
-                    value={formData.emergencyContact}
-                    onChange={(e) =>
-                      updateField("emergencyContact", e.target.value)
-                    }
-                    className={inputClass("emergencyContact")}
+                    value={formData.emergencyName}
+                    onChange={(e) => updateField("emergencyName", e.target.value)}
+                    className={inputClass("emergencyName")}
+                    disabled={submitting}
                   />
-                  {errors.emergencyContact && (
+                  {errors.emergencyName && (
                     <p className="mt-1 text-xs text-red-500">
-                      {errors.emergencyContact}
+                      {errors.emergencyName}
                     </p>
                   )}
                 </div>
@@ -380,10 +497,9 @@ export default function RegisterPage() {
                     type="tel"
                     placeholder="0912 345 678"
                     value={formData.emergencyPhone}
-                    onChange={(e) =>
-                      updateField("emergencyPhone", e.target.value)
-                    }
+                    onChange={(e) => updateField("emergencyPhone", e.target.value)}
                     className={inputClass("emergencyPhone")}
+                    disabled={submitting}
                   />
                   {errors.emergencyPhone && (
                     <p className="mt-1 text-xs text-red-500">
@@ -392,6 +508,32 @@ export default function RegisterPage() {
                   )}
                 </div>
               </div>
+            </section>
+
+            {/* Liability */}
+            <section className="rounded-2xl border border-border bg-card p-6 space-y-4">
+              <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-500 text-white text-xs font-bold">
+                  4
+                </span>
+                Terms & Conditions
+              </h2>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.liabilityAccepted}
+                  onChange={(e) => updateField("liabilityAccepted", e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-border text-orange-500 focus:ring-orange-500"
+                  disabled={submitting}
+                />
+                <span className="text-sm text-muted-foreground">
+                  I accept the liability terms, acknowledge the risks associated with
+                  running events, and confirm that I am physically fit to participate. *
+                </span>
+              </label>
+              {errors.liabilityAccepted && (
+                <p className="text-xs text-red-500">{errors.liabilityAccepted}</p>
+              )}
             </section>
           </div>
 
@@ -407,17 +549,13 @@ export default function RegisterPage() {
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Event</span>
                     <span className="font-medium text-foreground text-right max-w-[160px] truncate">
-                      {event.title}
+                      {event.name}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Date</span>
                     <span className="font-medium text-foreground">
-                      {new Date(event.date).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
+                      {formatDate(event.date)}
                     </span>
                   </div>
                   {selectedDistance && (
@@ -426,13 +564,13 @@ export default function RegisterPage() {
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Category</span>
                         <span className="font-medium text-foreground">
-                          {selectedDistance.label}
+                          {selectedDistance.name || selectedDistance.type}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Distance</span>
                         <span className="font-medium text-foreground">
-                          {selectedDistance.km} km
+                          {selectedDistance.distanceKm} km
                         </span>
                       </div>
                       <div className="h-px bg-border my-2" />
@@ -449,10 +587,19 @@ export default function RegisterPage() {
                 <button
                   type="submit"
                   className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-red-600 py-3 text-sm font-bold text-white shadow-lg shadow-orange-500/25 transition-all hover:shadow-orange-500/40 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                  disabled={!selectedDistance}
+                  disabled={!selectedDistance || submitting}
                 >
-                  Proceed to Payment
-                  <ChevronRight className="h-4 w-4" />
+                  {submitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Đang đăng ký…
+                    </>
+                  ) : (
+                    <>
+                      Proceed to Payment
+                      <ChevronRight className="h-4 w-4" />
+                    </>
+                  )}
                 </button>
               </div>
             </div>
