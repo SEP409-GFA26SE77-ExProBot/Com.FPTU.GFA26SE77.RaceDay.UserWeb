@@ -26,6 +26,11 @@ function LoginForm() {
     setError(null);
   };
 
+  const handleQuickLogin = (username: string, pass: string) => {
+    setForm({ username, password: pass });
+    setError(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.username.trim() || !form.password.trim()) {
