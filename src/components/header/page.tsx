@@ -188,21 +188,6 @@ export default function Header() {
     return true;
   });
 
-  const getRoleBadgeColor = (userRole: string | null) => {
-    switch (userRole) {
-      case Role.ADMIN:
-        return "bg-rose-500/10 text-rose-600 border-rose-500/20";
-      case Role.COORDINATOR:
-        return "bg-purple-500/10 text-purple-600 border-purple-500/20";
-      case Role.STAFF:
-        return "bg-blue-500/10 text-blue-600 border-blue-500/20";
-      case Role.RUNNER:
-        return "bg-orange-500/10 text-orange-600 border-orange-500/20";
-      default:
-        return "bg-slate-500/10 text-slate-600 border-slate-500/20";
-    }
-  };
-
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/85 backdrop-blur-md transition-all">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -270,15 +255,6 @@ export default function Header() {
                     {username}
                   </span>
                 </div>
-                {role && (
-                  <span
-                    className={`rounded-md border px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase ${getRoleBadgeColor(
-                      role
-                    )}`}
-                  >
-                    {role}
-                  </span>
-                )}
                 <ChevronDown
                   className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
                     userMenuOpen ? "rotate-180" : ""
@@ -294,11 +270,6 @@ export default function Header() {
                     <p className="text-sm font-semibold text-foreground truncate">
                       {username}
                     </p>
-                    {role && (
-                      <p className="mt-0.5 text-[11px] font-medium text-muted-foreground uppercase">
-                        Vai trò: {role}
-                      </p>
-                    )}
                   </div>
 
                   <div className="py-1">
@@ -346,12 +317,12 @@ export default function Header() {
                           Khiếu nại
                         </Link>
                         <Link
-                          href="/events"
+                          href="/registered-events"
                           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
                           onClick={closeMenus}
                         >
                           <Flag className="h-4 w-4 text-muted-foreground" />
-                          Tham gia giải chạy
+                          Giải đã đăng ký
                         </Link>
                       </>
                     )}
@@ -467,15 +438,6 @@ export default function Header() {
                   <p className="text-xs text-muted-foreground">Đã đăng nhập</p>
                 </div>
               </div>
-              {role && (
-                <span
-                  className={`rounded-md border px-2 py-0.5 text-xs font-semibold uppercase ${getRoleBadgeColor(
-                    role
-                  )}`}
-                >
-                  {role}
-                </span>
-              )}
             </div>
           )}
 

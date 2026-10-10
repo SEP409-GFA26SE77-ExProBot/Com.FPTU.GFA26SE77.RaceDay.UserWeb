@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Cookies from "js-cookie";
 import { logout } from "@/api/auth";
@@ -10,23 +10,21 @@ import { mapAppRole } from "@/lib/role";
 import { Role } from "@/interfaces/role";
 import {
   AlertTriangle,
+  ArrowLeft,
   Award,
-  Camera,
   ChevronDown,
   ClipboardCheck,
-  ClipboardList,
   CreditCard,
   Flag,
   LayoutDashboard,
+  Map,
   LogOut,
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
   QrCode,
   Ticket,
-  Trophy,
   User,
-  Users,
   X,
 } from "lucide-react";
 
@@ -38,42 +36,60 @@ function eventIdFromPath(pathname: string): string | null {
   return id;
 }
 
-const navigation = [
-  { label: "Duyệt đăng ký", href: "/organizer/approvals", icon: ClipboardCheck },
-  { label: "Participants", href: "/organizer/participants", icon: Users },
-  { label: "Race Day", href: "/organizer/race-day", icon: QrCode },
-  { label: "Results", href: "/organizer/results", icon: Trophy },
-  { label: "Photos", href: "/organizer/photos", icon: Camera },
-  { label: "Race Registration", href: "/organizer/registration", icon: ClipboardList },
-];
-
-function getRoleBadgeColor(userRole: string | null) {
-  switch (userRole) {
-    case Role.ADMIN:
-      return "bg-rose-500/10 text-rose-600 border-rose-500/20";
-    case Role.COORDINATOR:
-      return "bg-purple-500/10 text-purple-600 border-purple-500/20";
-    case Role.STAFF:
-      return "bg-blue-500/10 text-blue-600 border-blue-500/20";
-    case Role.RUNNER:
-      return "bg-orange-500/10 text-orange-600 border-orange-500/20";
-    default:
-      return "bg-slate-500/10 text-slate-600 border-slate-500/20";
-  }
+/** Chỉ nav theo event đang mở — không lộ URL portal /organizer/approvals, … */
+function eventWorkspaceNav(eventId: string) {
+  return [
+    {
+      label: "Tổng quan",
+      href: `/organizer/events/${eventId}`,
+      icon: LayoutDashboard,
+    },
+    {
+      label: "Duyệt đăng ký",
+      href: `/organizer/events/${eventId}?tab=approvals`,
+      icon: ClipboardCheck,
+      tab: "approvals" as const,
+    },
+    {
+      label: "Thiết lập bản đồ",
+      href: `/organizer/events/${eventId}/setup-map`,
+      icon: Map,
+      matchPath: `/organizer/events/${eventId}/setup-map`,
+    },
+    {
+      label: "Giả lập đua",
+      href: `/organizer/events/${eventId}/race-simulation`,
+      icon: Flag,
+      matchPath: `/organizer/events/${eventId}/race-simulation`,
+    },
+  ];
 }
 
 function useLoggedInUser() {
-  return useMemo(() => {
+  // Cookie chỉ có trên client — đọc sau mount để tránh hydration mismatch (U vs T)
+  const [user, setUser] = useState({
+    username: "User",
+    role: Role.RUNNER as string,
+    initial: "U",
+  });
+
+  useEffect(() => {
     const username = Cookies.get("username") || "User";
     const rawRole = Cookies.get("role") || "";
     const role = mapAppRole(rawRole || Role.RUNNER);
-    const initial = username.charAt(0).toUpperCase() || "U";
-    return { username, role, initial };
+    setUser({
+      username,
+      role,
+      initial: username.charAt(0).toUpperCase() || "U",
+    });
   }, []);
+
+  return user;
 }
 
 export default function OrganizerShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -81,6 +97,14 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
   const userMenuRef = useRef<HTMLDivElement>(null);
   const { username, role, initial } = useLoggedInUser();
   const eventId = useMemo(() => eventIdFromPath(pathname), [pathname]);
+  const navigation = useMemo(
+    () => (eventId ? eventWorkspaceNav(eventId) : []),
+    [eventId]
+  );
+  const activeTab = searchParams.get("tab");
+  const isMapWorkspace =
+    !!eventId &&
+    (/\/setup-map\/?$/.test(pathname) || /\/race-simulation\/?$/.test(pathname));
 
   const closeMobile = () => setMobileOpen(false);
   const closeUserMenu = () => setUserMenuOpen(false);
@@ -165,11 +189,29 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
               collapsed ? "lg:hidden" : ""
             }`}
           >
-            Workspace
+            Không gian làm việc
           </p>
           {navigation.map((item) => {
-            const active =
-              pathname === item.href || pathname.startsWith(`${item.href}/`);
+            const isApprovals = "tab" in item && item.tab === "approvals";
+            const matchPath =
+              "matchPath" in item && typeof item.matchPath === "string"
+                ? item.matchPath
+                : null;
+            const onEventHome =
+              Boolean(eventId) &&
+              (pathname === `/organizer/events/${eventId}` ||
+                pathname === `/organizer/events/${eventId}/`);
+
+            let active = false;
+            if (matchPath) {
+              // Setup map / Race simulation — exact prefix của sub-route
+              active = pathname === matchPath || pathname.startsWith(`${matchPath}/`);
+            } else if (isApprovals) {
+              active = onEventHome && activeTab === "approvals";
+            } else {
+              // Tổng quan — chỉ đúng trang event, không ăn nhầm /setup-map|/race-simulation
+              active = onEventHome && activeTab !== "approvals";
+            }
             const Icon = item.icon;
             return (
               <Link
@@ -193,6 +235,28 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
             );
           })}
         </nav>
+
+        <div
+          className={`mt-auto border-t border-white/10 py-3 ${
+            collapsed ? "px-3 lg:px-2" : "px-3"
+          }`}
+        >
+          <Link
+            href="/my-events"
+            onClick={closeMobile}
+            title={collapsed ? "Quay về quản lý giải" : undefined}
+            className={`flex items-center rounded-xl text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.07] hover:text-white ${
+              collapsed
+                ? "gap-3 px-3 py-3 lg:justify-center lg:px-0"
+                : "gap-3 px-3 py-3"
+            }`}
+          >
+            <ArrowLeft className="h-[18px] w-[18px] shrink-0 text-orange-400" />
+            <span className={collapsed ? "lg:hidden" : ""}>
+              Quay về quản lý giải
+            </span>
+          </Link>
+        </div>
       </aside>
       {mobileOpen && (
         <button
@@ -250,13 +314,6 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
               <span className="hidden max-w-[120px] truncate font-medium text-slate-900 sm:inline">
                 {username}
               </span>
-              <span
-                className={`hidden rounded-md border px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase sm:inline ${getRoleBadgeColor(
-                  role
-                )}`}
-              >
-                {role}
-              </span>
               <ChevronDown
                 className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${
                   userMenuOpen ? "rotate-180" : ""
@@ -270,9 +327,6 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
                   <p className="text-xs text-slate-500">Đã đăng nhập với</p>
                   <p className="truncate text-sm font-semibold text-slate-900">
                     {username}
-                  </p>
-                  <p className="mt-0.5 text-[11px] font-medium uppercase text-slate-500">
-                    Vai trò: {role}
                   </p>
                 </div>
 
@@ -321,12 +375,12 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
                         Khiếu nại
                       </Link>
                       <Link
-                        href="/events"
+                        href="/registered-events"
                         className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-800 transition-colors hover:bg-slate-50"
                         onClick={closeUserMenu}
                       >
                         <Flag className="h-4 w-4 text-slate-400" />
-                        Tham gia giải chạy
+                        Giải đã đăng ký
                       </Link>
                     </>
                   )}
@@ -382,7 +436,15 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
             )}
           </div>
         </header>
-        <main className="mx-auto max-w-[1540px] p-5 sm:p-8">{children}</main>
+        <main
+          className={`mx-auto max-w-[1540px] ${
+            isMapWorkspace
+              ? "px-5 pb-4 pt-3 sm:px-8 sm:pb-5 sm:pt-4"
+              : "p-5 sm:p-8"
+          }`}
+        >
+          {children}
+        </main>
       </div>
     </div>
   );

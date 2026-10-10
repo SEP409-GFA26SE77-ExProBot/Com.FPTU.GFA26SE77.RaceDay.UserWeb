@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -14,19 +14,27 @@ import {
   Plus,
   Route,
   ShieldCheck,
-  Sparkles,
   Trash2,
   Upload,
   Building2,
 } from "lucide-react";
-import { createRaceEvent, uploadOrganizerFile } from "@/api/organizer";
-import { BASE_URL } from "@/config/global-config";
+import { getEventById } from "@/api/events";
+import {
+  createRaceEvent,
+  submitRaceEvent,
+  uploadOrganizerFile,
+} from "@/api/organizer";
+import type { EventDistanceDto, RaceEventDto } from "@/dto/event.dto";
 import type {
   CreateRaceEventDistanceInput,
   CreateRaceEventDocumentInput,
   CreateRaceEventRequest,
 } from "@/dto/organizer.dto";
 import { getApiErrorMessage } from "@/lib/error";
+import {
+  mediaDisplayUrl,
+  resolveStoredFileUrl,
+} from "@/lib/media-url";
 
 const requiredDocuments = [
   {
@@ -130,6 +138,8 @@ type UploadedDoc = { fileName: string; fileUrl: string };
 type Props = {
   backHref?: string;
   backLabel?: string;
+  /** Tiếp tục hoàn thiện nháp đã tạo */
+  draftId?: string | null;
 };
 
 const EMPTY_FORM: EventForm = {
@@ -158,34 +168,6 @@ const EMPTY_FORM: EventForm = {
   aidStations: "",
 };
 
-const MOCK_FORM: EventForm = {
-  title: "RaceDay Coastal Run Đà Nẵng 2026",
-  tagline: "Chạy ven biển · BIB điện tử · Kit runner",
-  organizer: "RaceDay Event Company",
-  legalEntity: "Công ty TNHH RaceDay Event",
-  website: "https://raceday.vn",
-  date: "2026-11-22",
-  startTime: "05:30",
-  location: "Biển Mỹ Khê, Đà Nẵng",
-  scale: "3200",
-  contactName: "Vũ Thanh Phong",
-  phone: "0906789012",
-  email: "organizer@raceday.vn",
-  description:
-    "Giải chạy duyên hải Đà Nẵng với check-in QR, BIB điện tử và kit runner.",
-  bannerImage:
-    "https://images.unsplash.com/photo-1452626635019-14babd4f4a0b?auto=format&fit=crop&w=1600&q=80",
-  bankAccountHolder: "CONG TY TNHH RACEDAY EVENT",
-  bankAccountNumber: "0123456789",
-  bankName: "Vietcombank",
-  bankBranch: "Đà Nẵng",
-  bankTransferNote: "Giai ngan BTC Coastal Run 2026",
-  authorityContact: "Công an quận Sơn Trà",
-  medicalPartner: "Bệnh viện Đà Nẵng",
-  securityPosts: "12",
-  aidStations: "8",
-};
-
 function newDistanceKey() {
   return `d-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -202,10 +184,84 @@ function emptyDistance(): DistanceDraft {
   };
 }
 
+/** Lưu DB / payload: URL object thật (R2 public nếu cấu hình). */
 function absoluteUrl(fileUrl: string): string {
-  if (/^https?:\/\//i.test(fileUrl)) return fileUrl;
-  const base = (BASE_URL || "").replace(/\/$/, "");
-  return `${base}${fileUrl.startsWith("/") ? "" : "/"}${fileUrl}`;
+  return resolveStoredFileUrl(fileUrl);
+}
+
+function mapEventToForm(event: RaceEventDto): EventForm {
+  const org = event.organizer;
+  const bank = org?.beneficiaryAccount;
+  const rules = (event.rules || {}) as Record<string, unknown>;
+  const start = event.startTime || "";
+  return {
+    title: event.name || "",
+    tagline: event.tagline || "",
+    organizer: org?.name || "",
+    legalEntity: org?.legalEntity || "",
+    website: org?.website || "",
+    date: (event.date || "").slice(0, 10),
+    startTime: start.length >= 5 ? start.slice(0, 5) : start,
+    location: event.location || "",
+    scale: event.totalRunners != null ? String(event.totalRunners) : "",
+    contactName: String(rules.contactName || ""),
+    phone: org?.phone || "",
+    email: org?.email || "",
+    description: event.description || "",
+    bannerImage: event.bannerImage ? absoluteUrl(event.bannerImage) : "",
+    bankAccountHolder: bank?.accountHolder || "",
+    bankAccountNumber: bank?.accountNumber || "",
+    bankName: bank?.bankName || "",
+    bankBranch: bank?.branch || "",
+    bankTransferNote: bank?.transferNote || "",
+    authorityContact: String(rules.authorityContact || ""),
+    medicalPartner: String(rules.medicalPartner || ""),
+    securityPosts: String(rules.securityPosts || ""),
+    aidStations: String(rules.aidStations || ""),
+  };
+}
+
+function mapEventDistances(distances: EventDistanceDto[]): DistanceDraft[] {
+  if (!distances.length) return [emptyDistance()];
+  return distances.map((d) => ({
+    key: d.id || newDistanceKey(),
+    type: d.type || "road",
+    name: d.name || "",
+    distanceKm: d.distanceKm != null ? String(d.distanceKm) : "",
+    capacity: d.capacity != null ? String(d.capacity) : "",
+    price: d.price != null ? String(d.price) : "",
+    currency: d.currency || "VND",
+  }));
+}
+
+function mapEventFiles(
+  event: RaceEventDto
+): Record<string, UploadedDoc> {
+  const out: Record<string, UploadedDoc> = {};
+  for (const doc of event.documents || []) {
+    if (!doc.documentKey || !doc.fileUrl) continue;
+    out[doc.documentKey] = {
+      fileName: doc.fileName || doc.title || doc.documentKey,
+      fileUrl: absoluteUrl(doc.fileUrl),
+    };
+  }
+  return out;
+}
+
+function mapEventConditions(event: RaceEventDto): boolean[] {
+  const rules = (event.rules || {}) as {
+    safetyChecklist?: { label?: string; checked?: boolean }[];
+  };
+  const checklist = rules.safetyChecklist;
+  if (!Array.isArray(checklist) || !checklist.length) {
+    return safetyConditions.map(() => false);
+  }
+  return safetyConditions.map((label, i) => {
+    const row = checklist[i];
+    if (row && typeof row.checked === "boolean") return row.checked;
+    const byLabel = checklist.find((c) => c.label === label);
+    return Boolean(byLabel?.checked);
+  });
 }
 
 function parseTotalRunners(scale: string, distances: DistanceDraft[]): number {
@@ -423,6 +479,7 @@ function buildPayload(
 export default function EventPermitRegistration({
   backHref = "/events",
   backLabel = "Quay lại danh sách giải",
+  draftId = null,
 }: Props) {
   const [step, setStep] = useState(1);
   const [infoTab, setInfoTab] = useState<InfoTab>("chung");
@@ -443,11 +500,50 @@ export default function EventPermitRegistration({
   const [submitting, setSubmitting] = useState(false);
   const [createdEventId, setCreatedEventId] = useState<string | null>(null);
   const [createdAsDraft, setCreatedAsDraft] = useState(false);
+  const [editingDraftId, setEditingDraftId] = useState<string | null>(
+    draftId || null
+  );
+  const [loadingDraft, setLoadingDraft] = useState(Boolean(draftId));
 
   const showToast = (message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(""), 2400);
   };
+
+  useEffect(() => {
+    if (!draftId) {
+      setLoadingDraft(false);
+      return;
+    }
+    let cancelled = false;
+    setLoadingDraft(true);
+    setEditingDraftId(draftId);
+    (async () => {
+      try {
+        const event = await getEventById(draftId);
+        if (cancelled) return;
+        setForm(mapEventToForm(event));
+        setDistances(mapEventDistances(event.distances || []));
+        setFiles(mapEventFiles(event));
+        setConditions(mapEventConditions(event));
+        setStep(1);
+        setInfoTab("chung");
+        setCreatedEventId(null);
+        setError(null);
+      } catch (e) {
+        if (!cancelled) {
+          setError(
+            getApiErrorMessage(e, "Không tải được bản nháp để tiếp tục.")
+          );
+        }
+      } finally {
+        if (!cancelled) setLoadingDraft(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [draftId]);
 
   const clearFieldError = (key: FieldErrorKey) => {
     setFieldErrors((prev) => {
@@ -491,7 +587,7 @@ export default function EventPermitRegistration({
     setUploadingDocId(id);
     setError(null);
     try {
-      const stored = await uploadOrganizerFile(file);
+      const stored = await uploadOrganizerFile(file, "document");
       setFiles((current) => ({
         ...current,
         [id]: {
@@ -568,6 +664,20 @@ export default function EventPermitRegistration({
     setSubmitting(true);
     setError(null);
     try {
+      if (editingDraftId) {
+        if (!submitForApproval) {
+          setCreatedEventId(editingDraftId);
+          setCreatedAsDraft(true);
+          showToast("Nháp đã có trên hệ thống");
+          return;
+        }
+        const submitted = await submitRaceEvent(editingDraftId);
+        setCreatedEventId(submitted.id);
+        setCreatedAsDraft(false);
+        showToast("Đã gửi hồ sơ thẩm định");
+        return;
+      }
+
       const payload = buildPayload(
         form,
         distances,
@@ -577,12 +687,18 @@ export default function EventPermitRegistration({
       );
       const created = await createRaceEvent(payload);
       setCreatedEventId(created.id);
+      setEditingDraftId(created.id);
       setCreatedAsDraft(!submitForApproval);
       showToast(
         submitForApproval ? "Đã gửi hồ sơ thẩm định" : "Đã lưu bản nháp"
       );
     } catch (e) {
-      setError(getApiErrorMessage(e, "Không tạo được giải."));
+      setError(
+        getApiErrorMessage(
+          e,
+          submitForApproval ? "Không gửi được hồ sơ." : "Không tạo được giải."
+        )
+      );
     } finally {
       setSubmitting(false);
     }
@@ -677,16 +793,37 @@ export default function EventPermitRegistration({
         </div>
       )}
 
+      {loadingDraft ? (
+        <div className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-16 text-sm font-bold text-slate-600">
+          <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
+          Đang tải bản nháp…
+        </div>
+      ) : null}
+
       {createdEventId ? (
         <SuccessState
-          eventId={createdEventId}
+          eventName={form.title.trim() || "Giải chạy"}
           draft={createdAsDraft}
-          manageHref={`/organizer/events/${createdEventId}`}
           listHref="/my-events"
+          onContinueDraft={
+            createdAsDraft
+              ? () => {
+                  setCreatedEventId(null);
+                  setCreatedAsDraft(false);
+                  setStep(1);
+                  setInfoTab("chung");
+                  setError(null);
+                }
+              : undefined
+          }
+          detailHref={
+            createdAsDraft ? undefined : `/organizer/events/${createdEventId}`
+          }
         />
-      ) : (
+      ) : !loadingDraft ? (
         <>
-          {step === 1 && (
+          {/* Giữ mount khi đổi step — tránh mất preview banner (blob URL) */}
+          <div className={step === 1 ? undefined : "hidden"}>
             <BasicInfoStep
               form={form}
               onChange={patchForm}
@@ -704,15 +841,15 @@ export default function EventPermitRegistration({
               }
               onPatchDistance={patchDistance}
             />
-          )}
-          {step === 2 && (
+          </div>
+          <div className={step === 2 ? undefined : "hidden"}>
             <DocumentsStep
               files={files}
               uploadingDocId={uploadingDocId}
               onUpload={uploadDoc}
             />
-          )}
-          {step === 3 && (
+          </div>
+          <div className={step === 3 ? undefined : "hidden"}>
             <SafetyStep
               form={form}
               onChangeForm={patchForm}
@@ -724,53 +861,44 @@ export default function EventPermitRegistration({
                   )
                 )
               }
-              onMockSafety={() => {
-                setConditions(safetyConditions.map(() => true));
-                setForm((c) => ({
-                  ...c,
-                  authorityContact: MOCK_FORM.authorityContact,
-                  medicalPartner: MOCK_FORM.medicalPartner,
-                  securityPosts: MOCK_FORM.securityPosts,
-                  aidStations: MOCK_FORM.aidStations,
-                }));
-                showToast("Đã tick đủ điều kiện an toàn (mock)");
-              }}
             />
-          )}
-          {step === 4 && (
+          </div>
+          <div className={step === 4 ? undefined : "hidden"}>
             <ReviewStep
               form={form}
               files={files}
               conditions={conditions}
               distanceSummary={distanceSummary}
             />
-          )}
+          </div>
 
-          <div className="flex flex-col-reverse justify-between gap-3 sm:flex-row">
-            <button
-              type="button"
-              disabled={submitting}
-              onClick={() => {
-                if (step > 1) {
-                  setStep(step - 1);
-                  return;
-                }
-                void submit(false);
-              }}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:border-orange-300 hover:text-orange-600 disabled:opacity-50"
-            >
+          <div className="flex flex-col-reverse flex-wrap justify-between gap-3 sm:flex-row sm:items-center">
+            <div className="flex flex-col-reverse gap-3 sm:flex-row">
               {step > 1 ? (
-                <>
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => setStep(step - 1)}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:border-orange-300 hover:text-orange-600 disabled:opacity-50"
+                >
                   <ArrowLeft className="h-4 w-4" /> Quay lại
-                </>
-              ) : submitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> Đang lưu…
-                </>
-              ) : (
-                "Lưu bản nháp (gọi API)"
-              )}
-            </button>
+                </button>
+              ) : null}
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => void submit(false)}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-bold text-orange-800 hover:bg-orange-100 disabled:opacity-50"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Đang lưu…
+                  </>
+                ) : (
+                  "Lưu bản nháp"
+                )}
+              </button>
+            </div>
             <button
               type="button"
               disabled={submitting || (step > 1 && !canContinue)}
@@ -800,7 +928,7 @@ export default function EventPermitRegistration({
             </button>
           </div>
         </>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -829,6 +957,13 @@ function BasicInfoStep({
   const invalid = (key: FieldErrorKey) => fieldErrors.has(key);
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [bannerError, setBannerError] = useState<string | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [bannerBroken, setBannerBroken] = useState(false);
+
+  useEffect(() => {
+    setBannerError(null);
+    setBannerBroken(false);
+  }, [form.bannerImage, bannerPreview]);
 
   const onPickBanner = async (file?: File | null) => {
     if (!file) return;
@@ -842,8 +977,13 @@ function BasicInfoStep({
     }
     setUploadingBanner(true);
     setBannerError(null);
+    const localUrl = URL.createObjectURL(file);
+    setBannerPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return localUrl;
+    });
     try {
-      const stored = await uploadOrganizerFile(file);
+      const stored = await uploadOrganizerFile(file, "banner");
       onChange("bannerImage", absoluteUrl(stored.fileUrl));
     } catch (e) {
       setBannerError(
@@ -854,10 +994,16 @@ function BasicInfoStep({
     }
   };
 
+  const previewSrc = bannerPreview
+    ? bannerPreview
+    : form.bannerImage
+      ? mediaDisplayUrl(form.bannerImage)
+      : "";
+
   const tabs: { id: InfoTab; label: string; icon: typeof Info }[] = [
     { id: "chung", label: "Thông tin chung", icon: Info },
     { id: "cu-ly", label: "Cự ly & giá", icon: Route },
-    { id: "don-vi", label: "Đơn vị & giải ngân", icon: Building2 },
+    { id: "don-vi", label: "Đơn vị & tài khoản", icon: Building2 },
   ];
 
   return (
@@ -870,9 +1016,7 @@ function BasicInfoStep({
           <h2 className="text-lg font-black text-slate-950">
             Thông tin giải chạy
           </h2>
-          <p className="mt-1 text-xs text-slate-500">
-            * bắt buộc để tạo/nháp. TK giải ngân bắt buộc khi gửi duyệt.
-          </p>
+          <p className="mt-1 text-xs text-slate-500">* bắt buộc</p>
         </div>
       </div>
 
@@ -933,12 +1077,25 @@ function BasicInfoStep({
             {bannerError && (
               <p className="text-xs text-red-600">{bannerError}</p>
             )}
-            {form.bannerImage ? (
+            {previewSrc && !bannerBroken ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={form.bannerImage}
+                key={previewSrc}
+                src={previewSrc}
                 alt="Banner preview"
+                referrerPolicy="no-referrer"
                 className="mt-1 h-36 w-full rounded-xl border border-slate-200 object-cover"
+                onLoad={() => {
+                  setBannerBroken(false);
+                  setBannerError(null);
+                }}
+                onError={() => {
+                  if (bannerPreview) return;
+                  setBannerBroken(true);
+                  setBannerError(
+                    "Không tải được ảnh từ URL. Thử chọn lại ảnh từ máy."
+                  );
+                }}
               />
             ) : null}
           </div>
@@ -983,17 +1140,12 @@ function BasicInfoStep({
 
       {infoTab === "cu-ly" && (
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p
-              className={`text-xs ${
-                invalid("distances")
-                  ? "font-bold text-red-600"
-                  : "text-slate-500"
-              }`}
-            >
-              ≥ 1 cự ly: tên + km + slot + giá
-              {invalid("distances") ? " — đang thiếu." : "."}
-            </p>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {invalid("distances") ? (
+              <p className="mr-auto text-xs font-bold text-red-600">
+                Cần đủ tên, km, slot và giá cho mỗi cự ly.
+              </p>
+            ) : null}
             <button
               type="button"
               onClick={onAddDistance}
@@ -1074,12 +1226,6 @@ function BasicInfoStep({
 
       {infoTab === "don-vi" && (
         <div className="space-y-5">
-          <div className="rounded-xl border border-orange-100 bg-orange-50 p-4 text-xs leading-5 text-orange-950">
-            <strong>Thanh toán & giải ngân:</strong> VĐV trả phí qua PayOS → tiền
-            về <em>tài khoản hệ thống RaceDay</em>. TK dưới dùng để{" "}
-            <em>giải ngân BTC sau sự kiện</em>. Có thể bỏ trống khi lưu nháp —
-            bắt buộc khi gửi duyệt.
-          </div>
           <div className="grid gap-5 md:grid-cols-2">
             <Field
               label="Đơn vị tổ chức (hiển thị) *"
@@ -1178,8 +1324,7 @@ function DocumentsStep({
             Hồ sơ và giấy tờ
           </h2>
           <p className="mt-1 text-xs text-slate-500">
-            Có thể bỏ qua khi lưu nháp. Bắt buộc đủ file đánh dấu đỏ trước khi
-            gửi duyệt.
+            Bắt buộc đủ file đánh dấu đỏ trước khi gửi duyệt.
           </p>
         </div>
       </div>
@@ -1246,38 +1391,26 @@ function SafetyStep({
   onChangeForm,
   conditions,
   onToggle,
-  onMockSafety,
 }: {
   form: EventForm;
   onChangeForm: (key: keyof EventForm, value: string) => void;
   conditions: boolean[];
   onToggle: (index: number) => void;
-  onMockSafety: () => void;
 }) {
   return (
     <section className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-            <ShieldCheck className="h-5 w-5" />
-          </span>
-          <div>
-            <h2 className="text-lg font-black text-slate-950">
-              Điều kiện an toàn và phối hợp
-            </h2>
-            <p className="mt-1 text-xs text-slate-500">
-              Có thể bỏ qua khi lưu nháp. Tick đủ mới được gửi duyệt.
-            </p>
-          </div>
+      <div className="mb-6 flex items-start gap-3">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+          <ShieldCheck className="h-5 w-5" />
+        </span>
+        <div>
+          <h2 className="text-lg font-black text-slate-950">
+            Điều kiện an toàn và phối hợp
+          </h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Tick đủ mới được gửi duyệt.
+          </p>
         </div>
-        <button
-          type="button"
-          onClick={onMockSafety}
-          className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-orange-300 bg-orange-50 px-3 py-1.5 text-[11px] font-bold text-orange-800 hover:bg-orange-100"
-        >
-          <Sparkles className="h-3.5 w-3.5" />
-          Mock tick đủ
-        </button>
       </div>
       <div className="space-y-3">
         {safetyConditions.map((condition, index) => (
@@ -1445,15 +1578,17 @@ function Field({
 }
 
 function SuccessState({
-  eventId,
+  eventName,
   draft,
-  manageHref,
   listHref,
+  onContinueDraft,
+  detailHref,
 }: {
-  eventId: string;
+  eventName: string;
   draft: boolean;
-  manageHref: string;
   listHref: string;
+  onContinueDraft?: () => void;
+  detailHref?: string;
 }) {
   return (
     <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-8 text-center shadow-sm">
@@ -1464,18 +1599,28 @@ function SuccessState({
         {draft ? "Đã lưu bản nháp" : "Đã gửi hồ sơ thành công"}
       </h2>
       <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-emerald-800">
-        Mã giải <strong className="font-mono text-xs">{eventId}</strong>
+        Giải <strong>{eventName}</strong>
         {draft
           ? " đã được lưu. Bạn có thể hoàn thiện hồ sơ và gửi duyệt sau."
           : " đang chờ thẩm định. Bạn sẽ nhận thông báo khi có cập nhật."}
       </p>
       <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-        <Link
-          href={manageHref}
-          className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-800"
-        >
-          Xem chi tiết giải <ArrowRight className="h-4 w-4" />
-        </Link>
+        {draft && onContinueDraft ? (
+          <button
+            type="button"
+            onClick={onContinueDraft}
+            className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-800"
+          >
+            Tiếp tục đăng ký <ArrowRight className="h-4 w-4" />
+          </button>
+        ) : detailHref ? (
+          <Link
+            href={detailHref}
+            className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-800"
+          >
+            Xem chi tiết giải <ArrowRight className="h-4 w-4" />
+          </Link>
+        ) : null}
         <Link
           href={listHref}
           className="inline-flex items-center gap-2 rounded-xl border border-emerald-300 bg-white px-4 py-3 text-sm font-bold text-emerald-800 hover:bg-emerald-100"

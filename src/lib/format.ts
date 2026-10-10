@@ -13,12 +13,27 @@ export function formatDate(dateStr: string): string {
   });
 }
 
+/** Format ISO datetime to VI (ngày + giờ) */
+export function formatDateTime(dateStr?: string | null): string {
+  if (!dateStr) return "—";
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("vi-VN", {
+    weekday: "short",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 /** Map BE event status string to UI label (tiếng Việt) — góc nhìn VĐV */
 export function getStatusLabel(status: string): string {
   const key = (status || "").toLowerCase().replace(/_/g, "-");
   switch (key) {
     case "registration-open":
-      return "Đang mở đăng ký";
+      return "Đang mở";
     case "approved":
     case "published":
       // User FE: chưa mở ĐK → “Sắp mở” (không dùng wording admin “Đã duyệt”)

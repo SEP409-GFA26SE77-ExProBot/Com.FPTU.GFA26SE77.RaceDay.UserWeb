@@ -15,10 +15,16 @@ import {
   getStatusLabel,
   getRegistrationStatusLabel,
 } from "@/lib/format";
+import { mediaDisplayUrl } from "@/lib/media-url";
 
 interface EventCardProps {
   event: RaceEventListItemDto;
-  /** Status đăng ký của user trên giải này (nếu có) */
+  /**
+   * `event` — badge theo trạng thái giải (trang khám phá).
+   * `registration` — badge theo trạng thái ĐK của user (giải đã đăng ký).
+   */
+  statusMode?: "event" | "registration";
+  /** Status đăng ký của user trên giải này (dùng khi statusMode = registration) */
   myRegistrationStatus?: string | null;
 }
 
@@ -38,11 +44,6 @@ function DistanceChip({ label }: { label: string }) {
 }
 
 function myRegPrimaryLabel(status: string): string {
-  const s = status.toLowerCase();
-  if (s === "pending_payment") return "Chờ thanh toán";
-  if (s === "pending_approval") return "Chờ BTC duyệt";
-  if (s === "confirmed") return "Đã đăng ký";
-  if (s === "finished") return "Đã hoàn thành";
   return getRegistrationStatusLabel(status);
 }
 
@@ -92,6 +93,7 @@ function overlayRegStatusClass(status: string): string {
 
 export default function EventCard({
   event,
+  statusMode = "event",
   myRegistrationStatus = null,
 }: EventCardProps) {
   const distances = event.distances || [];
@@ -110,7 +112,8 @@ export default function EventCard({
     : 0;
   const slotsLeft = Math.max(0, totalCapacity - totalRegistered);
   const eventStatusKey = (event.status || "").toLowerCase().replace(/_/g, "-");
-  const hasMyReg = Boolean(myRegistrationStatus);
+  const showRegBadge =
+    statusMode === "registration" && Boolean(myRegistrationStatus);
   const href =
     eventStatusKey === "in-progress"
       ? `/race-day?eventId=${event.id}`
@@ -122,7 +125,7 @@ export default function EventCard({
       className={`group block rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-0.5 ${
         eventStatusKey === "in-progress"
           ? "border-[3px] border-rose-500 bg-gradient-to-br from-rose-50 via-orange-50/80 to-white shadow-lg shadow-rose-500/20 ring-2 ring-rose-400/30 hover:shadow-xl hover:shadow-rose-500/30"
-          : hasMyReg
+          : showRegBadge
             ? "border-2 border-orange-500/50 bg-card shadow-sm hover:shadow-lg hover:shadow-orange-500/15 hover:border-orange-500"
             : "border border-border/60 bg-card shadow-sm hover:shadow-xl hover:shadow-orange-500/8 hover:border-orange-500/30"
       }`}
@@ -130,7 +133,7 @@ export default function EventCard({
       <div className="relative h-48 overflow-hidden">
         {event.bannerImage ? (
           <Image
-            src={event.bannerImage}
+            src={mediaDisplayUrl(event.bannerImage)}
             alt={event.name}
             fill
             className="object-cover transition-transform duration-500 group-hover:scale-110"
@@ -144,9 +147,8 @@ export default function EventCard({
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/45" />
 
-        {/* Badge: ưu tiên status ĐK của user; không thì status event */}
         <div className="absolute top-3 left-3 right-3 flex flex-wrap gap-1.5">
-          {hasMyReg ? (
+          {showRegBadge ? (
             <span
               className={`${BADGE_BASE} ${overlayRegStatusClass(
                 myRegistrationStatus!
@@ -162,7 +164,7 @@ export default function EventCard({
             </span>
           )}
 
-          {!hasMyReg &&
+          {statusMode === "event" &&
             eventStatusKey === "registration-open" &&
             slotsLeft > 0 && (
               <span className={`${BADGE_BASE} bg-zinc-950 text-white`}>
@@ -170,19 +172,13 @@ export default function EventCard({
               </span>
             )}
 
-          {hasMyReg && eventStatusKey === "registration-open" && (
-            <span className={`${BADGE_BASE} bg-zinc-950 text-white`}>
-              Giải vẫn mở ĐK
-            </span>
-          )}
-
           {eventStatusKey === "in-progress" && (
             <span className={`${BADGE_BASE} bg-zinc-950 text-white ring-rose-400/60`}>
               LIVE · Vào SOS
             </span>
           )}
 
-          {eventStatusKey === "sold-out" && !hasMyReg && (
+          {statusMode === "event" && eventStatusKey === "sold-out" && (
             <span className={`${BADGE_BASE} bg-amber-400 text-zinc-950`}>
               0 chỗ trống
             </span>

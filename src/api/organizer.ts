@@ -1,5 +1,7 @@
 import api from "@/config/axios";
 import { getApiErrorMessage } from "@/lib/error";
+import { resolveStoredFileUrl } from "@/lib/media-url";
+import { getEventById } from "@/api/events";
 import type { RaceEventDto, RaceEventListItemDto } from "@/dto/event.dto";
 import type {
   ApiRegistration,
@@ -13,22 +15,70 @@ export async function createRaceEvent(
   payload: CreateRaceEventRequest
 ): Promise<RaceEventDto> {
   try {
+    const body: CreateRaceEventRequest = {
+      ...payload,
+      bannerImage: payload.bannerImage
+        ? resolveStoredFileUrl(payload.bannerImage)
+        : payload.bannerImage,
+      documents: payload.documents?.map((d) =>
+        d.fileUrl ? { ...d, fileUrl: resolveStoredFileUrl(d.fileUrl) } : d
+      ),
+    };
     return (await api.post(
       `${EVENT_API}/organizer/`,
-      payload
+      body
     )) as RaceEventDto;
   } catch (e) {
     throw new Error(getApiErrorMessage(e, "Tạo giải thất bại."));
   }
 }
 
-/** Giải của user đang đăng nhập (GET /organizer/mine → RaceEventListItemDto[]) */
+/** Gửi duyệt từ nháp / bị từ chối — POST /organizer/{id}/submit */
+export async function submitRaceEvent(eventId: string): Promise<RaceEventDto> {
+  try {
+    return (await api.post(
+      `${EVENT_API}/organizer/${eventId}/submit`
+    )) as RaceEventDto;
+  } catch (e) {
+    throw new Error(getApiErrorMessage(e, "Gửi duyệt thất bại."));
+  }
+}
+
+/**
+ * Giải của user đang đăng nhập (GET /organizer/mine).
+ * Mine list thường chỉ có distanceTypes ("road") — hydrate distances (tên cự ly)
+ * từ GET /event/:id khi thiếu.
+ */
 export async function listOrganizerEvents(): Promise<RaceEventListItemDto[]> {
   try {
     const data = (await api.get(
       `${EVENT_API}/organizer/mine`
     )) as RaceEventListItemDto[];
-    return Array.isArray(data) ? data : [];
+    const items = Array.isArray(data) ? data : [];
+
+    return Promise.all(
+      items.map(async (item) => {
+        const withBanner = {
+          ...item,
+          bannerImage: item.bannerImage
+            ? resolveStoredFileUrl(item.bannerImage)
+            : item.bannerImage,
+        };
+        if (withBanner.distances?.length) return withBanner;
+        try {
+          const detail = await getEventById(item.id);
+          const banner = withBanner.bannerImage || detail.bannerImage;
+          return {
+            ...withBanner,
+            distances: detail.distances ?? [],
+            bannerImage: banner ? resolveStoredFileUrl(banner) : banner,
+            tagline: withBanner.tagline || detail.tagline,
+          };
+        } catch {
+          return withBanner;
+        }
+      })
+    );
   } catch (e) {
     throw new Error(
       getApiErrorMessage(e, "Không tải được danh sách giải của bạn.")
@@ -42,7 +92,11 @@ export async function listEventRegistrations(eventId: string): Promise<ApiRegist
     const data = (await api.get(
       `${EVENT_API}/organizer/${eventId}/registrations`
     )) as ApiRegistration[];
-    return Array.isArray(data) ? data : [];
+    return (Array.isArray(data) ? data : []).map((r) =>
+      r.healthCertUrl
+        ? { ...r, healthCertUrl: resolveStoredFileUrl(r.healthCertUrl) }
+        : r
+    );
   } catch (e) {
     throw new Error(getApiErrorMessage(e, "Không tải được danh sách đăng ký."));
   }
@@ -55,16 +109,26 @@ export type StoredUpload = {
   sizeBytes: number;
 };
 
-/** Upload organizer file (banner / hồ sơ) → POST organizer/uploads */
-export async function uploadOrganizerFile(file: File): Promise<StoredUpload> {
+export type OrganizerUploadPurpose = "banner" | "document";
+
+/** Upload organizer file → POST organizer/uploads?purpose=banner|document */
+export async function uploadOrganizerFile(
+  file: File,
+  purpose: OrganizerUploadPurpose = "document"
+): Promise<StoredUpload> {
   const formData = new FormData();
   formData.append("file", file);
   try {
-    const data = (await api.post(`${EVENT_API}/organizer/uploads`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    })) as StoredUpload;
+    const data = (await api.post(
+      `${EVENT_API}/organizer/uploads?purpose=${purpose}`,
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } }
+    )) as StoredUpload;
     if (!data?.fileUrl) throw new Error("Upload không trả về fileUrl.");
-    return data;
+    return {
+      ...data,
+      fileUrl: resolveStoredFileUrl(data.fileUrl),
+    };
   } catch (e) {
     throw new Error(getApiErrorMessage(e, "Upload thất bại."));
   }

@@ -80,8 +80,12 @@ export interface RaceEventDto {
   documents?: EventDocumentDto[];
   distances: EventDistanceDto[];
   organizerUserId?: string;
+  /** Lý do từ chối hồ sơ giải (khi status = rejected) */
+  rejectionReason?: string | null;
   createdAt?: string;
   updatedAt?: string;
+  createdAtUtc?: string;
+  updatedAtUtc?: string;
 }
 
 export interface RaceEventListItemDto {

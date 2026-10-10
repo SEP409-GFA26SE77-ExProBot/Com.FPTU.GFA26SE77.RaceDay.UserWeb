@@ -12,13 +12,13 @@ const ROLE_PERMISSIONS: Record<string, (Role | string)[] | '*'> = {
     // Bất kỳ user đã login (account mới có thể chưa có cookie role)
     '/profile': '*',
     '/my-registrations': '*',
+    '/registered-events': '*',
     '/my-events': '*',
     '/payments': '*',
     '/certificates': '*',
     '/disputes': '*',
     '/race-day': '*',
-    // Tạo/quản lý giải: mọi user đã login (không cần duyệt TK organizer)
-    '/organizer': '*',
+    // Tạo giải: đã login. Chi tiết quản lý giải chỉ qua /organizer/events/{id} (xem regex bên dưới)
     '/events/create': '*',
     '/event-admin': [Role.ADMIN, Role.COORDINATOR],
     '/staff-admin': [Role.ADMIN, Role.COORDINATOR],
@@ -99,6 +99,15 @@ export function proxy(request: NextRequest) {
     } else if (/^\/events\/[^/]+\/(register|payment|confirmation|pending)(\/|$)/.test(pathname)) {
         // Tuyến đăng ký giải chạy cho người dùng đã đăng nhập
         allowedRoles = '*';
+    } else if (
+        /^\/organizer\/events\/[^/]+\/?$/.test(pathname) ||
+        /^\/organizer\/events\/[^/]+\/(setup-map|race-simulation)\/?$/.test(pathname)
+    ) {
+        // Chi tiết giải + Setup map + Race simulation — vào từ Giải của tôi
+        allowedRoles = '*';
+    } else if (pathname === '/organizer' || pathname.startsWith('/organizer/')) {
+        // Chặn gõ URL portal organizer (approvals, module prototype, …)
+        return NextResponse.redirect(new URL('/403', request.url));
     }
 
     if (allowedRoles) {

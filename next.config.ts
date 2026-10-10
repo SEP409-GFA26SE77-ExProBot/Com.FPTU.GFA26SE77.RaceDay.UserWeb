@@ -16,10 +16,14 @@ function apiImageRemotePatterns(): ImageRemotePattern[] {
     { protocol: "http", hostname: "127.0.0.1", port: "5080", pathname: "/**" },
   ];
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-  if (apiUrl) {
+  for (const envKey of [
+    "NEXT_PUBLIC_API_URL",
+    "NEXT_PUBLIC_STORAGE_PUBLIC_BASE_URL",
+  ] as const) {
+    const raw = process.env[envKey];
+    if (!raw) continue;
     try {
-      const u = new URL(apiUrl);
+      const u = new URL(raw);
       const protocol = u.protocol.replace(":", "") as "http" | "https";
       if (protocol === "http" || protocol === "https") {
         patterns.push({
@@ -41,6 +45,8 @@ const nextConfig: NextConfig = {
   /* config options here */
   output: "standalone",
   images: {
+    // Banner API chạy localhost — cho phép next/image fetch private IP (dev)
+    dangerouslyAllowLocalIP: true,
     remotePatterns: [
       {
         protocol: "https",
