@@ -6,15 +6,25 @@ export interface CheckoutDto {
   cancelUrl: string;
 }
 
-export interface CheckoutResponseDto {
+/** Fields VietQR để FE vẽ QR + CK chung 1 khung (không dùng tab PayOS). */
+export interface VietQrFields {
+  qrCode?: string;
+  accountNumber?: string;
+  accountName?: string;
+  bin?: string;
+  transferDescription?: string;
+}
+
+export interface CheckoutResponseDto extends VietQrFields {
   paymentId: string;
   checkoutUrl: string;
   amount?: number;
   description?: string;
   orderCode?: number;
+  status?: string;
 }
 
-export interface PaymentDto {
+export interface PaymentDto extends VietQrFields {
   id: string;
   registrationId: string;
   userId: string;

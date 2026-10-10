@@ -6,7 +6,6 @@ import Link from "next/link";
 import { login } from "@/api/auth";
 import { Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
 import { getApiErrorMessage } from "@/lib/error";
-import { LoginDto } from "@/dto/auth.dto";
 
 function LoginForm() {
   const router = useRouter();
@@ -23,11 +22,6 @@ function LoginForm() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-    setError(null);
-  };
-
-  const handleQuickLogin = (username: string, pass: string) => {
-    setForm({ username, password: pass });
     setError(null);
   };
 

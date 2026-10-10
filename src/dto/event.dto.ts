@@ -93,6 +93,10 @@ export interface RaceEventListItemDto {
   date: string;
   status: string;
   totalRunners?: number;
+  activeRunners?: number;
+  /** List API đôi khi trả mảng string thay vì full distances */
+  distanceTypes?: string[];
+  organizerName?: string;
   distances?: EventDistanceDto[];
   organizer?: OrganizerInfoDto;
 }

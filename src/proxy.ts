@@ -1,15 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ALL_ROLES, Role } from "./interfaces/role";
+import { Role } from "./interfaces/role";
+
+function mapAppRole(raw: string): string {
+    const r = raw.replace(/^ROLE_/i, "").trim().toUpperCase();
+    if (!r) return Role.RUNNER;
+    if (r === "USER" || r === "CUSTOMER" || r === "MEMBER") return Role.RUNNER;
+    return r;
+}
 
 const ROLE_PERMISSIONS: Record<string, (Role | string)[] | '*'> = {
-    '/profile': ALL_ROLES,
+    // Bất kỳ user đã login (account mới có thể chưa có cookie role)
+    '/profile': '*',
+    '/my-registrations': '*',
+    '/my-events': '*',
+    '/payments': '*',
+    '/certificates': '*',
+    '/disputes': '*',
+    '/race-day': '*',
+    // Tạo/quản lý giải: mọi user đã login (không cần duyệt TK organizer)
+    '/organizer': '*',
+    '/events/create': '*',
     '/event-admin': [Role.ADMIN, Role.COORDINATOR],
     '/staff-admin': [Role.ADMIN, Role.COORDINATOR],
-    '/scan-qr': [Role.COORDINATOR, Role.STAFF],
+    '/scan-qr': [Role.COORDINATOR, Role.STAFF, Role.ADMIN],
     '/register-event': '*',
 };
-
-const authRoutes = ['/login', '/register', '/forgot-password'];
 
 function extractRoleFromJwt(token?: string): string | undefined {
     if (!token) return undefined;
@@ -34,7 +49,7 @@ function extractRoleFromJwt(token?: string): string | undefined {
             return undefined;
         }
         const payload = JSON.parse(jsonStr);
-        const role =
+        const raw =
             payload.role ||
             payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] ||
             payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/role'] ||
@@ -42,6 +57,7 @@ function extractRoleFromJwt(token?: string): string | undefined {
             (Array.isArray(payload.role) ? payload.role[0] : undefined) ||
             payload.userRole ||
             payload.Role;
+        const role = Array.isArray(raw) ? raw[0] : raw;
         if (typeof role === 'string') {
             return role.replace(/^ROLE_/i, '').trim().toUpperCase();
         }
@@ -56,12 +72,19 @@ export function proxy(request: NextRequest) {
     const token = request.cookies.get('access_token')?.value;
     const rawRole = request.cookies.get('role')?.value;
     const tokenRole = extractRoleFromJwt(token);
-    const role = (rawRole || tokenRole || '').replace(/^ROLE_/i, '').trim().toUpperCase();
+    // USER (IAM) / trống → RUNNER
+    const role = token
+        ? mapAppRole(rawRole || tokenRole || Role.RUNNER)
+        : '';
 
-    const isAuthRoute = authRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
-
-    // Đã có token mà vào trang login/register -> đá sang home
-    if (isAuthRoute && token) {
+    // Đã login: login/register → home; forgot/reset vẫn mở được
+    if (
+        token &&
+        (pathname === '/login' ||
+            pathname.startsWith('/login/') ||
+            pathname === '/register' ||
+            pathname.startsWith('/register/'))
+    ) {
         return NextResponse.redirect(new URL('/', request.url));
     }
 
@@ -73,8 +96,8 @@ export function proxy(request: NextRequest) {
 
     if (matchedRoute) {
         allowedRoles = ROLE_PERMISSIONS[matchedRoute];
-    } else if (/^\/events\/[^/]+\/(register|payment|confirmation)(\/|$)/.test(pathname)) {
-        // Tuyến đăng ký giải chạy (/events/:id/register, payment, confirmation) cho người dùng đã đăng nhập
+    } else if (/^\/events\/[^/]+\/(register|payment|confirmation|pending)(\/|$)/.test(pathname)) {
+        // Tuyến đăng ký giải chạy cho người dùng đã đăng nhập
         allowedRoles = '*';
     }
 

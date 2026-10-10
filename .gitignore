@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local AI design/context rules — do not push to GitHub
+/rule_design/
+/.cursor/

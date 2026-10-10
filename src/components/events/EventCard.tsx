@@ -13,25 +13,94 @@ import {
   formatPrice,
   formatDate,
   getStatusLabel,
-  getStatusColor,
+  getRegistrationStatusLabel,
 } from "@/lib/format";
 
 interface EventCardProps {
   event: RaceEventListItemDto;
+  /** Status đăng ký của user trên giải này (nếu có) */
+  myRegistrationStatus?: string | null;
 }
 
-/** Default gradient when bannerImage is missing */
 const DEFAULT_GRADIENT =
   "linear-gradient(135deg, #f97316 0%, #ea580c 40%, #dc2626 100%)";
 
-export default function EventCard({ event }: EventCardProps) {
+/** Badge trên ảnh: nền đặc + chữ sáng — tránh bị lẫn vào banner */
+const BADGE_BASE =
+  "inline-flex items-center rounded-md px-2.5 py-1 text-[11px] font-extrabold shadow-md ring-1 ring-white/40";
+
+function DistanceChip({ label }: { label: string }) {
+  return (
+    <span className="inline-flex items-center rounded-md bg-zinc-950 text-white px-2 py-0.5 text-[11px] font-extrabold tracking-wide shadow-md ring-2 ring-white/90">
+      {label}
+    </span>
+  );
+}
+
+function myRegPrimaryLabel(status: string): string {
+  const s = status.toLowerCase();
+  if (s === "pending_payment") return "Chờ thanh toán";
+  if (s === "pending_approval") return "Chờ BTC duyệt";
+  if (s === "confirmed") return "Đã đăng ký";
+  if (s === "finished") return "Đã hoàn thành";
+  return getRegistrationStatusLabel(status);
+}
+
+function overlayEventStatusClass(status: string): string {
+  const key = (status || "").toLowerCase().replace(/_/g, "-");
+  switch (key) {
+    case "registration-open":
+      return "bg-emerald-600 text-white";
+    case "approved":
+    case "published":
+    case "upcoming":
+    case "pending":
+    case "pending-approval":
+    case "draft":
+      return "bg-amber-500 text-zinc-950";
+    case "in-progress":
+      return "bg-rose-600 text-white";
+    case "sold-out":
+    case "cancelled":
+    case "rejected":
+      return "bg-red-600 text-white";
+    case "closed":
+    case "completed":
+      return "bg-zinc-800 text-white";
+    default:
+      return "bg-zinc-950 text-white";
+  }
+}
+
+function overlayRegStatusClass(status: string): string {
+  switch ((status || "").toLowerCase()) {
+    case "pending_payment":
+      return "bg-amber-500 text-zinc-950";
+    case "pending_approval":
+      return "bg-sky-600 text-white";
+    case "confirmed":
+    case "finished":
+      return "bg-orange-600 text-white";
+    case "rejected":
+      return "bg-red-600 text-white";
+    case "cancelled":
+      return "bg-zinc-700 text-white";
+    default:
+      return "bg-zinc-950 text-white";
+  }
+}
+
+export default function EventCard({
+  event,
+  myRegistrationStatus = null,
+}: EventCardProps) {
   const distances = event.distances || [];
   const lowestPrice = distances.length
     ? Math.min(...distances.map((d) => d.price))
     : 0;
 
-  // Compute registered / capacity from distances
-  const totalCapacity = distances.reduce((s, d) => s + d.capacity, 0);
+  const totalCapacity =
+    distances.reduce((s, d) => s + d.capacity, 0) || event.totalRunners || 0;
   const totalRegistered = distances.reduce(
     (s, d) => s + (d.registeredCount ?? 0),
     0
@@ -39,13 +108,25 @@ export default function EventCard({ event }: EventCardProps) {
   const progressPercent = totalCapacity
     ? Math.round((totalRegistered / totalCapacity) * 100)
     : 0;
+  const slotsLeft = Math.max(0, totalCapacity - totalRegistered);
+  const eventStatusKey = (event.status || "").toLowerCase().replace(/_/g, "-");
+  const hasMyReg = Boolean(myRegistrationStatus);
+  const href =
+    eventStatusKey === "in-progress"
+      ? `/race-day?eventId=${event.id}`
+      : `/events/${event.id}`;
 
   return (
     <Link
-      href={`/events/${event.id}`}
-      className="group block rounded-2xl border border-border/60 bg-card overflow-hidden shadow-sm transition-all duration-300 hover:shadow-xl hover:shadow-orange-500/8 hover:-translate-y-1 hover:border-orange-500/30"
+      href={href}
+      className={`group block rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-0.5 ${
+        eventStatusKey === "in-progress"
+          ? "border-[3px] border-rose-500 bg-gradient-to-br from-rose-50 via-orange-50/80 to-white shadow-lg shadow-rose-500/20 ring-2 ring-rose-400/30 hover:shadow-xl hover:shadow-rose-500/30"
+          : hasMyReg
+            ? "border-2 border-orange-500/50 bg-card shadow-sm hover:shadow-lg hover:shadow-orange-500/15 hover:border-orange-500"
+            : "border border-border/60 bg-card shadow-sm hover:shadow-xl hover:shadow-orange-500/8 hover:border-orange-500/30"
+      }`}
     >
-      {/* Banner */}
       <div className="relative h-48 overflow-hidden">
         {event.bannerImage ? (
           <Image
@@ -61,40 +142,69 @@ export default function EventCard({ event }: EventCardProps) {
             style={{ background: DEFAULT_GRADIENT }}
           />
         )}
-        <div className="absolute inset-0 bg-black/20" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/45" />
 
-        {/* Status badge */}
-        <div className="absolute top-3 left-3">
-          <span
-            className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold backdrop-blur-md ${getStatusColor(
-              event.status
-            )}`}
-          >
-            {getStatusLabel(event.status)}
-          </span>
+        {/* Badge: ưu tiên status ĐK của user; không thì status event */}
+        <div className="absolute top-3 left-3 right-3 flex flex-wrap gap-1.5">
+          {hasMyReg ? (
+            <span
+              className={`${BADGE_BASE} ${overlayRegStatusClass(
+                myRegistrationStatus!
+              )}`}
+            >
+              {myRegPrimaryLabel(myRegistrationStatus!)}
+            </span>
+          ) : (
+            <span
+              className={`${BADGE_BASE} ${overlayEventStatusClass(event.status)}`}
+            >
+              {getStatusLabel(event.status)}
+            </span>
+          )}
+
+          {!hasMyReg &&
+            eventStatusKey === "registration-open" &&
+            slotsLeft > 0 && (
+              <span className={`${BADGE_BASE} bg-zinc-950 text-white`}>
+                Còn {slotsLeft.toLocaleString("vi-VN")} chỗ
+              </span>
+            )}
+
+          {hasMyReg && eventStatusKey === "registration-open" && (
+            <span className={`${BADGE_BASE} bg-zinc-950 text-white`}>
+              Giải vẫn mở ĐK
+            </span>
+          )}
+
+          {eventStatusKey === "in-progress" && (
+            <span className={`${BADGE_BASE} bg-zinc-950 text-white ring-rose-400/60`}>
+              LIVE · Vào SOS
+            </span>
+          )}
+
+          {eventStatusKey === "sold-out" && !hasMyReg && (
+            <span className={`${BADGE_BASE} bg-amber-400 text-zinc-950`}>
+              0 chỗ trống
+            </span>
+          )}
         </div>
 
-        {/* Distance badges */}
         <div className="absolute bottom-3 left-3 right-3 flex flex-wrap gap-1.5">
           {distances.map((d) => (
-            <span
-              key={d.id}
-              className="inline-flex items-center rounded-md bg-white/90 backdrop-blur-sm px-2 py-0.5 text-xs font-bold text-gray-800 shadow-sm"
-            >
-              {d.distanceKm}K
-            </span>
+            <DistanceChip key={d.id} label={`${d.distanceKm}K`} />
           ))}
+          {!distances.length &&
+            (event.distanceTypes || []).map((t) => (
+              <DistanceChip key={t} label={t} />
+            ))}
         </div>
       </div>
 
-      {/* Content */}
       <div className="p-4 space-y-3">
-        {/* Title */}
         <h3 className="text-base font-bold text-foreground leading-snug line-clamp-2 group-hover:text-orange-600 transition-colors duration-200">
           {event.name}
         </h3>
 
-        {/* Date & Location */}
         <div className="space-y-1.5">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Calendar className="h-3.5 w-3.5 text-orange-500 shrink-0" />
@@ -106,14 +216,13 @@ export default function EventCard({ event }: EventCardProps) {
           </div>
         </div>
 
-        {/* Registration progress */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-1 text-muted-foreground">
               <Users className="h-3 w-3" />
               <span>
-                {totalRegistered.toLocaleString()} /{" "}
-                {(event.totalRunners ?? totalCapacity).toLocaleString()}
+                {totalRegistered.toLocaleString("vi-VN")} /{" "}
+                {(event.totalRunners ?? totalCapacity).toLocaleString("vi-VN")}
               </span>
             </div>
             <span className="font-semibold text-foreground/80">
@@ -129,25 +238,23 @@ export default function EventCard({ event }: EventCardProps) {
                   progressPercent >= 90
                     ? "linear-gradient(90deg, #ef4444, #dc2626)"
                     : progressPercent >= 60
-                    ? "linear-gradient(90deg, #f97316, #ea580c)"
-                    : "linear-gradient(90deg, #22c55e, #16a34a)",
+                      ? "linear-gradient(90deg, #f97316, #ea580c)"
+                      : "linear-gradient(90deg, #22c55e, #16a34a)",
               }}
             />
           </div>
         </div>
 
-        {/* Price & Organizer */}
         <div className="flex items-center justify-between pt-1">
           <div className="flex items-center gap-1">
             <TrendingUp className="h-3.5 w-3.5 text-orange-500" />
             <span className="text-sm font-bold text-orange-600">
-              {formatPrice(lowestPrice)}
+              {lowestPrice > 0 ? `từ ${formatPrice(lowestPrice)}` : "Xem chi tiết"}
             </span>
-            <span className="text-xs text-muted-foreground">~</span>
           </div>
-          {event.organizer?.name && (
+          {(event.organizer?.name || event.organizerName) && (
             <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground truncate max-w-[120px]">
-              {event.organizer.name}
+              {event.organizer?.name || event.organizerName}
             </span>
           )}
         </div>

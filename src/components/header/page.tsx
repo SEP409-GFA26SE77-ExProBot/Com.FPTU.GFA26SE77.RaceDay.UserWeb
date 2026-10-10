@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import Cookies from "js-cookie";
 import { logout } from "@/api/auth";
 import { Role } from "@/interfaces/role";
+import { mapAppRole } from "@/lib/role";
 import {
   Flag,
   User,
@@ -18,6 +19,12 @@ import {
   QrCode,
   ShieldCheck,
   LayoutDashboard,
+  Camera,
+  Award,
+  CreditCard,
+  Ticket,
+  AlertTriangle,
+  PlusCircle,
 } from "lucide-react";
 
 interface NavLink {
@@ -31,12 +38,33 @@ interface NavLink {
 
 const NAV_LINKS: NavLink[] = [
   { label: "Trang chủ", href: "/" },
-  { label: "Sự kiện", href: "/events", icon: Calendar },
-  { label: "Kết quả", href: "/results", icon: Trophy },
+  { label: "Giải chạy", href: "/events", icon: Calendar },
   {
-    label: "Đăng ký sự kiện",
-    href: "/register-event",
-  }
+    label: "Tạo giải",
+    href: "/events/create",
+    icon: PlusCircle,
+    authOnly: true,
+  },
+  { label: "Kết quả", href: "/results", icon: Trophy },
+  { label: "Tìm ảnh", href: "/photos", icon: Camera },
+  {
+    label: "Quét QR",
+    href: "/scan-qr",
+    icon: QrCode,
+    roles: [Role.COORDINATOR, Role.STAFF, Role.ADMIN],
+  },
+  {
+    label: "Quản trị giải",
+    href: "/event-admin",
+    icon: LayoutDashboard,
+    roles: [Role.ADMIN, Role.COORDINATOR],
+  },
+  {
+    label: "Quản trị nhân sự",
+    href: "/staff-admin",
+    icon: ShieldCheck,
+    roles: [Role.ADMIN, Role.COORDINATOR],
+  },
 ];
 
 let cachedAuthRaw = "";
@@ -46,11 +74,39 @@ let cachedAuthState = {
   role: null as string | null,
 };
 
+function roleFromJwt(token: string): string | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const payload = JSON.parse(
+      atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"))
+    );
+    const raw =
+      payload.role ||
+      payload["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] ||
+      payload.roles?.[0] ||
+      (Array.isArray(payload.role) ? payload.role[0] : undefined);
+    if (typeof raw === "string" && raw.trim()) {
+      return raw.replace(/^ROLE_/i, "").trim().toUpperCase();
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 function getAuthSnapshot() {
   const token = Cookies.get("access_token") || "";
   const username = Cookies.get("username") || "Racer";
   const rawRole = Cookies.get("role") || "";
-  const role = rawRole ? rawRole.toUpperCase() : "";
+  // USER (IAM) / trống → RUNNER để hiện Vé, Chứng nhận, menu runner
+  const role = token
+    ? mapAppRole(rawRole || roleFromJwt(token) || Role.RUNNER)
+    : "";
+  // Đồng bộ cookie nếu còn lưu USER cũ
+  if (token && rawRole && mapAppRole(rawRole) !== rawRole.toUpperCase()) {
+    Cookies.set("role", role, { sameSite: "lax", path: "/" });
+  }
   const raw = `${token}:${username}:${role}`;
   if (raw !== cachedAuthRaw) {
     cachedAuthRaw = raw;
@@ -71,7 +127,14 @@ const SERVER_AUTH_SNAPSHOT = {
 
 function subscribeAuth(callback: () => void) {
   window.addEventListener("focus", callback);
-  return () => window.removeEventListener("focus", callback);
+  window.addEventListener("storage", callback);
+  // Cookie set sau login cùng tab — poll nhẹ khi focus chưa đủ
+  const id = window.setInterval(callback, 2000);
+  return () => {
+    window.removeEventListener("focus", callback);
+    window.removeEventListener("storage", callback);
+    window.clearInterval(id);
+  };
 }
 
 export default function Header() {
@@ -164,7 +227,11 @@ export default function Header() {
             const isActive =
               link.href === "/"
                 ? pathname === "/"
-                : pathname.startsWith(link.href);
+                : link.href === "/events"
+                  ? pathname === "/events" ||
+                    /^\/events\/(?!create(?:\/|$))/.test(pathname)
+                  : pathname === link.href ||
+                    pathname.startsWith(`${link.href}/`);
             const Icon = link.icon;
 
             return (
@@ -245,13 +312,58 @@ export default function Header() {
                     </Link>
 
                     {role === Role.RUNNER && (
+                      <>
+                        <Link
+                          href="/my-registrations"
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+                          onClick={closeMenus}
+                        >
+                          <Ticket className="h-4 w-4 text-muted-foreground" />
+                          Vé của tôi
+                        </Link>
+                        <Link
+                          href="/payments"
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+                          onClick={closeMenus}
+                        >
+                          <CreditCard className="h-4 w-4 text-muted-foreground" />
+                          Thanh toán
+                        </Link>
+                        <Link
+                          href="/certificates"
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+                          onClick={closeMenus}
+                        >
+                          <Award className="h-4 w-4 text-muted-foreground" />
+                          Chứng nhận
+                        </Link>
+                        <Link
+                          href="/disputes"
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+                          onClick={closeMenus}
+                        >
+                          <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                          Khiếu nại
+                        </Link>
+                        <Link
+                          href="/events"
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+                          onClick={closeMenus}
+                        >
+                          <Flag className="h-4 w-4 text-muted-foreground" />
+                          Tham gia giải chạy
+                        </Link>
+                      </>
+                    )}
+
+                    {isLoggedIn && (
                       <Link
-                        href="/register-event"
+                        href="/my-events"
                         className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
                         onClick={closeMenus}
                       >
-                        <Flag className="h-4 w-4 text-muted-foreground" />
-                        Tham gia giải chạy
+                        <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
+                        Quản lý giải của tôi
                       </Link>
                     )}
 
@@ -266,7 +378,9 @@ export default function Header() {
                       </Link>
                     )}
 
-                    {(role === Role.COORDINATOR || role === Role.STAFF) && (
+                    {(role === Role.COORDINATOR ||
+                      role === Role.STAFF ||
+                      role === Role.ADMIN) && (
                       <Link
                         href="/scan-qr"
                         className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
@@ -370,7 +484,11 @@ export default function Header() {
               const isActive =
                 link.href === "/"
                   ? pathname === "/"
-                  : pathname.startsWith(link.href);
+                  : link.href === "/events"
+                    ? pathname === "/events" ||
+                      /^\/events\/(?!create(?:\/|$))/.test(pathname)
+                    : pathname === link.href ||
+                      pathname.startsWith(`${link.href}/`);
               const Icon = link.icon;
 
               return (
@@ -391,18 +509,48 @@ export default function Header() {
             })}
 
             {isLoggedIn && (
-              <Link
-                href="/profile"
-                onClick={closeMenus}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  pathname === "/profile"
-                    ? "bg-orange-500/10 text-orange-600 font-semibold"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
-                }`}
-              >
-                <User className="h-4 w-4" />
-                Hồ sơ của tôi
-              </Link>
+              <>
+                <Link
+                  href="/profile"
+                  onClick={closeMenus}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    pathname === "/profile"
+                      ? "bg-orange-500/10 text-orange-600 font-semibold"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
+                  }`}
+                >
+                  <User className="h-4 w-4" />
+                  Hồ sơ của tôi
+                </Link>
+                {role === Role.RUNNER && (
+                  <>
+                    <Link
+                      href="/my-registrations"
+                      onClick={closeMenus}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                        pathname.startsWith("/my-registrations")
+                          ? "bg-orange-500/10 text-orange-600 font-semibold"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
+                      }`}
+                    >
+                      <Ticket className="h-4 w-4" />
+                      Vé của tôi
+                    </Link>
+                    <Link
+                      href="/certificates"
+                      onClick={closeMenus}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                        pathname.startsWith("/certificates")
+                          ? "bg-orange-500/10 text-orange-600 font-semibold"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
+                      }`}
+                    >
+                      <Award className="h-4 w-4" />
+                      Chứng nhận
+                    </Link>
+                  </>
+                )}
+              </>
             )}
           </nav>
 

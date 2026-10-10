@@ -312,6 +312,42 @@ body {
   }
 }
 
+/* List page-turn fade */
+.list-fade {
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+.list-fade-out {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.list-fade-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+.list-stagger > * {
+  animation: list-item-in 0.35s ease both;
+}
+.list-stagger > *:nth-child(1) { animation-delay: 0.02s; }
+.list-stagger > *:nth-child(2) { animation-delay: 0.05s; }
+.list-stagger > *:nth-child(3) { animation-delay: 0.08s; }
+.list-stagger > *:nth-child(4) { animation-delay: 0.11s; }
+.list-stagger > *:nth-child(5) { animation-delay: 0.14s; }
+.list-stagger > *:nth-child(6) { animation-delay: 0.17s; }
+.list-stagger > *:nth-child(7) { animation-delay: 0.2s; }
+.list-stagger > *:nth-child(8) { animation-delay: 0.23s; }
+.list-stagger > *:nth-child(9) { animation-delay: 0.26s; }
+
+@keyframes list-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

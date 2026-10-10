@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Cookies from "js-cookie";
 import {
   ArrowRight,
   Flag,
@@ -15,13 +16,17 @@ import {
   ChevronRight,
   Sparkles,
 } from "lucide-react";
-import { getEvents } from "@/api/events";
+import { getEvents, getMyRegistrations } from "@/api/events";
 import { RaceEventListItemDto } from "@/dto/event.dto";
 import EventCard from "@/components/events/EventCard";
 import EventCardSkeleton from "@/components/events/EventCardSkeleton";
+import { PAGE_SHELL } from "@/lib/page-shell";
 
 export default function Home() {
   const [featuredEvents, setFeaturedEvents] = useState<RaceEventListItemDto[]>([]);
+  const [myRegByEventId, setMyRegByEventId] = useState<Map<string, string>>(
+    new Map()
+  );
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -45,6 +50,39 @@ export default function Home() {
     loadEvents();
     return () => {
       isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!Cookies.get("access_token")) {
+      setMyRegByEventId(new Map());
+      return;
+    }
+    (async () => {
+      try {
+        const regs = await getMyRegistrations();
+        if (cancelled) return;
+        const map = new Map<string, string>();
+        const rank = (s: string) => {
+          if (s === "confirmed" || s === "finished") return 3;
+          if (s === "pending_approval") return 2;
+          if (s === "pending_payment") return 1;
+          return 0;
+        };
+        for (const r of Array.isArray(regs) ? regs : []) {
+          if (r.status === "rejected" || r.status === "cancelled") continue;
+          const id = String(r.eventId);
+          const prev = map.get(id);
+          if (!prev || rank(r.status) > rank(prev)) map.set(id, r.status);
+        }
+        setMyRegByEventId(map);
+      } catch {
+        if (!cancelled) setMyRegByEventId(new Map());
+      }
+    })();
+    return () => {
+      cancelled = true;
     };
   }, []);
 
@@ -139,7 +177,7 @@ export default function Home() {
 
       {/* Featured Events */}
       <section className="py-16 sm:py-20 bg-background">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className={PAGE_SHELL}>
           <div className="flex items-end justify-between mb-10">
             <div>
               <p className="text-xs font-bold text-orange-500 uppercase tracking-widest mb-2">
@@ -178,7 +216,13 @@ export default function Home() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
               {featuredEvents.map((event) => (
-                <EventCard key={event.id} event={event} />
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  myRegistrationStatus={
+                    myRegByEventId.get(String(event.id)) ?? null
+                  }
+                />
               ))}
             </div>
           )}
@@ -198,7 +242,7 @@ export default function Home() {
 
       {/* How It Works */}
       <section id="how-it-works" className="py-16 sm:py-20 bg-muted/30">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className={PAGE_SHELL}>
           <div className="text-center mb-14">
             <p className="text-xs font-bold text-orange-500 uppercase tracking-widest mb-2">
               Quy trình tham gia
@@ -270,10 +314,10 @@ export default function Home() {
       <section className="py-16 sm:py-20 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(249,115,22,0.08),transparent_60%)]" />
 
-        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className={`relative ${PAGE_SHELL}`}>
           <div className="text-center mb-14">
             <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Đồng Hành Cùng Cộng Đồng Runner
+              Đồng Hành Cùng Cộng Đồng VĐV
             </h2>
             <p className="mt-3 text-gray-400 max-w-md mx-auto">
               Hàng ngàn chân chạy phong trào và chuyên nghiệp tin tưởng lựa chọn RaceDay.
@@ -329,7 +373,7 @@ export default function Home() {
                   href="/register"
                   className="inline-flex items-center gap-2 rounded-full border-2 border-white/30 px-7 py-3.5 text-sm font-bold text-white transition-all hover:bg-white/10 hover:border-white/50"
                 >
-                  Tạo tài khoản Runner
+                  Tạo tài khoản VĐV
                 </Link>
               </div>
             </div>

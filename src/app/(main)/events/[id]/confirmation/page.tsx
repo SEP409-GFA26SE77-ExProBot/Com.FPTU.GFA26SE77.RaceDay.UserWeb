@@ -21,6 +21,7 @@ import { getEventById, getRegistrationById } from "@/api/events";
 import { syncPayment } from "@/api/payments";
 import { RaceEventDto, RegistrationDto } from "@/dto/event.dto";
 import { formatPrice, formatDate } from "@/lib/format";
+import { PAGE_SHELL_FORM } from "@/lib/page-shell";
 
 function ConfirmationContent() {
   const params = useParams();
@@ -87,7 +88,7 @@ function ConfirmationContent() {
                 eventId: parsed.eventId || eventId,
                 distanceId: "",
                 status: "pending_approval",
-                fullName: parsed.fullName || "Runner",
+                fullName: parsed.fullName || "Vận động viên",
                 email: parsed.email || "",
                 phone: "",
                 eventName: parsed.eventTitle,
@@ -165,7 +166,7 @@ function ConfirmationContent() {
   }
 
   return (
-    <div className="relative mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-8 overflow-hidden">
+    <div className={`relative ${PAGE_SHELL_FORM} py-8 overflow-hidden`}>
       {/* Confetti animation */}
       {showConfetti && (
         <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
@@ -232,7 +233,7 @@ function ConfirmationContent() {
                 Vé Tham Gia Giải Chạy
               </p>
               <h2 className="text-xl font-bold text-white mt-0.5">
-                {registration?.eventName || event?.name || "RaceDay Event"}
+                {registration?.eventName || event?.name || "Giải chạy RaceDay"}
               </h2>
             </div>
             <FileCheck className="h-9 w-9 text-white/30" />
@@ -280,7 +281,7 @@ function ConfirmationContent() {
               <div className="flex items-center gap-1.5">
                 <Calendar className="h-4 w-4 text-orange-500" />
                 <span className="text-sm font-bold text-foreground">
-                  {event ? formatDate(event.date) : "TBD"}
+                  {event ? formatDate(event.date) : "Chưa xác định"}
                 </span>
               </div>
             </div>
@@ -303,7 +304,7 @@ function ConfirmationContent() {
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Vận động viên</span>
               <span className="font-semibold text-foreground">
-                {registration?.fullName || "Runner"}
+                {registration?.fullName || "Vận động viên"}
               </span>
             </div>
 
@@ -356,18 +357,34 @@ function ConfirmationContent() {
 
           {/* Action buttons */}
           <div className="flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={handleDownloadQR}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-border bg-background py-2.5 text-sm font-semibold text-foreground hover:bg-muted transition-colors"
-            >
-              <Download className="h-4 w-4" />
-              Tải mã QR
-            </button>
+            {isConfirmed && (
+              <button
+                type="button"
+                onClick={handleDownloadQR}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-border bg-background py-2.5 text-sm font-semibold text-foreground hover:bg-muted transition-colors"
+              >
+                <Download className="h-4 w-4" />
+                Tải mã QR
+              </button>
+            )}
+            {isPendingApproval && registration?.id && (
+              <Link
+                href={`/events/${eventId}/pending?regId=${registration.id}`}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 py-2.5 text-sm font-semibold text-amber-800 hover:bg-amber-500/15 transition-colors"
+              >
+                <Clock className="h-4 w-4" />
+                Theo dõi chờ duyệt
+              </Link>
+            )}
             <Link
-              href="/events"
+              href={
+                registration?.id
+                  ? `/my-registrations/${registration.id}`
+                  : "/my-registrations"
+              }
               className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-red-600 py-2.5 text-sm font-bold text-white shadow-md shadow-orange-500/20 hover:shadow-orange-500/35 transition-all"
             >
-              Khám phá thêm giải chạy
+              Vé của tôi
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
