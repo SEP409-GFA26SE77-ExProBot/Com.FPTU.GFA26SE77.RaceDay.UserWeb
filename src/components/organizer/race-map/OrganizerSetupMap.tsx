@@ -2,16 +2,20 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Check,
+  Droplets,
+  Eye,
   Flag,
   MapPin,
   PencilRuler,
-  RotateCcw,
   Trash2,
+  X,
 } from "lucide-react";
 import { useCourse, type SetupTool } from "@/components/organizer/race-map/CourseContext";
 import { courseLengthLabel } from "@/lib/race-map/course";
+import { checkpointDotClass } from "@/lib/race-map/map-colors";
 import PlaceSearch, { type PlaceHit } from "@/components/organizer/race-map/PlaceSearch";
 import type { MapFocusTarget } from "@/components/organizer/race-map/SetupMapCanvas";
 
@@ -48,20 +52,32 @@ const TOOLS: {
   {
     id: "checkpoint",
     short: "Checkpoint",
-    hint: "Click sát đường đua để đặt CP",
+    hint: "Click sát đường đua để đặt CP timing",
     icon: MapPin,
+  },
+  {
+    id: "aid",
+    short: "Điểm tiếp tế",
+    hint: "Click sát đường đua để đặt điểm tiếp tế",
+    icon: Droplets,
   },
 ];
 
+const VIEW_HINT =
+  "Click điểm đã setup trên map để xem loại & khoảng cách từ xuất phát";
+
 const panel =
   "rounded-xl border border-border/60 bg-card shadow-sm";
+
+function isMidEditable(type: string) {
+  return type === "cp" || type === "aid";
+}
 
 export default function OrganizerSetupMap() {
   const {
     draft,
     tool,
     setTool,
-    setTitle,
     handleMapClick,
     moveWaypoint,
     removeViaAt,
@@ -71,14 +87,22 @@ export default function OrganizerSetupMap() {
     snapping,
     snapError,
     mapHint,
-    applyToSimulation,
-    resetToDefault,
+    applyCourse,
     startEndPhase,
   } = useCourse();
 
   const [focusTarget, setFocusTarget] = useState<MapFocusTarget | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  const toolMeta = TOOLS.find((t) => t.id === tool) ?? TOOLS[0];
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const toolMeta =
+    tool === "view"
+      ? { hint: VIEW_HINT }
+      : (TOOLS.find((t) => t.id === tool) ?? TOOLS[0]);
 
   useEffect(() => {
     setFocusTarget(null);
@@ -101,19 +125,20 @@ export default function OrganizerSetupMap() {
         ? "Chờ Finish…"
         : "Chưa có route";
 
-  return (
-    <div className="grid min-h-[640px] grid-cols-1 gap-3 xl:grid-cols-[280px_1fr]">
-      <aside className={`${panel} flex flex-col gap-3 p-4`}>
-        <label className="block space-y-1 text-xs">
-          <span className="font-semibold text-muted-foreground">Tên cự ly</span>
-          <input
-            value={draft.title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="w-full rounded-lg border border-border bg-background px-2.5 py-2 text-sm outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20"
-          />
-        </label>
+  const canApply =
+    draft.polyline.length >= 2 &&
+    draft.checkpoints.length >= 2 &&
+    !snapping;
 
-        <div className="rounded-lg bg-muted/50 px-3 py-2 text-[11px] text-muted-foreground">
+  const onConfirmApply = () => {
+    applyCourse();
+    setConfirmOpen(false);
+  };
+
+  return (
+    <div className="grid h-full min-h-0 grid-cols-1 gap-3 xl:grid-cols-[260px_1fr]">
+      <aside className={`${panel} flex min-h-0 flex-col gap-2.5 overflow-hidden p-3`}>
+        <div className="shrink-0 rounded-lg bg-muted/40 px-2.5 py-1.5 text-[11px] text-muted-foreground">
           <p className="font-semibold text-foreground">
             {snapping ? "Đang snap…" : routeStatus}
           </p>
@@ -131,23 +156,19 @@ export default function OrganizerSetupMap() {
         ) : null}
 
         <div className="min-h-0 flex-1 space-y-2 border-t border-border/60 pt-3">
-          <p className="text-xs font-bold text-foreground">Checkpoints</p>
-          <ul className="max-h-56 space-y-1.5 overflow-auto">
+          <p className="text-xs font-bold text-foreground">
+            Checkpoint & điểm tiếp tế
+          </p>
+          <ul className="max-h-[min(22rem,40vh)] space-y-1.5 overflow-y-auto overscroll-contain pr-0.5">
             {draft.checkpoints.map((cp) => (
               <li
                 key={cp.id}
                 className="flex items-center gap-2 rounded-lg border border-border/50 bg-muted/30 px-2 py-1.5 text-[11px]"
               >
                 <span
-                  className={`h-2 w-2 shrink-0 rounded-full ${
-                    cp.type === "finish"
-                      ? "bg-red-500"
-                      : cp.type === "start"
-                        ? "bg-emerald-500"
-                        : "bg-orange-500"
-                  }`}
+                  className={`h-2 w-2 shrink-0 rounded-full ${checkpointDotClass(cp.type)}`}
                 />
-                {cp.type === "aid" ? (
+                {isMidEditable(cp.type) ? (
                   <input
                     value={cp.name}
                     onChange={(e) => renameCheckpoint(cp.km, e.target.value)}
@@ -161,12 +182,12 @@ export default function OrganizerSetupMap() {
                 <span className="shrink-0 tabular-nums text-muted-foreground">
                   {cp.km}k
                 </span>
-                {cp.type === "aid" ? (
+                {isMidEditable(cp.type) ? (
                   <button
                     type="button"
                     onClick={() => removeMidCheckpoint(cp.km)}
                     className="text-red-500 hover:text-red-600"
-                    title="Xóa CP"
+                    title="Xóa điểm"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -174,27 +195,25 @@ export default function OrganizerSetupMap() {
               </li>
             ))}
             {draft.checkpoints.length === 0 ? (
-              <li className="text-muted-foreground">Chưa có checkpoint.</li>
+              <li className="text-muted-foreground">
+                Chưa có checkpoint / điểm tiếp tế.
+              </li>
             ) : null}
           </ul>
         </div>
 
         <button
           type="button"
-          onClick={applyToSimulation}
-          disabled={
-            draft.polyline.length < 2 ||
-            draft.checkpoints.length < 2 ||
-            snapping
-          }
+          onClick={() => setConfirmOpen(true)}
+          disabled={!canApply}
           className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-orange-500 to-red-600 px-3 py-2.5 text-sm font-bold text-white disabled:opacity-40"
         >
-          <Check className="h-4 w-4" /> Áp dụng → Simulation
+          <Check className="h-4 w-4" /> Áp dụng
         </button>
       </aside>
 
       <main
-        className={`${panel} relative min-h-[440px] overflow-hidden`}
+        className={`${panel} relative isolate h-[min(60vh,560px)] overflow-hidden xl:h-full xl:min-h-0`}
       >
         <SetupMapCanvas
           tool={tool}
@@ -231,21 +250,81 @@ export default function OrganizerSetupMap() {
             <PlaceSearch onSelect={onPlaceSelect} />
             <button
               type="button"
-              onClick={clearCourse}
-              className="ml-auto inline-flex items-center gap-1.5 rounded-xl border border-border bg-white px-3 py-2 text-xs font-bold text-muted-foreground hover:border-orange-400/60 hover:text-foreground"
+              onClick={() => setTool("view")}
+              className={`ml-auto inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition ${
+                tool === "view"
+                  ? "border-transparent bg-gradient-to-r from-orange-500 to-red-600 text-white"
+                  : "border-border bg-white text-muted-foreground hover:border-orange-400/60 hover:text-foreground"
+              }`}
             >
-              <Trash2 className="h-3.5 w-3.5" /> Xóa
+              <Eye className="h-3.5 w-3.5" /> View
             </button>
             <button
               type="button"
-              onClick={resetToDefault}
+              onClick={clearCourse}
               className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-white px-3 py-2 text-xs font-bold text-muted-foreground hover:border-orange-400/60 hover:text-foreground"
             >
-              <RotateCcw className="h-3.5 w-3.5" /> Gợi ý map
+              <Trash2 className="h-3.5 w-3.5" /> Xóa
             </button>
           </div>
         </div>
       </main>
+
+      {mounted && confirmOpen
+        ? createPortal(
+            <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="apply-map-title"
+                className="w-full max-w-md rounded-2xl border border-border/60 bg-card p-6 shadow-2xl"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-orange-600">
+                      Xác nhận
+                    </p>
+                    <h2
+                      id="apply-map-title"
+                      className="mt-2 text-lg font-black text-foreground"
+                    >
+                      Bạn có muốn lưu thay đổi này?
+                    </h2>
+                    <p className="mt-1.5 text-sm text-muted-foreground">
+                      Lộ trình, checkpoint và điểm tiếp tế của cự ly đang chọn
+                      sẽ được lưu.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmOpen(false)}
+                    className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    aria-label="Đóng"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <div className="mt-6 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmOpen(false)}
+                    className="rounded-xl border border-border bg-background px-4 py-2.5 text-sm font-bold text-foreground hover:bg-muted"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onConfirmApply}
+                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-red-600 px-4 py-2.5 text-sm font-bold text-white"
+                  >
+                    <Check className="h-4 w-4" /> Lưu thay đổi
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   );
 }

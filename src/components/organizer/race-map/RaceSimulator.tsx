@@ -4,6 +4,8 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
   Flag,
   Pause,
   Play,
@@ -19,6 +21,7 @@ import {
 } from "@/api/race-map.mock-data";
 import { useCourse } from "@/components/organizer/race-map/CourseContext";
 import { formatClock } from "@/lib/race-map/geo";
+import { checkpointDotClass } from "@/lib/race-map/map-colors";
 import {
   advanceRunners,
   applyPassagesToLive,
@@ -43,6 +46,57 @@ const MapView = dynamic(() => import("@/components/organizer/race-map/MapView"),
 
 type Phase = "idle" | "running" | "paused";
 
+const ATHLETE_PAGE_SIZE = 10;
+const RANKING_PAGE_SIZE = 10;
+
+function ListPager({
+  page,
+  totalPages,
+  total,
+  pageSize,
+  onPage,
+}: {
+  page: number;
+  totalPages: number;
+  total: number;
+  pageSize: number;
+  onPage: (p: number) => void;
+}) {
+  if (total <= pageSize) return null;
+  const from = page * pageSize + 1;
+  const to = Math.min(total, (page + 1) * pageSize);
+  return (
+    <div className="flex items-center justify-between gap-2 pt-1 text-[10px] text-muted-foreground">
+      <span className="tabular-nums">
+        {from}–{to} / {total}
+      </span>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          disabled={page <= 0}
+          onClick={() => onPage(page - 1)}
+          className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-border bg-background disabled:opacity-40"
+          aria-label="Trang trước"
+        >
+          <ChevronLeft className="h-3.5 w-3.5" />
+        </button>
+        <span className="min-w-[4.5rem] text-center tabular-nums">
+          Trang {page + 1}/{totalPages}
+        </span>
+        <button
+          type="button"
+          disabled={page >= totalPages - 1}
+          onClick={() => onPage(page + 1)}
+          className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-border bg-background disabled:opacity-40"
+          aria-label="Trang sau"
+        >
+          <ChevronRight className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function RaceSimulator() {
   const { applied, appliedVersion } = useCourse();
   const checkpoints = applied.checkpoints;
@@ -59,9 +113,30 @@ export default function RaceSimulator() {
   const [focusBib, setFocusBib] = useState(1024);
   const [selectedBib, setSelectedBib] = useState(1024);
   const [fieldSize, setFieldSize] = useState(0);
+  const [athletePage, setAthletePage] = useState(0);
+  const [rankingPage, setRankingPage] = useState(0);
 
   const binds = useMemo(() => buildOfficialBinds(runners), [runners]);
   const ranking = useMemo(() => buildRanking(live), [live]);
+
+  const athletePages = Math.max(1, Math.ceil(live.length / ATHLETE_PAGE_SIZE));
+  const rankingPages = Math.max(1, Math.ceil(ranking.length / RANKING_PAGE_SIZE));
+  const pagedLive = live.slice(
+    athletePage * ATHLETE_PAGE_SIZE,
+    athletePage * ATHLETE_PAGE_SIZE + ATHLETE_PAGE_SIZE
+  );
+  const pagedRanking = ranking.slice(
+    rankingPage * RANKING_PAGE_SIZE,
+    rankingPage * RANKING_PAGE_SIZE + RANKING_PAGE_SIZE
+  );
+
+  useEffect(() => {
+    setAthletePage((p) => Math.min(p, athletePages - 1));
+  }, [athletePages]);
+
+  useEffect(() => {
+    setRankingPage((p) => Math.min(p, rankingPages - 1));
+  }, [rankingPages]);
   const liveRef = useRef(live);
   const passagesRef = useRef(passages);
   const flagsRef = useRef(flags);
@@ -246,16 +321,16 @@ export default function RaceSimulator() {
   const panel = "rounded-xl border border-border/60 bg-card shadow-sm";
 
   return (
-    <div className="text-foreground">
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[260px_1fr_260px]">
+    <div className="flex h-full min-h-0 flex-col gap-2 text-foreground">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-auto xl:grid-cols-[240px_1fr_240px]">
         <aside className="space-y-3">
           <div className={`${panel} space-y-3 p-4`}>
             <h2 className="flex items-center gap-2 text-sm font-bold">
               <Flag className="h-4 w-4 text-orange-500" /> Vận động viên
             </h2>
-            <div className="max-h-48 overflow-auto rounded-lg border border-border/50">
+            <div className="max-h-56 overflow-y-auto overscroll-contain rounded-lg border border-border/50">
               <table className="w-full text-[11px]">
-                <thead className="bg-muted/50 text-muted-foreground">
+                <thead className="sticky top-0 z-[1] bg-muted/95 text-muted-foreground backdrop-blur-sm">
                   <tr>
                     <th className="p-2 text-left">BIB</th>
                     <th className="p-2 text-left">Tên</th>
@@ -263,7 +338,7 @@ export default function RaceSimulator() {
                   </tr>
                 </thead>
                 <tbody>
-                  {live.map((r) => (
+                  {pagedLive.map((r) => (
                     <tr
                       key={r.bib}
                       onClick={() => {
@@ -284,6 +359,13 @@ export default function RaceSimulator() {
                 </tbody>
               </table>
             </div>
+            <ListPager
+              page={athletePage}
+              totalPages={athletePages}
+              total={live.length}
+              pageSize={ATHLETE_PAGE_SIZE}
+              onPage={setAthletePage}
+            />
             {selected ? (
               <label className="block space-y-1 text-xs">
                 <span className="text-muted-foreground">
@@ -312,11 +394,11 @@ export default function RaceSimulator() {
             <h2 className="flex items-center gap-2 text-sm font-bold">
               <Trophy className="h-4 w-4 text-orange-500" /> Ranking
             </h2>
-            <ul className="max-h-56 space-y-1 overflow-auto text-xs">
+            <ul className="max-h-56 space-y-1 overflow-y-auto overscroll-contain text-xs">
               {ranking.length === 0 ? (
                 <li className="text-muted-foreground">Chưa có kết quả.</li>
               ) : null}
-              {ranking.slice(0, 12).map((row) => (
+              {pagedRanking.map((row) => (
                 <li
                   key={row.bib}
                   className="flex justify-between gap-2 rounded-lg bg-muted/40 px-2 py-1.5"
@@ -331,6 +413,13 @@ export default function RaceSimulator() {
                 </li>
               ))}
             </ul>
+            <ListPager
+              page={rankingPage}
+              totalPages={rankingPages}
+              total={ranking.length}
+              pageSize={RANKING_PAGE_SIZE}
+              onPage={setRankingPage}
+            />
           </div>
         </aside>
 
@@ -398,48 +487,69 @@ export default function RaceSimulator() {
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
-            <div className={`${panel} p-4`}>
-              <h3 className="mb-2 text-sm font-bold">Checkpoint</h3>
-              <table className="w-full text-[11px]">
-                <thead className="text-muted-foreground">
-                  <tr>
-                    <th className="py-1 text-left">CP</th>
-                    <th className="py-1 text-left">Leader</th>
-                    <th className="py-1 text-right">Split</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {checkpoints.map((cp) => {
-                    const atCp = passages
-                      .filter((p) => p.checkpointId === cp.id)
-                      .slice()
-                      .sort((a, b) => a.readAtSec - b.readAtSec);
-                    const lead = atCp[0];
-                    const leadLive = lead
-                      ? live.find((r) => r.bib === lead.bib)
-                      : undefined;
-                    return (
-                      <tr key={cp.id} className="border-t border-border/40">
-                        <td className="py-1.5">{cp.name}</td>
-                        <td className="py-1.5">
-                          {lead ? `BIB ${lead.bib}` : "—"}
-                        </td>
-                        <td className="py-1.5 text-right tabular-nums">
-                          {lead && leadLive
-                            ? formatClock(
-                                lead.readAtSec - leadLive.startOffsetSec
-                              )
-                            : "—"}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div className={`${panel} flex min-h-0 flex-col p-4`}>
+              <h3 className="mb-2 shrink-0 text-sm font-bold">
+                Checkpoint & điểm tiếp tế
+              </h3>
+              <div className="max-h-52 overflow-y-auto overscroll-contain">
+                <table className="w-full text-[11px]">
+                  <thead className="sticky top-0 z-[1] bg-card text-muted-foreground">
+                    <tr>
+                      <th className="py-1 text-left">Điểm</th>
+                      <th className="py-1 text-left">Loại</th>
+                      <th className="py-1 text-left">Leader</th>
+                      <th className="py-1 text-right">Split</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {checkpoints.map((cp) => {
+                      const atCp = passages
+                        .filter((p) => p.checkpointId === cp.id)
+                        .slice()
+                        .sort((a, b) => a.readAtSec - b.readAtSec);
+                      const lead = atCp[0];
+                      const leadLive = lead
+                        ? live.find((r) => r.bib === lead.bib)
+                        : undefined;
+                      const kind =
+                        cp.type === "aid"
+                          ? "Tiếp tế"
+                          : cp.type === "cp"
+                            ? "CP"
+                            : cp.type === "start"
+                              ? "Xuất phát"
+                              : "Đích";
+                      return (
+                        <tr key={cp.id} className="border-t border-border/40">
+                          <td className="py-1.5">
+                            <span className="inline-flex items-center gap-1.5">
+                              <span
+                                className={`h-1.5 w-1.5 shrink-0 rounded-full ${checkpointDotClass(cp.type)}`}
+                              />
+                              {cp.name}
+                            </span>
+                          </td>
+                          <td className="py-1.5 text-muted-foreground">{kind}</td>
+                          <td className="py-1.5">
+                            {lead ? `BIB ${lead.bib}` : "—"}
+                          </td>
+                          <td className="py-1.5 text-right tabular-nums">
+                            {lead && leadLive
+                              ? formatClock(
+                                  lead.readAtSec - leadLive.startOffsetSec
+                                )
+                              : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <div className={`${panel} p-4`}>
-              <h3 className="mb-2 text-sm font-bold">Nhật ký</h3>
-              <ul className="max-h-40 space-y-1 overflow-auto font-mono text-[11px] text-muted-foreground">
+            <div className={`${panel} flex min-h-0 flex-col p-4`}>
+              <h3 className="mb-2 shrink-0 text-sm font-bold">Nhật ký</h3>
+              <ul className="max-h-52 space-y-1 overflow-y-auto overscroll-contain font-mono text-[11px] text-muted-foreground">
                 {logs.length === 0 ? <li>Chưa có log.</li> : null}
                 {logs.map((l, i) => (
                   <li
@@ -457,16 +567,16 @@ export default function RaceSimulator() {
         <aside className="space-y-3">
           <div className={`${panel} space-y-3 p-4`}>
             <h2 className="text-sm font-bold">Cấu hình</h2>
-            <p className="text-[11px] text-muted-foreground">
-              {distanceKm} km · {checkpoints.length} CP · max{" "}
-              {DEMO_EVENT.maxPlausibleKmh} km/h
-            </p>
             <label className="block space-y-1 text-[11px]">
               <span className="text-muted-foreground">Số VĐV giả lập</span>
               <select
                 value={fieldSize}
                 disabled={phase === "running"}
-                onChange={(e) => applyFieldSize(Number(e.target.value))}
+                onChange={(e) => {
+                  setAthletePage(0);
+                  setRankingPage(0);
+                  applyFieldSize(Number(e.target.value));
+                }}
                 className="w-full rounded-lg border border-border bg-background px-2 py-1.5"
               >
                 <option value={0}>Demo 6 VĐV</option>
@@ -498,7 +608,7 @@ export default function RaceSimulator() {
             <h2 className="flex items-center gap-2 text-sm font-bold text-red-700">
               <AlertTriangle className="h-4 w-4" /> Fraud
             </h2>
-            <ul className="max-h-72 space-y-2 overflow-auto text-[11px]">
+            <ul className="max-h-56 space-y-2 overflow-y-auto overscroll-contain text-[11px]">
               {flags.length === 0 ? (
                 <li className="text-muted-foreground">Chưa có cảnh báo.</li>
               ) : null}

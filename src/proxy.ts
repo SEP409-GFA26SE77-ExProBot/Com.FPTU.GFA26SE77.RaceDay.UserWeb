@@ -15,6 +15,7 @@ const ROLE_PERMISSIONS: Record<string, (Role | string)[] | '*'> = {
     '/registered-events': '*',
     '/my-events': '*',
     '/payments': '*',
+    '/wallet': '*',
     '/certificates': '*',
     '/disputes': '*',
     '/race-day': '*',
@@ -101,7 +102,9 @@ export function proxy(request: NextRequest) {
         allowedRoles = '*';
     } else if (
         /^\/organizer\/events\/[^/]+\/?$/.test(pathname) ||
-        /^\/organizer\/events\/[^/]+\/(setup-map|race-simulation)\/?$/.test(pathname)
+        /^\/organizer\/events\/[^/]+\/(setup-map|race-simulation|staff|wallet|payout-history)\/?$/.test(
+          pathname
+        )
     ) {
         // Chi tiết giải + Setup map + Race simulation — vào từ Giải của tôi
         allowedRoles = '*';

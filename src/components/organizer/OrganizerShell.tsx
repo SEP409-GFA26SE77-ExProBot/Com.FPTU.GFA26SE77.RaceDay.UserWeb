@@ -23,8 +23,11 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   QrCode,
+  History,
   Ticket,
   User,
+  Users,
+  Wallet,
   X,
 } from "lucide-react";
 
@@ -61,6 +64,24 @@ function eventWorkspaceNav(eventId: string) {
       href: `/organizer/events/${eventId}/race-simulation`,
       icon: Flag,
       matchPath: `/organizer/events/${eventId}/race-simulation`,
+    },
+    {
+      label: "Quản lý nhân sự",
+      href: `/organizer/events/${eventId}/staff`,
+      icon: Users,
+      matchPath: `/organizer/events/${eventId}/staff`,
+    },
+    {
+      label: "Ví & giải ngân",
+      href: `/organizer/events/${eventId}/wallet`,
+      icon: Wallet,
+      matchPath: `/organizer/events/${eventId}/wallet`,
+    },
+    {
+      label: "Lịch sử giải ngân",
+      href: `/organizer/events/${eventId}/payout-history`,
+      icon: History,
+      matchPath: `/organizer/events/${eventId}/payout-history`,
     },
   ];
 }
@@ -104,7 +125,9 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
   const activeTab = searchParams.get("tab");
   const isMapWorkspace =
     !!eventId &&
-    (/\/setup-map\/?$/.test(pathname) || /\/race-simulation\/?$/.test(pathname));
+    (/\/(setup-map|race-simulation|staff|wallet|payout-history)\/?$/.test(
+      pathname
+    ));
 
   const closeMobile = () => setMobileOpen(false);
   const closeUserMenu = () => setUserMenuOpen(false);
@@ -270,7 +293,7 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
           collapsed ? "lg:pl-[72px]" : "lg:pl-[272px]"
         }`}
       >
-        <header className="sticky top-0 z-30 flex h-20 items-center justify-between border-b border-slate-200/80 bg-[#f7f5f1]/90 px-5 backdrop-blur-md sm:px-8">
+        <header className="sticky top-0 z-40 flex h-20 items-center justify-between border-b border-slate-200/80 bg-[#f7f5f1]/90 px-5 backdrop-blur-md sm:px-8">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileOpen(true)}
@@ -322,7 +345,7 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
             </button>
 
             {userMenuOpen && (
-              <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl ring-1 ring-black/5">
+              <div className="absolute right-0 z-50 mt-2 w-56 origin-top-right rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl ring-1 ring-black/5">
                 <div className="border-b border-slate-100 px-3 py-2">
                   <p className="text-xs text-slate-500">Đã đăng nhập với</p>
                   <p className="truncate text-sm font-semibold text-slate-900">

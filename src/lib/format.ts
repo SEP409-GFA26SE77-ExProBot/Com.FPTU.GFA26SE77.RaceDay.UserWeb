@@ -170,7 +170,46 @@ export function getPaymentStatusLabel(status: string): string {
     case "expired":
       return "Hết hạn";
     case "refunded":
-      return "Hoàn tiền";
+      return "Đã hoàn tiền";
+    case "refund_requested":
+    case "refund_processing":
+      return "Đang hoàn tiền";
+    default:
+      return status;
+  }
+}
+
+/** Trạng thái yêu cầu giải ngân (escrow) */
+export function getPayoutStatusLabel(status: string): string {
+  switch ((status || "").toLowerCase()) {
+    case "pending":
+      return "Chờ duyệt";
+    case "approved":
+      return "Đã duyệt";
+    case "transferred":
+      return "Đã chuyển khoản";
+    case "rejected":
+      return "Từ chối";
+    default:
+      return status;
+  }
+}
+
+/** Trạng thái yêu cầu hoàn tiền runner */
+export function getRefundStatusLabel(status: string): string {
+  switch ((status || "").toLowerCase()) {
+    case "eligible":
+      return "Có thể hoàn";
+    case "requested":
+      return "Đã gửi yêu cầu";
+    case "processing":
+      return "Đang xử lý";
+    case "refunded":
+      return "Đã hoàn tiền";
+    case "rejected":
+      return "Từ chối hoàn";
+    case "none":
+      return "—";
     default:
       return status;
   }

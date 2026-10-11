@@ -223,7 +223,11 @@ const CP_DEFS: { km: number; name: string; cutoff?: string }[] = [
 export const CHECKPOINTS: Checkpoint[] = CP_DEFS.map((d) => {
   const p = pointAtKm(ROUTE_POLYLINE, d.km, DEMO_EVENT.distanceKm);
   const type: CheckpointType =
-    d.km === 0 ? "start" : d.km >= DEMO_EVENT.distanceKm ? "finish" : "aid";
+    d.km === 0
+      ? "start"
+      : d.km >= DEMO_EVENT.distanceKm
+        ? "finish"
+        : "cp";
   return {
     id: `cp-${d.km}`,
     name: d.name,

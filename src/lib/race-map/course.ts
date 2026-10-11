@@ -11,6 +11,7 @@ import { pointAtKmAlongPolyline, polylineLengthKm } from "@/lib/race-map/geo";
 /** Shape gần Event.RouteGeometryJson + checkpoints */
 export interface CourseConfig {
   title: string;
+  distanceId?: string | null;
   distanceKm: number;
   /** Điểm organizer click — lưu như osrmWaypoints */
   waypoints: LatLng[];
@@ -24,6 +25,22 @@ export interface CheckpointDraft {
   name: string;
   km: number;
   cutoff?: string;
+  /** Điểm giữa: checkpoint timing hoặc điểm tiếp tế */
+  type?: "cp" | "aid";
+}
+
+/** Legacy mid từng lưu type "aid" dù tên CP → coi là checkpoint timing */
+export function midPointKind(
+  type: CheckpointType | undefined,
+  name: string
+): "cp" | "aid" {
+  if (type === "cp") return "cp";
+  if (type === "aid") {
+    if (/^CP\b/i.test(name.trim())) return "cp";
+    return "aid";
+  }
+  if (/ti[eế]p\s*t[eế]/i.test(name)) return "aid";
+  return "cp";
 }
 
 export function sampleWaypointsFromPolyline(poly: LatLng[], count = 5): LatLng[] {
@@ -46,8 +63,10 @@ export function buildCheckpoints(
   return sorted.map((d) => {
     const km = Math.max(0, Math.min(distanceKm, d.km));
     const p = pointAtKmAlongPolyline(poly, km);
-    const type: CheckpointType =
-      km <= 0.001 ? "start" : km >= distanceKm - 0.001 ? "finish" : "aid";
+    let type: CheckpointType;
+    if (km <= 0.001) type = "start";
+    else if (km >= distanceKm - 0.001) type = "finish";
+    else type = midPointKind(d.type, d.name);
     return {
       id: `cp-${km}`,
       name: d.name,
@@ -73,20 +92,41 @@ export function defaultCpDrafts(distanceKm: number): CheckpointDraft[] {
   const defs: CheckpointDraft[] = [
     { km: 0, name: "Xuất phát", cutoff: "06:10" },
   ];
-  if (mid1 > 0.2 && mid1 < finish - 0.2) defs.push({ km: mid1, name: `CP ${mid1}km` });
-  if (mid2 > mid1 + 0.2 && mid2 < finish - 0.2) defs.push({ km: mid2, name: `CP ${mid2}km` });
+  if (mid1 > 0.2 && mid1 < finish - 0.2) {
+    defs.push({ km: mid1, name: `CP ${mid1}km`, type: "cp" });
+  }
+  if (mid2 > mid1 + 0.2 && mid2 < finish - 0.2) {
+    defs.push({ km: mid2, name: `CP ${mid2}km`, type: "cp" });
+  }
   defs.push({ km: finish, name: `Vạch đích ${finish}km`, cutoff: "07:00" });
   return defs;
 }
 
-export function createDefaultCourse(): CourseConfig {
+export function createDefaultCourse(distanceId?: string | null): CourseConfig {
   const distanceKm = DEMO_EVENT.distanceKm;
   return {
     title: DEMO_EVENT.title,
+    distanceId: distanceId ?? null,
     distanceKm,
     waypoints: sampleWaypointsFromPolyline(ROUTE_POLYLINE, 5),
     polyline: [...ROUTE_POLYLINE],
     checkpoints: CHECKPOINTS.map((c) => ({ ...c })),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+/** Course trống khi cự ly chưa vẽ map */
+export function createEmptyCourse(
+  title: string,
+  distanceId?: string | null
+): CourseConfig {
+  return {
+    title,
+    distanceId: distanceId ?? null,
+    distanceKm: 0,
+    waypoints: [],
+    polyline: [],
+    checkpoints: [],
     updatedAt: new Date().toISOString(),
   };
 }
@@ -109,13 +149,18 @@ export function rebuildCourseFromSnap(
     polyline: [...polyline],
     checkpoints: buildCheckpoints(polyline, dist, drafts),
     updatedAt: new Date().toISOString(),
+    distanceId: undefined,
   };
 }
 
 export function normalizeCpDrafts(defs: CheckpointDraft[], distanceKm: number): CheckpointDraft[] {
   const mid = defs
     .filter((d) => d.km > 0.01 && d.km < distanceKm - 0.01)
-    .map((d) => ({ ...d, km: Math.round(d.km * 1000) / 1000 }));
+    .map((d) => {
+      const km = Math.round(d.km * 1000) / 1000;
+      const kind = midPointKind(d.type, d.name);
+      return { ...d, km, type: kind as "cp" | "aid" };
+    });
   return [
     { km: 0, name: defs.find((d) => d.km <= 0.01)?.name ?? "Xuất phát", cutoff: "06:10" },
     ...mid.sort((a, b) => a.km - b.km),

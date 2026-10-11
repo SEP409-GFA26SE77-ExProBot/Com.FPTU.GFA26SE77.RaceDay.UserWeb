@@ -109,7 +109,7 @@ export default function PlaceSearch({
       </div>
 
       {open && (hits.length > 0 || err) ? (
-        <ul className="absolute left-0 right-0 top-full z-[1100] mt-1 max-h-56 overflow-auto rounded-xl border border-border bg-white py-1 shadow-lg">
+        <ul className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-auto rounded-xl border border-border bg-white py-1 shadow-lg">
           {err ? (
             <li className="px-3 py-2 text-[11px] text-red-600">{err}</li>
           ) : null}

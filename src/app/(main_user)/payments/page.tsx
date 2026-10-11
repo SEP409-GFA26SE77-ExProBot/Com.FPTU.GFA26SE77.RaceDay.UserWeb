@@ -3,12 +3,21 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import Cookies from "js-cookie";
-import { Receipt, ExternalLink, LogIn } from "lucide-react";
+import { Receipt, ExternalLink, LogIn, Undo2 } from "lucide-react";
 import { getMyPayments } from "@/api/payments";
 import { getMyRegistrations } from "@/api/events";
+import {
+  createRefundRequest,
+  listMyRefundRequests,
+} from "@/api/finance";
 import { PaymentDto } from "@/dto/payment.dto";
 import { RegistrationDto } from "@/dto/event.dto";
-import { formatPrice, getPaymentStatusLabel } from "@/lib/format";
+import type { RefundRequestDto } from "@/dto/finance.dto";
+import {
+  formatPrice,
+  getPaymentStatusLabel,
+  getRefundStatusLabel,
+} from "@/lib/format";
 import { getApiErrorMessage } from "@/lib/error";
 import { PAGE_SHELL } from "@/lib/page-shell";
 import PageLoading from "@/components/ui/PageLoading";
@@ -45,7 +54,10 @@ export default function PaymentsHistoryPage() {
   const [boot, setBoot] = useState(true);
   const [loggedIn, setLoggedIn] = useState(false);
   const [items, setItems] = useState<Row[]>([]);
+  const [refunds, setRefunds] = useState<RefundRequestDto[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [refundBusyId, setRefundBusyId] = useState<string | null>(null);
+  const [refundMsg, setRefundMsg] = useState<string | null>(null);
 
   useEffect(() => {
     const token = Cookies.get("access_token");
@@ -58,9 +70,10 @@ export default function PaymentsHistoryPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [payments, regs] = await Promise.all([
+        const [payments, regs, refundList] = await Promise.all([
           getMyPayments(),
           getMyRegistrations(),
+          listMyRefundRequests().catch(() => [] as RefundRequestDto[]),
         ]);
         if (cancelled) return;
 
@@ -86,6 +99,7 @@ export default function PaymentsHistoryPage() {
           });
 
         setItems(mapped);
+        setRefunds(Array.isArray(refundList) ? refundList : []);
         setError(null);
       } catch (e) {
         if (!cancelled) {
@@ -101,6 +115,33 @@ export default function PaymentsHistoryPage() {
       cancelled = true;
     };
   }, []);
+
+  const refundByPayment = new Map(
+    refunds.map((r) => [r.paymentId, r] as const)
+  );
+
+  const requestRefund = async (paymentId: string, eventId?: string, amount?: number) => {
+    const reason = window.prompt(
+      "Lý do yêu cầu hoàn tiền (giải hủy / hủy vé theo chính sách):"
+    );
+    if (!reason?.trim()) return;
+    setRefundBusyId(paymentId);
+    setRefundMsg(null);
+    try {
+      const row = await createRefundRequest({
+        paymentId,
+        reason: reason.trim(),
+        eventId,
+        amount,
+      });
+      setRefunds((prev) => [row, ...prev.filter((r) => r.paymentId !== paymentId)]);
+      setRefundMsg("Đã gửi yêu cầu hoàn tiền — theo dõi trạng thái bên dưới.");
+    } catch (e) {
+      setRefundMsg(getApiErrorMessage(e, "Gửi yêu cầu hoàn tiền thất bại."));
+    } finally {
+      setRefundBusyId(null);
+    }
+  };
 
   const pager = usePagedList(items, PAGE_SIZE, String(items.length));
 
@@ -138,13 +179,19 @@ export default function PaymentsHistoryPage() {
         </p>
         <h1 className="text-3xl font-extrabold tracking-tight">Lịch sử thanh toán</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Theo dõi giao dịch PayOS (thành công / chờ / hoàn tiền / thất bại / hủy).
+          Theo dõi giao dịch PayOS và yêu cầu hoàn tiền khi giải hủy / hủy vé
+          hợp lệ (chuẩn Ticketmaster / Ticketbox refund).
         </p>
       </div>
 
       {error && (
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           {error}
+        </div>
+      )}
+      {refundMsg && (
+        <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+          {refundMsg}
         </div>
       )}
 
@@ -208,6 +255,31 @@ export default function PaymentsHistoryPage() {
                                 <ExternalLink className="h-3 w-3" />
                               </Link>
                             )}
+                          {p.status === "paid" &&
+                            !refundByPayment.has(p.id) && (
+                              <button
+                                type="button"
+                                disabled={refundBusyId === p.id}
+                                onClick={() =>
+                                  void requestRefund(
+                                    p.id,
+                                    p.eventId,
+                                    Number(p.amount || 0) || undefined
+                                  )
+                                }
+                                className="inline-flex items-center gap-1 text-xs font-semibold text-sky-700 hover:underline disabled:opacity-50"
+                              >
+                                <Undo2 className="h-3 w-3" />
+                                Yêu cầu hoàn tiền
+                              </button>
+                            )}
+                          {refundByPayment.get(p.id) ? (
+                            <span className="inline-flex items-center rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[11px] font-bold text-sky-800">
+                              {getRefundStatusLabel(
+                                refundByPayment.get(p.id)!.status
+                              )}
+                            </span>
+                          ) : null}
                           {p.eventId && (
                             <Link
                               href={`/events/${p.eventId}`}

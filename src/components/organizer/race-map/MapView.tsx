@@ -14,6 +14,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { DEMO_EVENT, type Checkpoint, type LatLng } from "@/api/race-map.mock-data";
 import { positionAtCourseKm } from "@/lib/race-map/geo";
+import { MAP_COLORS, checkpointMapColor } from "@/lib/race-map/map-colors";
 import type { RunnerLive } from "@/lib/race-map/timing";
 
 function FitBounds({ points, token }: { points: LatLng[]; token: string }) {
@@ -126,27 +127,36 @@ export default function MapView({
       <FitBounds points={polyline} token={fitToken} />
       <Polyline
         positions={polyline.map((p) => [p.lat, p.lng] as [number, number])}
-        pathOptions={{ color: "#38bdf8", weight: 5, opacity: 0.9 }}
+        pathOptions={{ color: MAP_COLORS.route, weight: 5, opacity: 0.88 }}
       />
-      {checkpoints.map((cp) => (
-        <CircleMarker
-          key={cp.id}
-          center={[cp.lat, cp.lng]}
-          radius={cp.type === "finish" || cp.type === "start" ? 10 : 8}
-          pathOptions={{
-            color: cp.type === "finish" ? "#ef4444" : "#22c55e",
-            fillColor: cp.type === "finish" ? "#ef4444" : "#22c55e",
-            fillOpacity: 0.85,
-          }}
-        >
-          <Popup>
-            <strong>{cp.name}</strong>
-            <br />
-            {cp.km} km
-            {cp.cutoff ? ` · cutoff ${cp.cutoff}` : ""}
-          </Popup>
-        </CircleMarker>
-      ))}
+      {checkpoints.map((cp) => {
+        const color = checkpointMapColor(cp.type);
+        return (
+          <CircleMarker
+            key={cp.id}
+            center={[cp.lat, cp.lng]}
+            radius={cp.type === "finish" || cp.type === "start" ? 10 : 8}
+            pathOptions={{
+              color: "#fff7ed",
+              fillColor: color,
+              fillOpacity: 0.95,
+              weight: 2,
+            }}
+          >
+            <Popup>
+              <strong>{cp.name}</strong>
+              <br />
+              {cp.km} km
+              {cp.type === "aid"
+                ? " · điểm tiếp tế"
+                : cp.type === "cp"
+                  ? " · checkpoint"
+                  : ""}
+              {cp.cutoff ? ` · cutoff ${cp.cutoff}` : ""}
+            </Popup>
+          </CircleMarker>
+        );
+      })}
       {markers.map((r) => {
         const pos = positionAtCourseKm(polyline, r.courseKm, distanceKm);
         return (

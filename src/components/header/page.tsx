@@ -25,6 +25,7 @@ import {
   Ticket,
   AlertTriangle,
   PlusCircle,
+  Wallet,
 } from "lucide-react";
 
 interface NavLink {
@@ -328,14 +329,24 @@ export default function Header() {
                     )}
 
                     {isLoggedIn && (
-                      <Link
-                        href="/my-events"
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
-                        onClick={closeMenus}
-                      >
-                        <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
-                        Quản lý giải của tôi
-                      </Link>
+                      <>
+                        <Link
+                          href="/my-events"
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+                          onClick={closeMenus}
+                        >
+                          <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
+                          Quản lý giải của tôi
+                        </Link>
+                        <Link
+                          href="/wallet"
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+                          onClick={closeMenus}
+                        >
+                          <Wallet className="h-4 w-4 text-muted-foreground" />
+                          Ví & giải ngân
+                        </Link>
+                      </>
                     )}
 
                     {(role === Role.ADMIN || role === Role.COORDINATOR) && (

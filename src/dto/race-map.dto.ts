@@ -1,6 +1,7 @@
 /** Course / checkpoint shape — khớp demo Map & (tương lai) Event.RouteGeometryJson */
 
-export type CheckpointType = "start" | "aid" | "finish";
+/** start/finish cố định; cp = checkpoint timing; aid = điểm tiếp tế */
+export type CheckpointType = "start" | "cp" | "aid" | "finish";
 
 export interface LatLngDto {
   lat: number;
@@ -17,9 +18,11 @@ export interface RaceCheckpointDto {
   cutoff?: string;
 }
 
-/** Config đường đua + CP — lưu mock localStorage hoặc PUT BE sau này */
+/** Config đường đua + CP — mỗi cự ly (distanceId) một course riêng */
 export interface CourseConfigDto {
   title: string;
+  /** Cự ly thuộc event — null = legacy 1 map / event */
+  distanceId?: string | null;
   distanceKm: number;
   waypoints: LatLngDto[];
   polyline: LatLngDto[];
@@ -31,6 +34,8 @@ export interface CheckpointDraftDto {
   name: string;
   km: number;
   cutoff?: string;
+  /** Chỉ dùng cho điểm giữa route */
+  type?: "cp" | "aid";
 }
 
 export interface SimRunnerDto {

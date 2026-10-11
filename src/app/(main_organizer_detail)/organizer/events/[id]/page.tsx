@@ -39,11 +39,12 @@ import {
 import { getApiErrorMessage } from "@/lib/error";
 import { mediaDisplayUrl } from "@/lib/media-url";
 import { PAGE_SHELL } from "@/lib/page-shell";
+import EventFinancePanel from "@/components/organizer/EventFinancePanel";
 
 const DEFAULT_GRADIENT =
   "linear-gradient(135deg, #f97316 0%, #ea580c 40%, #dc2626 100%)";
 
-type TabKey = "overview" | "approvals";
+type TabKey = "overview" | "approvals" | "finance";
 
 function isManageableOrganizerStatus(status: string): boolean {
   const key = (status || "").toLowerCase().replace(/_/g, "-");
@@ -166,13 +167,14 @@ function MyEventDetailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const eventId = String(params?.id || "");
+  const rawTab = searchParams.get("tab");
   const tab: TabKey =
-    searchParams.get("tab") === "approvals" ? "approvals" : "overview";
+    rawTab === "approvals" || rawTab === "finance" ? rawTab : "overview";
   const setTab = (next: TabKey) => {
     const url =
-      next === "approvals"
-        ? `/organizer/events/${eventId}?tab=approvals`
-        : `/organizer/events/${eventId}`;
+      next === "overview"
+        ? `/organizer/events/${eventId}`
+        : `/organizer/events/${eventId}?tab=${next}`;
     router.replace(url);
   };
   const [event, setEvent] = useState<RaceEventDto | null>(null);
@@ -378,6 +380,7 @@ function MyEventDetailContent() {
                 key: "approvals",
                 label: `Duyệt đăng ký${pendingCount ? ` (${pendingCount})` : ""}`,
               },
+              { key: "finance", label: "Tài chính" },
             ] as { key: TabKey; label: string }[]
           ).map((t) => (
             <button
@@ -468,6 +471,8 @@ function MyEventDetailContent() {
           </div>
         </>
       )}
+
+      {tab === "finance" && <EventFinancePanel eventId={eventId} />}
 
       {tab === "approvals" && (
         <section className="mt-6 space-y-4">
