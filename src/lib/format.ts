@@ -50,6 +50,8 @@ export function getStatusLabel(status: string): string {
       return "Đã kết thúc";
     case "cancelled":
       return "Đã hủy";
+    case "suspended":
+      return "Hết hạn gói";
     case "rejected":
       return "Từ chối";
     case "sold-out":
@@ -61,30 +63,30 @@ export function getStatusLabel(status: string): string {
   }
 }
 
-/** Status giải — góc nhìn BTC / quản lý giải của tôi */
+/** Status giải — góc nhìn BTC (hồ sơ / chi tiết). List “Giải của tôi” dùng getMyEventsCardStatusLabel. */
 export function getOrganizerStatusLabel(status: string): string {
   const key = (status || "").toLowerCase().replace(/_/g, "-");
   switch (key) {
     case "draft":
-      return "Nháp";
+      return "Chưa duyệt";
     case "pending":
     case "pending-approval":
       return "Chờ duyệt";
+    case "suspended":
+      return "Hết hạn gói";
     case "approved":
     case "published":
-      return "Đã duyệt";
     case "registration-open":
-      return "Đang mở ĐK";
     case "closed":
-      return "Đã đóng ĐK";
+      return "Đã duyệt";
     case "completed":
       return "Đã kết thúc";
     case "cancelled":
       return "Đã hủy";
     case "rejected":
-      return "Bị từ chối";
+      return "Đã từ chối";
     case "in-progress":
-      return "Đang diễn ra";
+      return "Đã bắt đầu";
     default:
       return getStatusLabel(status);
   }
@@ -107,6 +109,7 @@ export function getStatusColor(status: string): string {
       return "bg-orange-500/15 text-orange-700 border-orange-500/25";
     case "closed":
     case "completed":
+    case "suspended":
       return "bg-gray-500/15 text-gray-600 border-gray-500/25";
     case "cancelled":
     case "rejected":

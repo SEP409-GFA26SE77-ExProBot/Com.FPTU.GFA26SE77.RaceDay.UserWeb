@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import {
   createPayoutRequest,
+  FINANCE_USE_MOCK,
   getEventFinanceSummary,
   getOrganizerWallet,
   saveOrganizerBankAccount,
@@ -146,6 +147,12 @@ export default function OrganizerEventWallet({ eventId }: { eventId: string }) {
         </div>
       </div>
 
+      {FINANCE_USE_MOCK ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Đang dùng finance mock (NEXT_PUBLIC_FINANCE_USE_MOCK=true) — doanh thu /
+          hoàn tiền không đồng bộ PayOS thật. Tắt flag và reload để đọc ledger BE.
+        </div>
+      ) : null}
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
           {error}

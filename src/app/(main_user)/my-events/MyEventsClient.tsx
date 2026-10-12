@@ -16,11 +16,11 @@ import {
 } from "lucide-react";
 import { listOrganizerEvents } from "@/api/organizer";
 import type { RaceEventListItemDto } from "@/dto/event.dto";
+import { formatDate } from "@/lib/format";
 import {
-  formatDate,
-  getOrganizerStatusLabel,
-  getStatusColor,
-} from "@/lib/format";
+  getMyEventsCardStatusColor,
+  getMyEventsCardStatusLabel,
+} from "@/lib/event-lifecycle";
 import { getApiErrorMessage } from "@/lib/error";
 import { mediaDisplayUrl } from "@/lib/media-url";
 import { PAGE_SHELL } from "@/lib/page-shell";
@@ -34,41 +34,79 @@ const PAGE_SIZE = 6;
 const DEFAULT_GRADIENT =
   "linear-gradient(135deg, #f97316 0%, #ea580c 40%, #dc2626 100%)";
 
-type FilterKey = "all" | "draft" | "pending" | "open" | "done";
+type FilterKey =
+  | "all"
+  | "draft"
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "started"
+  | "ended";
 
 function statusKey(status: string): string {
   return (status || "").toLowerCase().replace(/_/g, "-");
 }
 
-function matchesFilter(status: string, filter: FilterKey): boolean {
+function eventEnded(event: RaceEventListItemDto): boolean {
+  const key = statusKey(event.status);
+  if (key === "completed" || key === "cancelled") return true;
+  const end = (event.endDate || event.date || "").slice(0, 10);
+  if (!end) return false;
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  return today > end;
+}
+
+function eventStarted(event: RaceEventListItemDto): boolean {
+  if (eventEnded(event)) return false;
+  const start = (event.date || "").slice(0, 10);
+  if (!start) return false;
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  return today >= start;
+}
+
+function matchesFilter(event: RaceEventListItemDto, filter: FilterKey): boolean {
   if (filter === "all") return true;
-  const key = statusKey(status);
+  const key = statusKey(event.status);
   switch (filter) {
     case "draft":
       return key === "draft";
     case "pending":
       return key === "pending" || key === "pending-approval";
-    case "open":
+    case "rejected":
+      return key === "rejected";
+    case "ended":
+      return eventEnded(event) || key === "closed" || key === "completed";
+    case "started":
+      return eventStarted(event);
+    case "approved":
+      // Đã duyệt / mở ĐK nhưng chưa tới ngày tổ chức và chưa kết thúc
       return (
-        key === "approved" ||
-        key === "published" ||
-        key === "registration-open"
-      );
-    case "done":
-      return (
-        key === "closed" ||
-        key === "completed" ||
-        key === "cancelled" ||
-        key === "rejected"
+        !eventStarted(event) &&
+        !eventEnded(event) &&
+        (key === "approved" ||
+          key === "published" ||
+          key === "registration-open" ||
+          key === "closed")
       );
     default:
       return true;
   }
 }
 
-/** Đã duyệt / mở ĐK — CTA “Xem chi tiết”; còn lại cần thẩm định */
+/** Đã duyệt / mở ĐK — CTA “Xem chi tiết” */
 function isApprovedOrOpen(status: string): boolean {
-  return matchesFilter(status, "open");
+  const key = statusKey(status);
+  return (
+    key === "approved" ||
+    key === "published" ||
+    key === "registration-open" ||
+    key === "closed" ||
+    key === "completed"
+  );
 }
 
 function isDraftStatus(status: string): boolean {
@@ -84,9 +122,9 @@ function isRejectedStatus(status: string): boolean {
   return statusKey(status) === "rejected";
 }
 
-/** Chờ duyệt / bị từ chối → modal hồ sơ, không vào màn quản lý organizer */
+/** Chờ duyệt / bị từ chối → vẫn vào organizer panel, modal optional */
 function opensStatusModal(status: string): boolean {
-  return isPendingStatus(status) || isRejectedStatus(status);
+  return false;
 }
 
 function manageCardCta(status: string): {
@@ -173,7 +211,7 @@ export default function MyEventsClient() {
   }, []);
 
   const filtered = useMemo(
-    () => list.filter((e) => matchesFilter(e.status, filter)),
+    () => list.filter((e) => matchesFilter(e, filter)),
     [list, filter]
   );
   const pager = usePagedList(filtered, PAGE_SIZE, filter);
@@ -210,10 +248,12 @@ export default function MyEventsClient() {
 
   const filters: { key: FilterKey; label: string }[] = [
     { key: "all", label: "Tất cả" },
-    { key: "draft", label: "Nháp" },
+    { key: "draft", label: "Chưa duyệt" },
     { key: "pending", label: "Chờ duyệt" },
-    { key: "open", label: "Đã duyệt / Mở ĐK" },
-    { key: "done", label: "Đóng / Kết thúc" },
+    { key: "approved", label: "Đã duyệt" },
+    { key: "rejected", label: "Đã từ chối" },
+    { key: "started", label: "Đã bắt đầu" },
+    { key: "ended", label: "Đã kết thúc" },
   ];
 
   return (
@@ -333,12 +373,8 @@ function ManageEventCard({
   const active = event.activeRunners ?? 0;
   const pct = total > 0 ? Math.round((active / total) * 100) : 0;
   const cta = manageCardCta(event.status);
-  const useModal = opensStatusModal(event.status);
-  const href = isDraftStatus(event.status)
-    ? `/events/create?draftId=${event.id}`
-    : useModal
-      ? null
-      : `/organizer/events/${event.id}`;
+  const statusLabel = getMyEventsCardStatusLabel(event);
+  const href = `/organizer/events/${event.id}`;
 
   const cardClass =
     "group block w-full overflow-hidden rounded-2xl border border-border/60 bg-card text-left shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-orange-500/30 hover:shadow-xl hover:shadow-orange-500/8";
@@ -362,11 +398,11 @@ function ManageEventCard({
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-black/35" />
         <span
-          className={`absolute left-3 top-3 inline-flex rounded-md border px-2.5 py-1 text-[11px] font-extrabold shadow-md backdrop-blur-sm ${getStatusColor(
-            event.status
+          className={`absolute left-3 top-3 inline-flex rounded-md border px-2.5 py-1 text-[11px] font-extrabold shadow-md backdrop-blur-sm ${getMyEventsCardStatusColor(
+            statusLabel
           )}`}
         >
-          {getOrganizerStatusLabel(event.status)}
+          {statusLabel}
         </span>
         {chips.length > 0 ? (
           <div className="absolute bottom-3 left-3 right-3 flex flex-wrap gap-1.5">

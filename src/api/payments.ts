@@ -5,6 +5,7 @@ import {
   PaymentDto,
   PaymentStatusDto,
 } from "@/dto/payment.dto";
+import type { CreatePackageCheckoutRequest } from "@/dto/event-package.dto";
 
 const PAYMENT_API = "api/v1/payment";
 
@@ -13,6 +14,9 @@ type RawCheckout = PaymentDto & {
   id?: string;
   transferDescription?: string;
   description?: string;
+  listAmount?: number;
+  discountAmount?: number;
+  promoCode?: string | null;
 };
 
 function normalizeCheckout(raw: RawCheckout): CheckoutResponseDto {
@@ -21,6 +25,9 @@ function normalizeCheckout(raw: RawCheckout): CheckoutResponseDto {
     paymentId,
     checkoutUrl: raw.checkoutUrl || "",
     amount: raw.amount,
+    listAmount: raw.listAmount,
+    discountAmount: raw.discountAmount,
+    promoCode: raw.promoCode,
     description: raw.description,
     orderCode: raw.orderCode,
     status: raw.status,
@@ -60,6 +67,17 @@ export async function getPaymentById(paymentId: string): Promise<PaymentDto> {
 /** Sync payment status from PayOS (after returnUrl redirect) */
 export async function syncPayment(paymentId: string): Promise<PaymentDto> {
   return api.post(`${PAYMENT_API}/${paymentId}/sync`);
+}
+
+/** Create checkout for a package purchase (event organizer flow) */
+export async function createPackageCheckout(
+  data: CreatePackageCheckoutRequest
+): Promise<CheckoutResponseDto> {
+  const raw = (await api.post(
+    `${PAYMENT_API}/checkout/package`,
+    data
+  )) as RawCheckout;
+  return normalizeCheckout(raw);
 }
 
 // ─── Mock (dev only) ───────────────────────────────────

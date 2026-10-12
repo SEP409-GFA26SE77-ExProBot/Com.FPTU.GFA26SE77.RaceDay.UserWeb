@@ -59,12 +59,11 @@ function matchesEventStatus(statusRaw: string, filter: StatusKey): boolean {
   const status = normalizeEventStatus(statusRaw);
   if (filter === "registration-open") return status === "registration-open";
   if (filter === "upcoming") {
+    // Sắp mở: đã duyệt / chưa tới cửa sổ ĐK (không gồm pending hồ sơ)
     return (
       status === "upcoming" ||
       status === "approved" ||
-      status === "published" ||
-      status === "pending" ||
-      status === "pending-approval"
+      status === "published"
     );
   }
   // ended: đóng ĐK / kết thúc / hết slot / hủy

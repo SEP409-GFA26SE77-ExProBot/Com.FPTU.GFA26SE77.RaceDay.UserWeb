@@ -43,10 +43,36 @@ export async function getEvents(): Promise<RaceEventListItemDto[]> {
   return (Array.isArray(data) ? data : []).map(withResolvedBanner);
 }
 
+/** Short TTL cache — tránh shell + page gọi đôi → 429 rate limit. */
+const eventDetailCache = new Map<
+  string,
+  { at: number; promise: Promise<RaceEventDto> }
+>();
+const EVENT_CACHE_TTL_MS = 20_000;
+
+export function invalidateEventCache(eventId?: string) {
+  if (eventId) eventDetailCache.delete(eventId);
+  else eventDetailCache.clear();
+}
+
 /** Get event detail by ID (public) */
 export async function getEventById(eventId: string): Promise<RaceEventDto> {
-  const data = (await api.get(`${EVENT_API}/${eventId}`)) as RaceEventDto;
-  return withResolvedDocuments(data);
+  const now = Date.now();
+  const hit = eventDetailCache.get(eventId);
+  if (hit && now - hit.at < EVENT_CACHE_TTL_MS) {
+    return hit.promise;
+  }
+  const promise = (async () => {
+    try {
+      const data = (await api.get(`${EVENT_API}/${eventId}`)) as RaceEventDto;
+      return withResolvedDocuments(data);
+    } catch (e) {
+      eventDetailCache.delete(eventId);
+      throw e;
+    }
+  })();
+  eventDetailCache.set(eventId, { at: now, promise });
+  return promise;
 }
 
 // ─── Runner uploads ────────────────────────────────────

@@ -7,6 +7,7 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
   ChangePasswordDto,
+  MyProfileDto,
 } from "@/dto/auth.dto";
 import Cookies from 'js-cookie';
 import { mapAppRole } from "@/lib/role";
@@ -100,6 +101,11 @@ export async function resetPassword(data: ResetPasswordDto): Promise<void> {
 
 export async function changePassword(data: ChangePasswordDto): Promise<void> {
   await api.post(`${PUBLIC_API}/auth/change-password`, data);
+}
+
+/** Hồ sơ user đang đăng nhập */
+export async function getMyProfile(): Promise<MyProfileDto> {
+  return api.get(`${PUBLIC_API}/me`) as Promise<MyProfileDto>;
 }
 
 export async function logout(): Promise<void> {

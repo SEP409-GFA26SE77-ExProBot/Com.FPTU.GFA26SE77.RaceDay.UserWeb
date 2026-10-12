@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Cookies from "js-cookie";
 import { logout } from "@/api/auth";
 import { getEventById } from "@/api/events";
+import { getPackagePurchase } from "@/api/event-packages";
 import { mapAppRole } from "@/lib/role";
 import { Role } from "@/interfaces/role";
 import {
@@ -13,9 +14,11 @@ import {
   ArrowLeft,
   Award,
   ChevronDown,
+  ChevronRight,
   ClipboardCheck,
   CreditCard,
   Flag,
+  FolderOpen,
   LayoutDashboard,
   Map,
   LogOut,
@@ -29,6 +32,10 @@ import {
   Users,
   Wallet,
   X,
+  Route,
+  ScrollText,
+  ClipboardList,
+  Building2,
 } from "lucide-react";
 
 function eventIdFromPath(pathname: string): string | null {
@@ -39,55 +46,112 @@ function eventIdFromPath(pathname: string): string | null {
   return id;
 }
 
-/** Chỉ nav theo event đang mở — không lộ URL portal /organizer/approvals, … */
-function eventWorkspaceNav(eventId: string) {
+type NavLeaf = {
+  label: string;
+  href: string;
+  icon: typeof LayoutDashboard;
+  matchPath?: string;
+  tab?: "approvals";
+};
+
+type NavGroup = {
+  heading: string;
+  items: NavLeaf[];
+};
+
+function eventWorkspaceGroups(eventId: string): NavGroup[] {
+  const base = `/organizer/events/${eventId}`;
   return [
     {
-      label: "Tổng quan",
-      href: `/organizer/events/${eventId}`,
-      icon: LayoutDashboard,
+      heading: "Vận hành",
+      items: [
+        {
+          label: "Tổng quan",
+          href: base,
+          icon: LayoutDashboard,
+        },
+        {
+          label: "Xét mở chính thức",
+          href: `${base}/profile/open-registration`,
+          icon: ClipboardList,
+          matchPath: `${base}/profile/open-registration`,
+        },
+        {
+          label: "Duyệt đăng ký",
+          href: `${base}?tab=approvals`,
+          icon: ClipboardCheck,
+          tab: "approvals",
+        },
+        {
+          label: "Thiết lập bản đồ",
+          href: `${base}/setup-map`,
+          icon: Map,
+          matchPath: `${base}/setup-map`,
+        },
+        {
+          label: "Giả lập đua",
+          href: `${base}/race-simulation`,
+          icon: Flag,
+          matchPath: `${base}/race-simulation`,
+        },
+        {
+          label: "Quản lý nhân sự",
+          href: `${base}/staff`,
+          icon: Users,
+          matchPath: `${base}/staff`,
+        },
+      ],
     },
     {
-      label: "Duyệt đăng ký",
-      href: `/organizer/events/${eventId}?tab=approvals`,
-      icon: ClipboardCheck,
-      tab: "approvals" as const,
+      heading: "Tài chính",
+      items: [
+        {
+          label: "Ví & giải ngân",
+          href: `${base}/wallet`,
+          icon: Wallet,
+          matchPath: `${base}/wallet`,
+        },
+        {
+          label: "Lịch sử giải ngân",
+          href: `${base}/payout-history`,
+          icon: History,
+          matchPath: `${base}/payout-history`,
+        },
+      ],
     },
     {
-      label: "Thiết lập bản đồ",
-      href: `/organizer/events/${eventId}/setup-map`,
-      icon: Map,
-      matchPath: `/organizer/events/${eventId}/setup-map`,
-    },
-    {
-      label: "Giả lập đua",
-      href: `/organizer/events/${eventId}/race-simulation`,
-      icon: Flag,
-      matchPath: `/organizer/events/${eventId}/race-simulation`,
-    },
-    {
-      label: "Quản lý nhân sự",
-      href: `/organizer/events/${eventId}/staff`,
-      icon: Users,
-      matchPath: `/organizer/events/${eventId}/staff`,
-    },
-    {
-      label: "Ví & giải ngân",
-      href: `/organizer/events/${eventId}/wallet`,
-      icon: Wallet,
-      matchPath: `/organizer/events/${eventId}/wallet`,
-    },
-    {
-      label: "Lịch sử giải ngân",
-      href: `/organizer/events/${eventId}/payout-history`,
-      icon: History,
-      matchPath: `/organizer/events/${eventId}/payout-history`,
+      heading: "Chi tiết giải",
+      items: [
+        {
+          label: "Thông tin cơ bản",
+          href: `${base}/profile/basic`,
+          icon: Building2,
+          matchPath: `${base}/profile/basic`,
+        },
+        {
+          label: "Cự ly & giá vé",
+          href: `${base}/profile/distances`,
+          icon: Route,
+          matchPath: `${base}/profile/distances`,
+        },
+        {
+          label: "Giấy phép & tài liệu",
+          href: `${base}/profile/documents`,
+          icon: FolderOpen,
+          matchPath: `${base}/profile/documents`,
+        },
+        {
+          label: "Quản lý nội dung",
+          href: `${base}/profile/content`,
+          icon: ScrollText,
+          matchPath: `${base}/profile/content`,
+        },
+      ],
     },
   ];
 }
 
 function useLoggedInUser() {
-  // Cookie chỉ có trên client — đọc sau mount để tránh hydration mismatch (U vs T)
   const [user, setUser] = useState({
     username: "User",
     role: Role.RUNNER as string,
@@ -108,6 +172,28 @@ function useLoggedInUser() {
   return user;
 }
 
+function leafActive(
+  item: NavLeaf,
+  pathname: string,
+  eventId: string | null,
+  activeTab: string | null
+) {
+  const isApprovals = item.tab === "approvals";
+  const matchPath = item.matchPath ?? null;
+  const onEventHome =
+    Boolean(eventId) &&
+    (pathname === `/organizer/events/${eventId}` ||
+      pathname === `/organizer/events/${eventId}/`);
+
+  if (matchPath) {
+    return pathname === matchPath || pathname.startsWith(`${matchPath}/`);
+  }
+  if (isApprovals) {
+    return onEventHome && activeTab === "approvals";
+  }
+  return onEventHome && activeTab !== "approvals";
+}
+
 export default function OrganizerShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -115,17 +201,27 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [eventName, setEventName] = useState<string | null>(null);
+  const [packageExpiresAtUtc, setPackageExpiresAtUtc] = useState<string | null>(
+    null
+  );
+  const [packageTitle, setPackageTitle] = useState<string | null>(null);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    "Vận hành": true,
+    "Tài chính": true,
+    "Chi tiết giải": true,
+  });
   const userMenuRef = useRef<HTMLDivElement>(null);
   const { username, role, initial } = useLoggedInUser();
   const eventId = useMemo(() => eventIdFromPath(pathname), [pathname]);
-  const navigation = useMemo(
-    () => (eventId ? eventWorkspaceNav(eventId) : []),
+  const groups = useMemo(
+    () => (eventId ? eventWorkspaceGroups(eventId) : []),
     [eventId]
   );
   const activeTab = searchParams.get("tab");
+
   const isMapWorkspace =
     !!eventId &&
-    (/\/(setup-map|race-simulation|staff|wallet|payout-history)\/?$/.test(
+    (/\/(setup-map|race-simulation|staff|wallet|payout-history|profile)(\/|$)/.test(
       pathname
     ));
 
@@ -150,21 +246,97 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
   useEffect(() => {
     if (!eventId) {
       setEventName(null);
+      setPackageExpiresAtUtc(null);
+      setPackageTitle(null);
       return;
     }
     let cancelled = false;
     setEventName(null);
-    getEventById(eventId)
-      .then((event) => {
-        if (!cancelled) setEventName(event.name || null);
-      })
-      .catch(() => {
-        if (!cancelled) setEventName(null);
-      });
+    setPackageExpiresAtUtc(null);
+    setPackageTitle(null);
+    (async () => {
+      try {
+        const event = await getEventById(eventId);
+        if (cancelled) return;
+        setEventName(event.name || null);
+        setPackageExpiresAtUtc(event.packageExpiresAtUtc || null);
+
+        if (event.packagePurchaseId) {
+          try {
+            const purchase = await getPackagePurchase(event.packagePurchaseId);
+            if (cancelled) return;
+            const months = purchase.durationMonths;
+            const cap = purchase.participantCap;
+            setPackageTitle(
+              `Gói ${months} tháng · ${cap.toLocaleString("vi-VN")} VĐV`
+            );
+          } catch {
+            // Fallback: chỉ biết quy mô từ event
+            if (event.totalRunners) {
+              setPackageTitle(
+                `Gói · ${event.totalRunners.toLocaleString("vi-VN")} VĐV`
+              );
+            }
+          }
+        } else if (event.totalRunners) {
+          setPackageTitle(
+            `Quy mô ${event.totalRunners.toLocaleString("vi-VN")} VĐV`
+          );
+        }
+      } catch {
+        if (!cancelled) {
+          setEventName(null);
+          setPackageExpiresAtUtc(null);
+          setPackageTitle(null);
+        }
+      }
+    })();
     return () => {
       cancelled = true;
     };
   }, [eventId]);
+
+  const packageLabel = useMemo(() => {
+    const parts: string[] = [];
+    if (packageTitle) parts.push(packageTitle);
+
+    if (packageExpiresAtUtc) {
+      const end = new Date(packageExpiresAtUtc);
+      if (!Number.isNaN(end.getTime())) {
+        const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+        const today = new Date();
+        const todayDay = new Date(
+          today.getFullYear(),
+          today.getMonth(),
+          today.getDate()
+        );
+        const diffDays = Math.ceil(
+          (endDay.getTime() - todayDay.getTime()) / (24 * 60 * 60 * 1000)
+        );
+        const endLabel = end.toLocaleDateString("vi-VN");
+        if (diffDays < 0) {
+          parts.push(`đã hết hạn ${endLabel}`);
+        } else if (diffDays === 0) {
+          parts.push(`hết hạn hôm nay (${endLabel})`);
+        } else {
+          parts.push(`còn ${diffDays} ngày · kết thúc ${endLabel}`);
+        }
+      }
+    }
+
+    return parts.length ? parts.join(" · ") : null;
+  }, [packageExpiresAtUtc, packageTitle]);
+
+  const linkClass = (active: boolean) =>
+    `group flex items-center rounded-xl text-sm font-medium transition-colors ${
+      active
+        ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg shadow-orange-950/20"
+        : "text-slate-400 hover:bg-white/[0.07] hover:text-white"
+    } ${
+      collapsed
+        ? "gap-3 px-3 py-3 lg:justify-center lg:px-0 lg:py-3"
+        : "gap-3 px-3 py-2.5"
+    }`;
 
   return (
     <div className="min-h-screen bg-[#f7f5f1] text-slate-950">
@@ -203,58 +375,72 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
           </button>
         </div>
         <nav
-          className={`flex-1 space-y-1 overflow-y-auto py-5 ${
+          className={`flex-1 space-y-4 overflow-y-auto py-5 ${
             collapsed ? "px-3 lg:px-2" : "px-3"
           }`}
         >
-          <p
-            className={`px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 ${
-              collapsed ? "lg:hidden" : ""
-            }`}
-          >
-            Không gian làm việc
-          </p>
-          {navigation.map((item) => {
-            const isApprovals = "tab" in item && item.tab === "approvals";
-            const matchPath =
-              "matchPath" in item && typeof item.matchPath === "string"
-                ? item.matchPath
-                : null;
-            const onEventHome =
-              Boolean(eventId) &&
-              (pathname === `/organizer/events/${eventId}` ||
-                pathname === `/organizer/events/${eventId}/`);
-
-            let active = false;
-            if (matchPath) {
-              // Setup map / Race simulation — exact prefix của sub-route
-              active = pathname === matchPath || pathname.startsWith(`${matchPath}/`);
-            } else if (isApprovals) {
-              active = onEventHome && activeTab === "approvals";
-            } else {
-              // Tổng quan — chỉ đúng trang event, không ăn nhầm /setup-map|/race-simulation
-              active = onEventHome && activeTab !== "approvals";
-            }
-            const Icon = item.icon;
+          {groups.map((group) => {
+            const isOpen = openGroups[group.heading] !== false;
+            const groupExpanded = isOpen || collapsed;
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={closeMobile}
-                title={collapsed ? item.label : undefined}
-                className={`group flex items-center rounded-xl text-sm font-medium transition-colors ${
-                  active
-                    ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg shadow-orange-950/20"
-                    : "text-slate-400 hover:bg-white/[0.07] hover:text-white"
-                } ${
-                  collapsed
-                    ? "gap-3 px-3 py-3 lg:justify-center lg:px-0 lg:py-3"
-                    : "gap-3 px-3 py-3"
-                }`}
-              >
-                <Icon className="h-[18px] w-[18px] shrink-0" />
-                <span className={collapsed ? "lg:hidden" : ""}>{item.label}</span>
-              </Link>
+              <div key={group.heading} className="space-y-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (collapsed) {
+                      setCollapsed(false);
+                      setOpenGroups((prev) => ({
+                        ...prev,
+                        [group.heading]: true,
+                      }));
+                    } else {
+                      setOpenGroups((prev) => ({
+                        ...prev,
+                        [group.heading]: !isOpen,
+                      }));
+                    }
+                  }}
+                  className={`flex w-full items-center gap-1 px-3 pb-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 transition-colors hover:text-slate-300 ${
+                    collapsed ? "lg:justify-center lg:px-0" : ""
+                  }`}
+                  title={isOpen ? `Thu gọn ${group.heading}` : `Mở ${group.heading}`}
+                >
+                  <span className={collapsed ? "lg:hidden" : ""}>
+                    {group.heading}
+                  </span>
+                  <span className={collapsed ? "lg:hidden" : ""}>
+                    {isOpen ? (
+                      <ChevronDown className="h-3 w-3 opacity-80" />
+                    ) : (
+                      <ChevronRight className="h-3 w-3 opacity-80" />
+                    )}
+                  </span>
+                </button>
+                {groupExpanded &&
+                  group.items.map((leaf) => {
+                    const active = leafActive(
+                      leaf,
+                      pathname,
+                      eventId,
+                      activeTab
+                    );
+                    const Icon = leaf.icon;
+                    return (
+                      <Link
+                        key={leaf.href}
+                        href={leaf.href}
+                        onClick={closeMobile}
+                        title={collapsed ? leaf.label : undefined}
+                        className={linkClass(active)}
+                      >
+                        <Icon className="h-[18px] w-[18px] shrink-0" />
+                        <span className={collapsed ? "lg:hidden" : ""}>
+                          {leaf.label}
+                        </span>
+                      </Link>
+                    );
+                  })}
+              </div>
             );
           })}
         </nav>
@@ -313,13 +499,27 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
                 <PanelLeftClose className="h-5 w-5" />
               )}
             </button>
-            <div className="min-w-0 max-w-[min(100%,32rem)] overflow-hidden rounded-xl border border-orange-200/80 bg-gradient-to-r from-orange-50 via-white to-white px-3 py-1.5 shadow-sm shadow-orange-500/5">
+            <div className="min-w-0 max-w-[min(100%,44rem)] overflow-hidden rounded-xl border border-orange-200/80 bg-gradient-to-r from-orange-50 via-white to-white px-3 py-1.5 shadow-sm shadow-orange-500/5">
               <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-orange-600">
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-orange-500" />
                 Quản lý giải
               </p>
-              <p className="truncate text-sm font-bold tracking-tight text-slate-900">
-                {eventName || "Chọn giải để quản lý"}
+              <p className="flex min-w-0 items-baseline gap-2 truncate text-sm">
+                <span className="shrink-0 font-bold tracking-tight text-slate-900">
+                  {eventName || "Chọn giải để quản lý"}
+                </span>
+                {packageLabel && (
+                  <span
+                    className={`min-w-0 truncate text-[11px] font-medium ${
+                      packageLabel.includes("hết hạn")
+                        ? "text-red-600"
+                        : "text-slate-500"
+                    }`}
+                    title={packageLabel}
+                  >
+                    · {packageLabel}
+                  </span>
+                )}
               </p>
             </div>
           </div>

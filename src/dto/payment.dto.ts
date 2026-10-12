@@ -18,7 +18,11 @@ export interface VietQrFields {
 export interface CheckoutResponseDto extends VietQrFields {
   paymentId: string;
   checkoutUrl: string;
+  /** Số đã charge PayOS (= sau giảm giá) */
   amount?: number;
+  listAmount?: number;
+  discountAmount?: number;
+  promoCode?: string | null;
   description?: string;
   orderCode?: number;
   status?: string;
@@ -26,9 +30,15 @@ export interface CheckoutResponseDto extends VietQrFields {
 
 export interface PaymentDto extends VietQrFields {
   id: string;
-  registrationId: string;
+  registrationId?: string;
+  referenceId?: string | null;
+  purpose?: string;
   userId: string;
+  /** Số đã thu / hoàn phải bám field này — không hoàn theo listAmount */
   amount: number;
+  listAmount?: number | null;
+  discountAmount?: number | null;
+  promoCode?: string | null;
   currency?: string;
   status: string; // pending | paid | failed | cancelled | expired | refunded
   checkoutUrl?: string;
@@ -41,6 +51,8 @@ export interface PaymentDto extends VietQrFields {
   eventName?: string;
   distanceName?: string;
   fullName?: string;
+  eventId?: string;
+  bibNumber?: string;
 }
 
 export interface PaymentStatusDto {

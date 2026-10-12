@@ -19,12 +19,17 @@ import { RegistrationDto, RaceEventDto } from "@/dto/event.dto";
 import {
   formatPrice,
   formatDate,
+  formatDateTime,
   getRegistrationStatusLabel,
 } from "@/lib/format";
 import {
   readConfirmationSession,
   resolveDistanceDisplay,
 } from "@/lib/registration-display";
+import {
+  registrationReviewedAt,
+  registrationReviewerLabel,
+} from "@/lib/registration-medical";
 import { mediaDisplayUrl } from "@/lib/media-url";
 import { PAGE_SHELL_FORM } from "@/lib/page-shell";
 import PageLoading from "@/components/ui/PageLoading";
@@ -203,6 +208,13 @@ export default function RegistrationDetailPage() {
   }
 
   if (reg.status === "rejected") {
+    const reviewedAt = registrationReviewedAt(reg);
+    const reviewer =
+      registrationReviewerLabel(reg) ||
+      event?.organizer?.name ||
+      "Ban tổ chức";
+    const registeredAt = reg.createdAtUtc || reg.createdAt;
+
     return (
       <div className={`${PAGE_SHELL_FORM} max-w-lg py-10 space-y-5`}>
         <Link
@@ -221,9 +233,9 @@ export default function RegistrationDetailPage() {
             BTC không duyệt đơn. Xem lý do bên dưới.
           </p>
         </div>
-        <div className="rounded-2xl border bg-card p-5 space-y-3 text-sm">
+        <div className="rounded-2xl border border-red-200/60 bg-card p-5 space-y-3 text-sm shadow-sm">
           <div className="flex justify-between gap-3">
-            <span className="text-muted-foreground">Giải</span>
+            <span className="text-muted-foreground">Tên giải</span>
             <span className="font-semibold text-right">
               {reg.eventName || event?.name || "—"}
             </span>
@@ -233,12 +245,30 @@ export default function RegistrationDetailPage() {
             <span className="font-semibold">{distanceLabel}</span>
           </div>
           <div className="flex justify-between gap-3">
-            <span className="text-muted-foreground">Ngày đua</span>
-            <span className="font-semibold">{event ? formatDate(event.date) : "—"}</span>
+            <span className="text-muted-foreground">Đăng ký lúc</span>
+            <span className="font-semibold text-right">
+              {formatDateTime(registeredAt)}
+            </span>
+          </div>
+          <div className="flex justify-between gap-3">
+            <span className="text-muted-foreground">Trạng thái</span>
+            <span className="font-semibold text-red-700">
+              {getRegistrationStatusLabel(reg.status)}
+            </span>
+          </div>
+          <div className="flex justify-between gap-3">
+            <span className="text-muted-foreground">Người duyệt</span>
+            <span className="font-semibold text-right">{reviewer}</span>
+          </div>
+          <div className="flex justify-between gap-3">
+            <span className="text-muted-foreground">Thời gian duyệt</span>
+            <span className="font-semibold text-right">
+              {reviewedAt ? formatDateTime(reviewedAt) : "—"}
+            </span>
           </div>
           <div className="rounded-xl bg-red-50 border border-red-100 p-3">
             <p className="text-xs font-bold text-red-800 mb-1">Lý do từ chối</p>
-            <p className="text-sm text-red-900/90">
+            <p className="text-sm text-red-900/90 whitespace-pre-wrap">
               {reg.rejectionReason || "Không có mô tả."}
             </p>
           </div>

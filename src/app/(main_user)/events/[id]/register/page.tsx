@@ -21,7 +21,15 @@ import {
 } from "lucide-react";
 import { RaceEventDto, EventDistanceDto } from "@/dto/event.dto";
 import { getEventById, createRegistration, uploadHealthCert } from "@/api/events";
-import { formatPrice, formatDate, getStatusLabel } from "@/lib/format";
+import { formatPrice, formatDate } from "@/lib/format";
+import {
+  getPublicEventStatusLabel,
+  isPublicRegistrationLive,
+} from "@/lib/event-lifecycle";
+import { resolveDistanceTicketPrice } from "@/lib/ticket-pricing";
+import TicketPriceDisplay, {
+  formatPhaseWindow,
+} from "@/components/events/TicketPriceDisplay";
 import { getApiErrorMessage } from "@/lib/error";
 import {
   isValidDateOfBirth,
@@ -209,8 +217,9 @@ function RegisterPageContent() {
     );
   }
 
-  if (event.status !== "registration-open") {
+  if (!isPublicRegistrationLive(event)) {
     const isSoldOut = event.status === "sold-out";
+    const label = getPublicEventStatusLabel(event);
     return (
       <div className={`${PAGE_SHELL_FORM} py-16 text-center space-y-4`}>
         <ShieldOff className="mx-auto h-10 w-10 text-muted-foreground" />
@@ -220,7 +229,7 @@ function RegisterPageContent() {
         <p className="text-sm text-muted-foreground max-w-md mx-auto">
           {isSoldOut
             ? "Tất cả hạng mục đã hết chỗ. Hãy theo dõi để đăng ký giải tiếp theo."
-            : `Trạng thái hiện tại: ${getStatusLabel(event.status)}. Vui lòng quay lại khi đăng ký được mở.`}
+            : `Trạng thái hiện tại: ${label}. Vui lòng quay lại khi đăng ký được mở.`}
         </p>
         <Link
           href={`/events/${eventId}`}
@@ -237,6 +246,9 @@ function RegisterPageContent() {
   const selectedDistance: EventDistanceDto | undefined = distances.find(
     (d) => d.id === formData.selectedDistanceId
   );
+  const selectedTicket = selectedDistance
+    ? resolveDistanceTicketPrice(event?.ticketPricing, selectedDistance)
+    : null;
 
   const validate = (): boolean => {
     const newErrors: ErrorMap = {};
@@ -491,9 +503,16 @@ function RegisterPageContent() {
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {d.distanceKm} km • Còn {d.capacity - registered} chỗ
                       </p>
-                      <p className="text-lg font-extrabold text-orange-600 mt-2">
-                        {formatPrice(d.price)}
-                      </p>
+                      <div className="mt-2">
+                        <TicketPriceDisplay
+                          ticket={resolveDistanceTicketPrice(
+                            event.ticketPricing,
+                            d
+                          )}
+                          size="md"
+                          align="left"
+                        />
+                      </div>
                       {soldOut && (
                         <span className="absolute top-2 right-2 text-[10px] font-bold text-red-500 uppercase">
                           Hết slot
@@ -836,12 +855,28 @@ function RegisterPageContent() {
                         </span>
                       </div>
                       <div className="h-px bg-border my-2" />
-                      <div className="flex justify-between items-center">
-                        <span className="font-bold text-foreground">Tổng cộng</span>
-                        <span className="text-xl font-extrabold text-orange-600">
-                          {formatPrice(selectedDistance.price)}
+                      <div className="flex justify-between items-start gap-3">
+                        <span className="font-bold text-foreground pt-1">
+                          Tổng cộng
                         </span>
+                        {selectedTicket ? (
+                          <TicketPriceDisplay
+                            ticket={selectedTicket}
+                            size="md"
+                            align="right"
+                          />
+                        ) : (
+                          <span className="text-xl font-extrabold text-orange-600">
+                            {formatPrice(selectedDistance.price)}
+                          </span>
+                        )}
                       </div>
+                      {selectedTicket?.phase &&
+                      formatPhaseWindow(selectedTicket.phase) ? (
+                        <p className="text-right text-[11px] text-muted-foreground">
+                          Áp dụng {formatPhaseWindow(selectedTicket.phase)}
+                        </p>
+                      ) : null}
                     </>
                   )}
                 </div>
