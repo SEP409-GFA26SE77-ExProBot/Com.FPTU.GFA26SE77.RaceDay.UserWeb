@@ -47,9 +47,9 @@ export default function Footer() {
             <ul className="space-y-2.5">
               {[
                 { label: "Tất cả sự kiện", href: "/events" },
-                { label: "Chạy địa hình (Trail)", href: "/events?tag=trail" },
-                { label: "Marathon", href: "/events?tag=marathon" },
                 { label: "Kết quả thi đấu", href: "/results" },
+                { label: "Tìm ảnh theo BIB", href: "/photos" },
+                { label: "Vé của tôi", href: "/my-registrations" },
               ].map((link) => (
                 <li key={link.href}>
                   <Link
@@ -70,10 +70,10 @@ export default function Footer() {
             </h4>
             <ul className="space-y-2.5">
               {[
-                { label: "Câu hỏi thường gặp (FAQ)", href: "#" },
-                { label: "Liên hệ chúng tôi", href: "#" },
-                { label: "Chính sách bảo mật", href: "#" },
-                { label: "Điều khoản dịch vụ", href: "#" },
+                { label: "Câu hỏi thường gặp (FAQ)", href: "/#how-it-works" },
+                { label: "Liên hệ chúng tôi", href: "mailto:support@raceday.vn" },
+                { label: "Chính sách bảo mật", href: "/privacy" },
+                { label: "Điều khoản dịch vụ", href: "/terms" },
               ].map((link) => (
                 <li key={link.label}>
                   <Link

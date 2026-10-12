@@ -14,9 +14,16 @@ const robotoMono = Roboto_Mono({
   display: "swap",
 });
 
+const APP_TITLE = "RaceDay – Running Events Registration Platform";
+
 export const metadata: Metadata = {
-  title: "RaceDay – Running Events Registration Platform",
-  description: "Discover and register for running events, marathons, and trail runs across Vietnam. Your next race starts here.",
+  // absolute: mọi route giữ cùng tên tab (không đổi theo page metadata)
+  title: { absolute: APP_TITLE, default: APP_TITLE },
+  description:
+    "Discover and register for running events, marathons, and trail runs across Vietnam. Your next race starts here.",
+  icons: {
+    icon: [{ url: "/raceday-icon.svg", type: "image/svg+xml" }],
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

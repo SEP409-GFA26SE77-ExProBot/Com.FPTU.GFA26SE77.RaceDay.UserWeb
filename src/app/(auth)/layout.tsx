@@ -4,10 +4,6 @@ import { Flag, ArrowLeft } from "lucide-react";
 import "./auth.css";
 
 export const metadata: Metadata = {
-  title: {
-    default: "Tài khoản – RaceDay",
-    template: "%s – RaceDay",
-  },
   description:
     "Đăng nhập hoặc tạo tài khoản RaceDay để tham gia sự kiện chạy bộ, theo dõi đăng ký và nhiều tính năng khác.",
 };

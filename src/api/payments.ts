@@ -8,6 +8,30 @@ import {
 
 const PAYMENT_API = "api/v1/payment";
 
+type RawCheckout = PaymentDto & {
+  paymentId?: string;
+  id?: string;
+  transferDescription?: string;
+  description?: string;
+};
+
+function normalizeCheckout(raw: RawCheckout): CheckoutResponseDto {
+  const paymentId = String(raw.paymentId || raw.id || "");
+  return {
+    paymentId,
+    checkoutUrl: raw.checkoutUrl || "",
+    amount: raw.amount,
+    description: raw.description,
+    orderCode: raw.orderCode,
+    status: raw.status,
+    qrCode: raw.qrCode,
+    accountNumber: raw.accountNumber,
+    accountName: raw.accountName,
+    bin: raw.bin,
+    transferDescription: raw.transferDescription || raw.description,
+  };
+}
+
 // ─── Public ────────────────────────────────────────────
 
 /** Get PayOS mode (mock | live) */
@@ -19,7 +43,8 @@ export async function getPaymentStatus(): Promise<PaymentStatusDto> {
 
 /** Create checkout link for a pending_payment registration */
 export async function createCheckout(data: CheckoutDto): Promise<CheckoutResponseDto> {
-  return api.post(`${PAYMENT_API}/checkout`, data);
+  const raw = (await api.post(`${PAYMENT_API}/checkout`, data)) as RawCheckout;
+  return normalizeCheckout(raw);
 }
 
 /** Get my payment history */
