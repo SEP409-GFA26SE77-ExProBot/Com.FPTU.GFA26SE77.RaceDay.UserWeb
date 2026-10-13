@@ -120,3 +120,21 @@ export interface CreateRaceEventRequest {
   documents?: CreateRaceEventDocumentInput[] | null;
   submitForApproval: boolean;
 }
+
+export interface ProfileAdditionDto {
+  selectedItems?: string[];
+  notes?: string;
+  [key: string]: unknown;
+}
+
+export interface EventSupplyItemDto {
+  id: string;
+  name: string;
+  quantity: number;
+  unit?: string;
+  notes?: string;
+}
+
+export interface UpdateEventSuppliesRequest {
+  supplies: EventSupplyItemDto[];
+}
