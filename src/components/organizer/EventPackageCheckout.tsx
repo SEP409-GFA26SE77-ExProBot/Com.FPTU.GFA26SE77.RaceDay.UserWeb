@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { getMyProfile } from "@/api/auth";
 import { getPackageCatalog, createPackagePurchase } from "@/api/event-packages";
-import { createPackageCheckout, syncPayment } from "@/api/payments";
+import { createPackageCheckout, syncPayment, mockPay } from "@/api/payments";
 import type { MyProfileDto } from "@/dto/auth.dto";
 import type {
   PackageCatalogDto,
@@ -77,6 +77,8 @@ export default function EventPackageCheckout() {
   const [step, setStep] = useState<Step>("form");
   const [checkout, setCheckout] = useState<CheckoutResponseDto | null>(null);
   const [purchaseId, setPurchaseId] = useState<string | null>(null);
+  const [mockPaying, setMockPaying] = useState(false);
+  const [mockError, setMockError] = useState<string | null>(null);
 
   // Load catalog + profile
   useEffect(() => {
@@ -229,6 +231,28 @@ export default function EventPackageCheckout() {
     }, 800);
   }, [purchaseId, activePaymentId, router]);
 
+  const handleMockPay = useCallback(async () => {
+    if (!activePaymentId) {
+      setMockError("Không tìm thấy mã thanh toán (paymentId).");
+      return;
+    }
+    setMockPaying(true);
+    setMockError(null);
+    try {
+      await mockPay(activePaymentId);
+      setStep("success");
+      setTimeout(() => {
+        router.push(
+          `/events/create/package-return?purchaseId=${purchaseId}&paymentId=${activePaymentId}`
+        );
+      }, 800);
+    } catch (e) {
+      setMockError(getApiErrorMessage(e, "Giả lập thanh toán thất bại."));
+    } finally {
+      setMockPaying(false);
+    }
+  }, [activePaymentId, purchaseId, router]);
+
   // ── Loading ──
   if (loading) {
     return (
@@ -322,6 +346,37 @@ export default function EventPackageCheckout() {
               <p className="text-[11px] leading-relaxed text-muted-foreground">
                 PayOS xác nhận xong sẽ tự chuyển trang. Giải nháp được tạo sau khi thanh toán thành công.
               </p>
+
+              {/* Mock pay button for dev / testing */}
+              <div className="rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/5 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider">
+                    Thử nghiệm / Test
+                  </span>
+                  <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                    MOCK MODE
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  disabled={mockPaying || !activePaymentId}
+                  onClick={() => void handleMockPay()}
+                  className="w-full flex items-center justify-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 text-xs font-bold shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {mockPaying ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  )}
+                  {mockPaying ? "Đang giả lập thanh toán…" : "Giả lập thanh toán (Mock Pay)"}
+                </button>
+                {mockError && (
+                  <p className="text-[11px] text-red-500 font-medium">{mockError}</p>
+                )}
+                <p className="text-[10px] leading-tight text-muted-foreground">
+                  Bấm để gọi API <code className="font-mono text-emerald-700 dark:text-emerald-400">mockPay()</code> xác nhận đơn đã thanh toán.
+                </p>
+              </div>
             </aside>
           </div>
         </div>

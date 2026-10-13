@@ -34,6 +34,8 @@ type PricePhase = {
 
 type DistRow = {
   key: string;
+  checked: boolean;
+  label: string;
   type: string;
   name: string;
   distanceKm: number;
@@ -44,6 +46,13 @@ type DistRow = {
   phases: PricePhase[];
   pricingOpen: boolean;
 };
+
+const FIXED_DISTANCES = [
+  { distanceKm: 5, defaultName: "5km", label: "Cự ly 5km" },
+  { distanceKm: 10, defaultName: "10km", label: "Cự ly 10km" },
+  { distanceKm: 21, defaultName: "21km", label: "Cự ly 21km" },
+  { distanceKm: 42, defaultName: "42km", label: "Cự ly 42km" },
+] as const;
 
 type PricingByDistance = {
   byDistanceName?: Record<
@@ -120,40 +129,65 @@ export default function ProfileDistancesClient() {
   const load = useCallback(async () => {
     const data = await getEventById(eventId);
     setEvent(data);
-    const mapped: DistRow[] = (data.distances || []).map((d, i) => {
-      const name = d.name || "";
-      const parsed = loadPhasesForDistance(data.ticketPricing, name, d.price || 0);
+    const existing = data.distances || [];
+    const hasExisting = existing.length > 0;
+
+    const mapped: DistRow[] = FIXED_DISTANCES.map((cfg) => {
+      // Find matching distance in existing distances
+      const found = existing.find((d) => {
+        const km = Number(d.distanceKm);
+        if (km === cfg.distanceKm) return true;
+        if (Math.abs(km - cfg.distanceKm) < 0.6) return true;
+        const n = String(d.name || "").toLowerCase().trim();
+        return (
+          n === `${cfg.distanceKm}km` ||
+          n === `${cfg.distanceKm}k` ||
+          n === `${cfg.distanceKm} km`
+        );
+      });
+
+      if (found) {
+        const name = found.name || cfg.defaultName;
+        const parsed = loadPhasesForDistance(
+          data.ticketPricing,
+          name,
+          found.price || 0
+        );
+        return {
+          key: found.id || `fixed-${cfg.distanceKm}`,
+          checked: true,
+          label: cfg.label,
+          type: found.type || "road",
+          name,
+          distanceKm: cfg.distanceKm,
+          capacity: found.capacity || 100,
+          basePrice: parsed.basePrice,
+          startAt: timeOnlyToInput(found.startAt),
+          endAt: timeOnlyToInput(found.endAt),
+          phases: parsed.phases,
+          pricingOpen: false,
+        };
+      }
+
+      const isDefaultChecked = !hasExisting && cfg.distanceKm === 5;
+
       return {
-        key: d.id || `d-${i}`,
-        type: d.type || "road",
-        name,
-        distanceKm: d.distanceKm || 0,
-        capacity: d.capacity || 0,
-        basePrice: parsed.basePrice,
-        startAt: timeOnlyToInput(d.startAt),
-        endAt: timeOnlyToInput(d.endAt),
-        phases: parsed.phases,
+        key: `fixed-${cfg.distanceKm}`,
+        checked: isDefaultChecked,
+        label: cfg.label,
+        type: "road",
+        name: cfg.defaultName,
+        distanceKm: cfg.distanceKm,
+        capacity: 100,
+        basePrice: 0,
+        startAt: "",
+        endAt: "",
+        phases: [],
         pricingOpen: false,
       };
     });
-    setRows(
-      mapped.length
-        ? mapped
-        : [
-            {
-              key: "new-1",
-              type: "road",
-              name: "5K",
-              distanceKm: 5,
-              capacity: 100,
-              basePrice: 0,
-              startAt: "",
-              endAt: "",
-              phases: [],
-              pricingOpen: false,
-            },
-          ]
-    );
+
+    setRows(mapped);
   }, [eventId]);
 
   useEffect(() => {
@@ -174,39 +208,24 @@ export default function ProfileDistancesClient() {
     };
   }, [eventId, load]);
 
-  const totalCap = rows.reduce((s, r) => s + (Number(r.capacity) || 0), 0);
+  const checkedRows = rows.filter((r) => r.checked);
+  const totalCap = checkedRows.reduce((s, r) => s + (Number(r.capacity) || 0), 0);
   const packageCap = event?.totalRunners || 0;
 
   const updateRow = (key: string, patch: Partial<DistRow>) => {
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   };
 
-  const addRow = () => {
-    setRows((prev) => [
-      ...prev,
-      {
-        key: `new-${Date.now()}`,
-        type: "road",
-        name: "",
-        distanceKm: 10,
-        capacity: 100,
-        basePrice: 0,
-        startAt: "",
-        endAt: "",
-        phases: [],
-        pricingOpen: false,
-      },
-    ]);
-  };
-
-  const removeRow = (key: string) => {
-    setRows((prev) => (prev.length <= 1 ? prev : prev.filter((r) => r.key !== key)));
-  };
-
   const handleSave = async () => {
     if (!event || saving) return;
-    if (rows.some((r) => !r.name.trim() || r.distanceKm <= 0 || r.capacity < 1)) {
-      setError("Mỗi cự ly cần tên, km > 0 và sức chứa ≥ 1.");
+
+    const checkedRows = rows.filter((r) => r.checked);
+    if (checkedRows.length === 0) {
+      setError("Vui lòng chọn ít nhất một cự ly để lưu.");
+      return;
+    }
+    if (checkedRows.some((r) => !r.name.trim() || r.distanceKm <= 0 || r.capacity < 1)) {
+      setError("Mỗi cự ly được chọn cần tên, km > 0 và sức chứa ≥ 1.");
       return;
     }
     if (event.packagePurchaseId && packageCap > 0 && totalCap > packageCap) {
@@ -220,7 +239,7 @@ export default function ProfileDistancesClient() {
         string,
         { basePrice: number; phases: Array<Record<string, unknown>> }
       > = {};
-      for (const r of rows) {
+      for (const r of checkedRows) {
         const n = r.name.trim();
         byDistanceName[n] = {
           basePrice: Number(r.basePrice) || 0,
@@ -235,7 +254,7 @@ export default function ProfileDistancesClient() {
       }
 
       await replaceEventDistances(eventId, {
-        distances: rows.map((r) => ({
+        distances: checkedRows.map((r) => ({
           type: r.type || "road",
           name: r.name.trim(),
           distanceKm: Number(r.distanceKm),
@@ -320,280 +339,304 @@ export default function ProfileDistancesClient() {
 
       <section className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-bold">Danh sách cự ly</h2>
+          <div>
+            <h2 className="text-sm font-bold">Danh sách cự ly</h2>
+            <p className="text-xs text-muted-foreground">
+              Chọn các cự ly áp dụng cho giải (5km, 10km, 21km, 42km). Chỉ cự ly được tích chọn mới được cập nhật lên hệ thống.
+            </p>
+          </div>
           <p className="text-xs text-muted-foreground">
-            Tổng slot: <strong>{totalCap}</strong>
+            Đã chọn: <strong className="text-foreground">{checkedRows.length}/4</strong> cự ly · Tổng slot:{" "}
+            <strong className="text-foreground">{totalCap}</strong>
             {event.packagePurchaseId ? ` / ${packageCap} (gói)` : null}
           </p>
         </div>
 
         <div className="space-y-4">
-          {rows.map((r) => (
-            <div
-              key={r.key}
-              className="rounded-xl border border-border/60 bg-background/50 p-4"
-            >
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-                <LabeledField label="Tên cự ly">
-                  <input
-                    placeholder="VD: 5K, 10K"
-                    value={r.name}
-                    disabled={!editable}
-                    onChange={(e) => updateRow(r.key, { name: e.target.value })}
-                    className={inputClass}
-                  />
-                </LabeledField>
-                <LabeledField label="Quãng đường (km)">
-                  <input
-                    type="number"
-                    step="0.1"
-                    min={0.1}
-                    value={r.distanceKm || ""}
-                    disabled={!editable}
-                    onChange={(e) =>
-                      updateRow(r.key, { distanceKm: Number(e.target.value) || 0 })
-                    }
-                    className={inputClass}
-                  />
-                </LabeledField>
-                <LabeledField label="Sức chứa (slot)">
-                  <input
-                    type="number"
-                    min={1}
-                    value={r.capacity || ""}
-                    disabled={!editable}
-                    onChange={(e) =>
-                      updateRow(r.key, { capacity: Number(e.target.value) || 0 })
-                    }
-                    className={inputClass}
-                  />
-                </LabeledField>
-                <LabeledField label="Giờ xuất phát">
-                  <input
-                    type="time"
-                    value={r.startAt}
-                    disabled={!editable}
-                    onChange={(e) => updateRow(r.key, { startAt: e.target.value })}
-                    className={inputClass}
-                  />
-                </LabeledField>
-                <LabeledField label="Giờ kết thúc / cutoff">
-                  <input
-                    type="time"
-                    value={r.endAt}
-                    disabled={!editable}
-                    onChange={(e) => updateRow(r.key, { endAt: e.target.value })}
-                    className={inputClass}
-                  />
-                </LabeledField>
-              </div>
+          {rows.map((r) => {
+            const isChecked = r.checked;
+            const isFieldDisabled = !editable || !isChecked;
 
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    updateRow(r.key, { pricingOpen: !r.pricingOpen })
-                  }
-                  className="inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-700 hover:bg-orange-100"
-                >
-                  <Settings2 className="h-3.5 w-3.5" />
-                  {r.pricingOpen
-                    ? "Đóng"
-                    : editable
-                      ? "Setup giá"
-                      : "Xem giá / phase"}
-                  {r.basePrice > 0
-                    ? ` · ${r.basePrice.toLocaleString("vi-VN")}đ`
-                    : ""}
-                  {r.phases.length > 0 ? ` · ${r.phases.length} phase` : ""}
-                </button>
-                {editable && (
-                  <button
-                    type="button"
-                    onClick={() => removeRow(r.key)}
-                    className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" /> Xóa cự ly
-                  </button>
-                )}
-              </div>
-
-              {r.pricingOpen && (
-                <div className="mt-4 rounded-xl border border-orange-200/80 bg-orange-50/40 p-4">
-                  <div className="mb-3 flex items-center justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-bold text-foreground">
-                        {editable ? "Setup giá" : "Chi tiết giá"} —{" "}
-                        {r.name || "cự ly"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {editable
-                          ? "Giá fallback khi ngoài mọi đợt phase. Có Regular rồi thì Regular lo cửa sổ thường; Early bird ưu tiên khi còn trong ngày."
-                          : "Chỉ xem — hồ sơ đã duyệt / mở ĐK không sửa giá."}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => updateRow(r.key, { pricingOpen: false })}
-                      className="rounded-lg p-1.5 text-slate-500 hover:bg-white"
-                      aria-label="Đóng"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-
-                  <LabeledField label="Giá fallback / ngoài đợt (VND)">
+            return (
+              <div
+                key={r.key}
+                className={`rounded-xl border transition-all ${
+                  isChecked
+                    ? "border-border/80 bg-background/80 p-4 shadow-sm"
+                    : "border-border/40 bg-muted/20 p-4 opacity-60"
+                }`}
+              >
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-3">
+                  <label className="flex items-center gap-3 cursor-pointer select-none">
                     <input
-                      type="number"
-                      min={0}
-                      value={r.basePrice || ""}
+                      type="checkbox"
+                      checked={isChecked}
                       disabled={!editable}
                       onChange={(e) =>
-                        updateRow(r.key, {
-                          basePrice: Number(e.target.value) || 0,
-                        })
+                        updateRow(r.key, { checked: e.target.checked })
                       }
-                      className={`${inputClass} max-w-xs`}
+                      className="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500 cursor-pointer disabled:cursor-not-allowed"
+                    />
+                    <div className="flex items-center gap-2">
+                      <span className={`text-sm font-bold ${isChecked ? "text-foreground" : "text-muted-foreground"}`}>
+                        {r.label}
+                      </span>
+                      <span
+                        className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${
+                          isChecked
+                            ? "bg-orange-50 text-orange-700 border border-orange-200"
+                            : "bg-muted text-muted-foreground border border-border"
+                        }`}
+                      >
+                        {isChecked ? "Đã chọn" : "Chưa chọn"}
+                      </span>
+                    </div>
+                  </label>
+
+                  {isChecked && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateRow(r.key, { pricingOpen: !r.pricingOpen })
+                      }
+                      className="inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-700 hover:bg-orange-100"
+                    >
+                      <Settings2 className="h-3.5 w-3.5" />
+                      {r.pricingOpen
+                        ? "Đóng setup giá"
+                        : editable
+                          ? "Setup giá"
+                          : "Xem giá / phase"}
+                      {r.basePrice > 0
+                        ? ` · ${r.basePrice.toLocaleString("vi-VN")}đ`
+                        : ""}
+                      {r.phases.length > 0 ? ` · ${r.phases.length} phase` : ""}
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                  <LabeledField label="Tên cự ly">
+                    <input
+                      placeholder="VD: 5km, 10km"
+                      value={r.name}
+                      disabled={isFieldDisabled}
+                      onChange={(e) => updateRow(r.key, { name: e.target.value })}
+                      className={inputClass}
                     />
                   </LabeledField>
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    Không thay Early bird. Nếu đã có phase Regular cùng mức này thì OK — fallback chỉ khi hết mọi cửa sổ phase.
-                  </p>
+                  <LabeledField label="Quãng đường (km)">
+                    <input
+                      type="number"
+                      value={r.distanceKm}
+                      disabled={true}
+                      readOnly
+                      className={`${inputClass} bg-muted/50 cursor-not-allowed font-medium`}
+                    />
+                  </LabeledField>
+                  <LabeledField label="Sức chứa (slot)">
+                    <input
+                      type="number"
+                      min={1}
+                      value={r.capacity || ""}
+                      disabled={isFieldDisabled}
+                      onChange={(e) =>
+                        updateRow(r.key, {
+                          capacity: Number(e.target.value) || 0,
+                        })
+                      }
+                      className={inputClass}
+                    />
+                  </LabeledField>
+                  <LabeledField label="Giờ xuất phát">
+                    <input
+                      type="time"
+                      value={r.startAt}
+                      disabled={isFieldDisabled}
+                      onChange={(e) =>
+                        updateRow(r.key, { startAt: e.target.value })
+                      }
+                      className={inputClass}
+                    />
+                  </LabeledField>
+                  <LabeledField label="Giờ kết thúc / cutoff">
+                    <input
+                      type="time"
+                      value={r.endAt}
+                      disabled={isFieldDisabled}
+                      onChange={(e) => updateRow(r.key, { endAt: e.target.value })}
+                      className={inputClass}
+                    />
+                  </LabeledField>
+                </div>
 
-                  <div className="mt-4 space-y-3">
-                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                      Đợt giá theo ngày (phase)
-                    </p>
-                    {r.phases.length === 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        Chưa có phase — dùng giá fallback.
-                      </p>
-                    )}
-                    {r.phases.map((p, pi) => (
-                      <div
-                        key={p.id}
-                        className="grid grid-cols-1 gap-2 rounded-lg border border-border/60 bg-white p-3 sm:grid-cols-5"
-                      >
-                        <LabeledField label="Tên phase">
-                          <input
-                            value={p.name}
-                            disabled={!editable}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              updateRow(r.key, {
-                                phases: r.phases.map((x, i) =>
-                                  i === pi ? { ...x, name: v } : x
-                                ),
-                              });
-                            }}
-                            className={inputClass}
-                            placeholder="Early Bird"
-                          />
-                        </LabeledField>
-                        <LabeledField label="Từ ngày">
-                          <input
-                            type="date"
-                            value={p.dateFrom}
-                            disabled={!editable}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              updateRow(r.key, {
-                                phases: r.phases.map((x, i) =>
-                                  i === pi ? { ...x, dateFrom: v } : x
-                                ),
-                              });
-                            }}
-                            className={inputClass}
-                          />
-                        </LabeledField>
-                        <LabeledField label="Đến ngày">
-                          <input
-                            type="date"
-                            value={p.dateTo}
-                            disabled={!editable}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              updateRow(r.key, {
-                                phases: r.phases.map((x, i) =>
-                                  i === pi ? { ...x, dateTo: v } : x
-                                ),
-                              });
-                            }}
-                            className={inputClass}
-                          />
-                        </LabeledField>
-                        <LabeledField label="Giá (VND)">
-                          <input
-                            type="number"
-                            min={0}
-                            value={p.price || ""}
-                            disabled={!editable}
-                            onChange={(e) => {
-                              const v = Number(e.target.value) || 0;
-                              updateRow(r.key, {
-                                phases: r.phases.map((x, i) =>
-                                  i === pi ? { ...x, price: v } : x
-                                ),
-                              });
-                            }}
-                            className={inputClass}
-                          />
-                        </LabeledField>
-                        {editable && (
-                          <div className="flex items-end">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                updateRow(r.key, {
-                                  phases: r.phases.filter((_, i) => i !== pi),
-                                })
-                              }
-                              className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-border py-2 text-xs font-semibold text-red-600 hover:bg-red-50"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" /> Xóa
-                            </button>
-                          </div>
-                        )}
+                {isChecked && r.pricingOpen && (
+                  <div className="mt-4 rounded-xl border border-orange-200/80 bg-orange-50/40 p-4">
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-bold text-foreground">
+                          {editable ? "Setup giá" : "Chi tiết giá"} —{" "}
+                          {r.name || "cự ly"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {editable
+                            ? "Giá fallback khi ngoài mọi đợt phase. Có Regular rồi thì Regular lo cửa sổ thường; Early bird ưu tiên khi còn trong ngày."
+                            : "Chỉ xem — hồ sơ đã duyệt / mở ĐK không sửa giá."}
+                        </p>
                       </div>
-                    ))}
-                    {editable && (
                       <button
                         type="button"
-                        onClick={() =>
+                        onClick={() => updateRow(r.key, { pricingOpen: false })}
+                        className="rounded-lg p-1.5 text-slate-500 hover:bg-white"
+                        aria-label="Đóng"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <LabeledField label="Giá fallback / ngoài đợt (VND)">
+                      <input
+                        type="number"
+                        min={0}
+                        value={r.basePrice || ""}
+                        disabled={!editable}
+                        onChange={(e) =>
                           updateRow(r.key, {
-                            phases: [
-                              ...r.phases,
-                              {
-                                id: `phase-${Date.now()}`,
-                                name: "Early Bird",
-                                dateFrom: "",
-                                dateTo: "",
-                                price: Math.max(0, r.basePrice - 50000),
-                              },
-                            ],
+                            basePrice: Number(e.target.value) || 0,
                           })
                         }
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-dashed border-orange-300 px-3 py-2 text-xs font-bold text-orange-600 hover:bg-orange-50"
-                      >
-                        <Plus className="h-3.5 w-3.5" /> Thêm phase giá
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+                        className={`${inputClass} max-w-xs`}
+                      />
+                    </LabeledField>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Không thay Early bird. Nếu đã có phase Regular cùng mức này thì OK — fallback chỉ khi hết mọi cửa sổ phase.
+                    </p>
 
-        {editable && (
-          <button
-            type="button"
-            onClick={addRow}
-            className="mt-4 inline-flex items-center gap-2 rounded-xl border border-dashed border-orange-300 px-3 py-2 text-xs font-bold text-orange-600 hover:bg-orange-50"
-          >
-            <Plus className="h-3.5 w-3.5" /> Thêm cự ly
-          </button>
-        )}
+                    <div className="mt-4 space-y-3">
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                        Đợt giá theo ngày (phase)
+                      </p>
+                      {r.phases.length === 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          Chưa có phase — dùng giá fallback.
+                        </p>
+                      )}
+                      {r.phases.map((p, pi) => (
+                        <div
+                          key={p.id}
+                          className="grid grid-cols-1 gap-2 rounded-lg border border-border/60 bg-white p-3 sm:grid-cols-5"
+                        >
+                          <LabeledField label="Tên phase">
+                            <input
+                              value={p.name}
+                              disabled={!editable}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                updateRow(r.key, {
+                                  phases: r.phases.map((x, i) =>
+                                    i === pi ? { ...x, name: v } : x
+                                  ),
+                                });
+                              }}
+                              className={inputClass}
+                              placeholder="Early Bird"
+                            />
+                          </LabeledField>
+                          <LabeledField label="Từ ngày">
+                            <input
+                              type="date"
+                              value={p.dateFrom}
+                              disabled={!editable}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                updateRow(r.key, {
+                                  phases: r.phases.map((x, i) =>
+                                    i === pi ? { ...x, dateFrom: v } : x
+                                  ),
+                                });
+                              }}
+                              className={inputClass}
+                            />
+                          </LabeledField>
+                          <LabeledField label="Đến ngày">
+                            <input
+                              type="date"
+                              value={p.dateTo}
+                              disabled={!editable}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                updateRow(r.key, {
+                                  phases: r.phases.map((x, i) =>
+                                    i === pi ? { ...x, dateTo: v } : x
+                                  ),
+                                });
+                              }}
+                              className={inputClass}
+                            />
+                          </LabeledField>
+                          <LabeledField label="Giá (VND)">
+                            <input
+                              type="number"
+                              min={0}
+                              value={p.price || ""}
+                              disabled={!editable}
+                              onChange={(e) => {
+                                const v = Number(e.target.value) || 0;
+                                updateRow(r.key, {
+                                  phases: r.phases.map((x, i) =>
+                                    i === pi ? { ...x, price: v } : x
+                                  ),
+                                });
+                              }}
+                              className={inputClass}
+                            />
+                          </LabeledField>
+                          {editable && (
+                            <div className="flex items-end">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateRow(r.key, {
+                                    phases: r.phases.filter((_, i) => i !== pi),
+                                  })
+                                }
+                                className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-border py-2 text-xs font-semibold text-red-600 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" /> Xóa
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {editable && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateRow(r.key, {
+                              phases: [
+                                ...r.phases,
+                                {
+                                  id: `phase-${Date.now()}`,
+                                  name: "Early Bird",
+                                  dateFrom: "",
+                                  dateTo: "",
+                                  price: Math.max(0, r.basePrice - 50000),
+                                },
+                              ],
+                            })
+                          }
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-dashed border-orange-300 px-3 py-2 text-xs font-bold text-orange-600 hover:bg-orange-50"
+                        >
+                          <Plus className="h-3.5 w-3.5" /> Thêm phase giá
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </section>
     </div>
   );
