@@ -59,6 +59,14 @@ const nextConfig: NextConfig = {
       ...apiImageRemotePatterns(),
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: "/organizer/:id/profile/addition",
+        destination: "/organizer/events/:id/profile/addition",
+      },
+    ];
+  },
 };
 
 export default nextConfig;

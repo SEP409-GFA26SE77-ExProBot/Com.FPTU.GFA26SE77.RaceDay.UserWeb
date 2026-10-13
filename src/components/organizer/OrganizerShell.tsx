@@ -36,6 +36,8 @@ import {
   ScrollText,
   ClipboardList,
   Building2,
+  PackagePlus,
+  Boxes,
 } from "lucide-react";
 
 function eventIdFromPath(pathname: string): string | null {
@@ -145,6 +147,18 @@ function eventWorkspaceGroups(eventId: string): NavGroup[] {
           href: `${base}/profile/content`,
           icon: ScrollText,
           matchPath: `${base}/profile/content`,
+        },
+        {
+          label: "Bổ sung",
+          href: `${base}/profile/addition`,
+          icon: PackagePlus,
+          matchPath: `${base}/profile/addition`,
+        },
+        {
+          label: "Vật phẩm tiếp tế",
+          href: `${base}/profile/supplies`,
+          icon: Boxes,
+          matchPath: `${base}/profile/supplies`,
         },
       ],
     },

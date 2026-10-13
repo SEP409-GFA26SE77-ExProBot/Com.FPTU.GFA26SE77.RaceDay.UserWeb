@@ -2,6 +2,14 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+.font-condensed {
+  font-family: var(--font-saira-condensed), 'Saira Condensed', 'Teko', sans-serif-condensed, Impact, sans-serif;
+}
+
+.font-poppins {
+  font-family: var(--font-poppins), 'Poppins', var(--font-inter), sans-serif;
+}
+
 /* @custom-variant dark (&:is(.dark *)); */
 
 :root {

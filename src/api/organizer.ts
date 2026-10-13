@@ -6,6 +6,7 @@ import type { RaceEventDto, RaceEventListItemDto } from "@/dto/event.dto";
 import type {
   ApiRegistration,
   CreateRaceEventRequest,
+  ProfileAdditionDto,
 } from "@/dto/organizer.dto";
 
 const EVENT_API = "api/v1/event";
@@ -159,5 +160,13 @@ export async function rejectRegistrationApi(
     })) as ApiRegistration;
   } catch (e) {
     throw new Error(getApiErrorMessage(e, "Từ chối đăng ký thất bại."));
+  }
+}
+
+export async function updateProfileAddition(eventId: string, data: ProfileAdditionDto): Promise<RaceEventDto> {
+  try {
+    return (await api.post(`${EVENT_API}/organizer/${eventId}/profile-addition`, data)) as RaceEventDto;
+  } catch (e) {
+    throw new Error(getApiErrorMessage(e, "Cập nhật thông tin bổ sung thất bại."));
   }
 }
