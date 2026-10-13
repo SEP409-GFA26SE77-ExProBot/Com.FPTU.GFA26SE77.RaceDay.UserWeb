@@ -71,7 +71,7 @@ function eventWorkspaceGroups(eventId: string): NavGroup[] {
           icon: LayoutDashboard,
         },
         {
-          label: "Xét mở chính thức",
+          label: "Hồ sơ · gửi duyệt",
           href: `${base}/profile/open-registration`,
           icon: ClipboardList,
           matchPath: `${base}/profile/open-registration`,

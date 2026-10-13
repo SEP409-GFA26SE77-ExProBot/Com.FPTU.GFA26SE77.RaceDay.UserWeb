@@ -13,11 +13,10 @@ import {
   Loader2,
   MapPin,
   Save,
-  Send,
   Users,
 } from "lucide-react";
 import { getEventById } from "@/api/events";
-import { submitRaceEvent, uploadOrganizerFile } from "@/api/organizer";
+import { uploadOrganizerFile } from "@/api/organizer";
 import { updateEventProfile } from "@/api/event-packages";
 import { getOrganizerWallet, saveOrganizerBankAccount } from "@/api/finance";
 import type { RaceEventDto } from "@/dto/event.dto";
@@ -27,7 +26,6 @@ import { getOrganizerStatusLabel, getStatusColor } from "@/lib/format";
 import { mediaDisplayUrl } from "@/lib/media-url";
 import {
   canEditProfile,
-  canSubmitForApproval,
   localInputToUtcIso,
   statusKey,
   utcToLocalInput,
@@ -45,7 +43,6 @@ export default function ProfileBasicClient() {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [submittingApproval, setSubmittingApproval] = useState(false);
 
   const [name, setName] = useState("");
   const [tagline, setTagline] = useState("");
@@ -57,6 +54,10 @@ export default function ProfileBasicClient() {
   const [totalRunners, setTotalRunners] = useState(0);
   const [opensAt, setOpensAt] = useState("");
   const [closesAt, setClosesAt] = useState("");
+  /** Liên hệ BTC — draft từ gói thường để trống / placeholder. */
+  const [orgName, setOrgName] = useState("");
+  const [orgEmail, setOrgEmail] = useState("");
+  const [orgPhone, setOrgPhone] = useState("");
   /** Cùng schema Ví & giải ngân (Finance bank account). */
   const [accountHolder, setAccountHolder] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
@@ -89,6 +90,17 @@ export default function ProfileBasicClient() {
         setTotalRunners(data.totalRunners || 0);
         setOpensAt(utcToLocalInput(data.registrationOpensAtUtc));
         setClosesAt(utcToLocalInput(data.registrationClosesAtUtc));
+        setOrgName(data.organizer?.name || "");
+        setOrgEmail(
+          isPlaceholderOrgEmail(data.organizer?.email)
+            ? ""
+            : data.organizer?.email || ""
+        );
+        setOrgPhone(
+          isPlaceholderPhone(data.organizer?.phone)
+            ? ""
+            : data.organizer?.phone || ""
+        );
         const ba = data.organizer?.beneficiaryAccount;
         setAccountHolder(ba?.accountHolder || "");
         setAccountNumber(ba?.accountNumber || "");
@@ -138,6 +150,7 @@ export default function ProfileBasicClient() {
   const handleSave = useCallback(async () => {
     if (saving || !event) return;
 
+    const editable = canEditProfile(event.status);
     const today = todayYmdLocal();
     if (editable) {
       if (!date) {
@@ -186,16 +199,44 @@ export default function ProfileBasicClient() {
       return;
     }
 
+    const hasBank =
+      Boolean(accountHolder.trim()) ||
+      Boolean(accountNumber.trim()) ||
+      Boolean(bankName.trim()) ||
+      Boolean(branch.trim()) ||
+      Boolean(transferNote.trim());
+    const phoneTrim = orgPhone.trim();
+    const emailTrim = orgEmail.trim();
+    const nameTrim = orgName.trim() || event.organizer?.name || "";
+
+    if (hasBank || phoneTrim || emailTrim) {
+      if (!nameTrim) {
+        setError("Vui lòng nhập tên ban tổ chức.");
+        return;
+      }
+      if (!emailTrim || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrim)) {
+        setError("Vui lòng nhập email ban tổ chức hợp lệ.");
+        return;
+      }
+      if (isPlaceholderOrgEmail(emailTrim)) {
+        setError("Vui lòng nhập email ban tổ chức thật (không dùng email tạm).");
+        return;
+      }
+      if (phoneTrim && !isValidVnMobile(phoneTrim)) {
+        setError("Số điện thoại không hợp lệ (VD: 0901234567 hoặc +84901234567).");
+        return;
+      }
+      if (hasBank && !phoneTrim) {
+        setError("Cần nhập SĐT ban tổ chức trước khi lưu tài khoản giải ngân.");
+        return;
+      }
+    }
+
     setSaving(true);
     setError(null);
     try {
       const org = event.organizer;
-      const hasBank =
-        accountHolder.trim() ||
-        accountNumber.trim() ||
-        bankName.trim() ||
-        branch.trim();
-      const editable = canEditProfile(event.status);
+      const shouldPatchOrganizer = hasBank || Boolean(phoneTrim) || Boolean(emailTrim);
 
       if (editable) {
         await updateEventProfile(eventId, {
@@ -210,21 +251,23 @@ export default function ProfileBasicClient() {
           ...(event.packagePurchaseId
             ? {}
             : { totalRunners: totalRunners || undefined }),
-          ...(hasBank && org?.name && org?.email && org?.phone
+          ...(shouldPatchOrganizer
             ? {
                 organizer: {
-                  name: org.name,
-                  email: org.email,
-                  phone: org.phone,
-                  legalEntity: org.legalEntity,
-                  website: org.website,
-                  beneficiaryAccount: {
-                    accountHolder: accountHolder.trim() || undefined,
-                    accountNumber: accountNumber.trim() || undefined,
-                    bankName: bankName.trim() || undefined,
-                    branch: branch.trim() || undefined,
-                    transferNote: transferNote.trim() || undefined,
-                  },
+                  name: nameTrim,
+                  email: emailTrim,
+                  phone: phoneTrim,
+                  legalEntity: org?.legalEntity,
+                  website: org?.website,
+                  beneficiaryAccount: hasBank
+                    ? {
+                        accountHolder: accountHolder.trim() || undefined,
+                        accountNumber: accountNumber.trim() || undefined,
+                        bankName: bankName.trim() || undefined,
+                        branch: branch.trim() || undefined,
+                        transferNote: transferNote.trim() || undefined,
+                      }
+                    : org?.beneficiaryAccount,
                 },
               }
             : {}),
@@ -269,27 +312,15 @@ export default function ProfileBasicClient() {
     totalRunners,
     opensAt,
     closesAt,
+    orgName,
+    orgEmail,
+    orgPhone,
     accountHolder,
     accountNumber,
     bankName,
     branch,
     transferNote,
   ]);
-
-  const handleSubmitApproval = useCallback(async () => {
-    if (submittingApproval) return;
-    setSubmittingApproval(true);
-    setError(null);
-    try {
-      const updated = await submitRaceEvent(eventId);
-      setEvent(updated);
-      notify("Đã gửi duyệt hồ sơ giải.");
-    } catch (e) {
-      setError(getApiErrorMessage(e, "Gửi duyệt thất bại."));
-    } finally {
-      setSubmittingApproval(false);
-    }
-  }, [submittingApproval, eventId]);
 
   if (loading) {
     return (
@@ -314,7 +345,6 @@ export default function ProfileBasicClient() {
   }
 
   const editable = canEditProfile(event.status);
-  const showSubmit = canSubmitForApproval(event.status);
   const bannerUrl = bannerImage ? mediaDisplayUrl(bannerImage) : null;
   const canEditWindow =
     !["suspended", "cancelled", "completed"].includes(statusKey(event.status));
@@ -334,6 +364,18 @@ export default function ProfileBasicClient() {
           >
             {getOrganizerStatusLabel(event.status)}
           </span>
+          {canEditProfile(event.status) && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Gửi admin duyệt tại{" "}
+              <Link
+                href={`/organizer/events/${eventId}/profile/open-registration`}
+                className="font-bold text-orange-600 hover:underline"
+              >
+                Xét mở chính thức
+              </Link>
+              .
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           {(editable || canEditWindow) && (
@@ -345,21 +387,6 @@ export default function ProfileBasicClient() {
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Lưu
-            </button>
-          )}
-          {showSubmit && (
-            <button
-              type="button"
-              disabled={submittingApproval || !name.trim()}
-              onClick={() => void handleSubmitApproval()}
-              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-orange-500 to-red-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-orange-500/20 disabled:opacity-50"
-            >
-              {submittingApproval ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-              Gửi duyệt
             </button>
           )}
         </div>
@@ -554,10 +581,51 @@ export default function ProfileBasicClient() {
         </section>
 
         <section className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm lg:col-span-2">
+          <h2 className="mb-1 text-sm font-bold">Liên hệ ban tổ chức</h2>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Bắt buộc trước khi lưu tài khoản giải ngân hoặc gửi duyệt. Draft từ gói
+            thường chưa có SĐT/email thật.
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="Tên BTC" required>
+              <input
+                type="text"
+                value={orgName}
+                onChange={(e) => setOrgName(e.target.value)}
+                disabled={!editable}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="SĐT BTC" required>
+              <input
+                type="tel"
+                value={orgPhone}
+                onChange={(e) => setOrgPhone(e.target.value)}
+                disabled={!editable}
+                placeholder="0901234567"
+                className={inputClass}
+              />
+            </Field>
+            <div className="sm:col-span-2">
+              <Field label="Email BTC" required>
+                <input
+                  type="email"
+                  value={orgEmail}
+                  onChange={(e) => setOrgEmail(e.target.value)}
+                  disabled={!editable}
+                  placeholder="btc@example.com"
+                  className={inputClass}
+                />
+              </Field>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm lg:col-span-2">
           <h2 className="mb-1 text-sm font-bold">Tài khoản nhận giải ngân</h2>
           <p className="mb-3 text-xs text-muted-foreground">
             Cùng tài khoản với mục <strong>Ví &amp; giải ngân</strong> — lưu ở đây
-            sẽ đồng bộ sang ví.
+            sẽ đồng bộ sang ví. Cần có SĐT BTC hợp lệ ở trên.
           </p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Ngân hàng">
@@ -613,6 +681,22 @@ export default function ProfileBasicClient() {
 
 const inputClass =
   "w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm disabled:opacity-60 focus:border-orange-500/50 focus:outline-none focus:ring-2 focus:ring-orange-500/20";
+
+function isPlaceholderPhone(phone?: string | null): boolean {
+  const digits = String(phone || "").replace(/\D/g, "");
+  return !digits || /^0+$/.test(digits);
+}
+
+function isPlaceholderOrgEmail(email?: string | null): boolean {
+  const e = String(email || "").toLowerCase();
+  return !e || e.includes("pending-") || e.includes("@update.raceday.vn");
+}
+
+/** Khớp BE VietnamPhone: 03/05/07/08/09 + 8 số, hoặc +84… */
+function isValidVnMobile(phone: string): boolean {
+  const normalized = phone.trim().replace(/[\s.\-()]/g, "");
+  return /^(0|\+84)(3|5|7|8|9)\d{8}$/.test(normalized);
+}
 
 function Field({
   label,
