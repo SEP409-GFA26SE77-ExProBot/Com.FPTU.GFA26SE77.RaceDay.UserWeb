@@ -25,6 +25,11 @@ export interface ApiRegistration {
   healthCertUrl?: string | null;
   bibNumber?: string | null;
   rejectionReason?: string | null;
+  /** Người duyệt / từ chối (nếu BE trả) */
+  reviewedByName?: string | null;
+  reviewedBy?: string | null;
+  reviewedAtUtc?: string | null;
+  updatedAtUtc?: string | null;
   ticketCode?: string | null;
   qrPayload?: unknown;
   eventName?: string | null;

@@ -1,6 +1,7 @@
 /**
  * Escrow / ví organizer / hoàn tiền — ledger theo từng giải.
- * MOCK mặc định: NEXT_PUBLIC_FINANCE_USE_MOCK !== "false"
+ * Mặc định gọi BE thật. Bật mock chỉ khi NEXT_PUBLIC_FINANCE_USE_MOCK=true
+ * (tránh ví/doanh thu/hoàn tiền kẹt localStorage trong khi PayOS đã paid).
  */
 import api from "@/config/axios";
 import type {
@@ -17,7 +18,7 @@ import type {
 const FINANCE_API = "api/v1/finance";
 
 export const FINANCE_USE_MOCK =
-  process.env.NEXT_PUBLIC_FINANCE_USE_MOCK !== "false";
+  process.env.NEXT_PUBLIC_FINANCE_USE_MOCK === "true";
 
 export async function getOrganizerWallet(): Promise<OrganizerWalletDto> {
   if (FINANCE_USE_MOCK) {

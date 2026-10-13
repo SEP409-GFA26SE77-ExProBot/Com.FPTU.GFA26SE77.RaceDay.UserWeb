@@ -7,8 +7,13 @@ export type EventStaffStatus = "invited" | "active" | "revoked";
 export interface StaffStationDto {
   id: string;
   label: string;
-  /** check_in | kit | medical | checkpoint | photo_zone | other */
+  /** check_in | kit | medical | checkpoint | photo_zone | aid | other */
   kind: string;
+  /** map = từ course checkpoint/aid; duty = nhiệm vụ không gắn map */
+  source?: "map" | "duty";
+  mapCheckpointId?: string | null;
+  distanceId?: string | null;
+  distanceName?: string | null;
 }
 
 export interface EventStaffMemberDto {
@@ -30,6 +35,7 @@ export interface InviteStaffDto {
   fullName: string;
   phone?: string;
   stationId?: string;
+  stationLabel?: string;
 }
 
 export interface AddStaffDto {
@@ -38,9 +44,11 @@ export interface AddStaffDto {
   email?: string;
   phone?: string;
   stationId?: string;
+  stationLabel?: string;
 }
 
 export interface AssignStaffStationDto {
   memberId: string;
   stationId: string | null;
+  stationLabel?: string | null;
 }

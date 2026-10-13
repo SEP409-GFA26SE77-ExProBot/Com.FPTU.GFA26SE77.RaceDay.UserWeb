@@ -12,9 +12,12 @@ import { RaceEventListItemDto } from "@/dto/event.dto";
 import {
   formatPrice,
   formatDate,
-  getStatusLabel,
   getRegistrationStatusLabel,
 } from "@/lib/format";
+import {
+  getPublicEventStatusLabel,
+  isPublicRegistrationLive,
+} from "@/lib/event-lifecycle";
 import { mediaDisplayUrl } from "@/lib/media-url";
 
 interface EventCardProps {
@@ -47,26 +50,21 @@ function myRegPrimaryLabel(status: string): string {
   return getRegistrationStatusLabel(status);
 }
 
-function overlayEventStatusClass(status: string): string {
-  const key = (status || "").toLowerCase().replace(/_/g, "-");
-  switch (key) {
-    case "registration-open":
+function overlayPublicLabelClass(label: string): string {
+  switch (label) {
+    case "Đang mở":
       return "bg-emerald-600 text-white";
-    case "approved":
-    case "published":
-    case "upcoming":
-    case "pending":
-    case "pending-approval":
-    case "draft":
+    case "Sắp mở":
+    case "Chờ mở":
       return "bg-amber-500 text-zinc-950";
-    case "in-progress":
+    case "Đang diễn ra":
       return "bg-rose-600 text-white";
-    case "sold-out":
-    case "cancelled":
-    case "rejected":
+    case "Hết slot":
+    case "Đã hủy":
+    case "Từ chối":
       return "bg-red-600 text-white";
-    case "closed":
-    case "completed":
+    case "Đã đóng":
+    case "Đã kết thúc":
       return "bg-zinc-800 text-white";
     default:
       return "bg-zinc-950 text-white";
@@ -112,10 +110,12 @@ export default function EventCard({
     : 0;
   const slotsLeft = Math.max(0, totalCapacity - totalRegistered);
   const eventStatusKey = (event.status || "").toLowerCase().replace(/_/g, "-");
+  const publicLabel = getPublicEventStatusLabel(event);
+  const regLive = isPublicRegistrationLive(event);
   const showRegBadge =
     statusMode === "registration" && Boolean(myRegistrationStatus);
   const href =
-    eventStatusKey === "in-progress"
+    publicLabel === "Đang diễn ra" || eventStatusKey === "in-progress"
       ? `/race-day?eventId=${event.id}`
       : `/events/${event.id}`;
 
@@ -123,7 +123,7 @@ export default function EventCard({
     <Link
       href={href}
       className={`group block rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-0.5 ${
-        eventStatusKey === "in-progress"
+        publicLabel === "Đang diễn ra" || eventStatusKey === "in-progress"
           ? "border-[3px] border-rose-500 bg-gradient-to-br from-rose-50 via-orange-50/80 to-white shadow-lg shadow-rose-500/20 ring-2 ring-rose-400/30 hover:shadow-xl hover:shadow-rose-500/30"
           : showRegBadge
             ? "border-2 border-orange-500/50 bg-card shadow-sm hover:shadow-lg hover:shadow-orange-500/15 hover:border-orange-500"
@@ -158,14 +158,14 @@ export default function EventCard({
             </span>
           ) : (
             <span
-              className={`${BADGE_BASE} ${overlayEventStatusClass(event.status)}`}
+              className={`${BADGE_BASE} ${overlayPublicLabelClass(publicLabel)}`}
             >
-              {getStatusLabel(event.status)}
+              {publicLabel}
             </span>
           )}
 
           {statusMode === "event" &&
-            eventStatusKey === "registration-open" &&
+            regLive &&
             slotsLeft > 0 && (
               <span className={`${BADGE_BASE} bg-zinc-950 text-white`}>
                 Còn {slotsLeft.toLocaleString("vi-VN")} chỗ

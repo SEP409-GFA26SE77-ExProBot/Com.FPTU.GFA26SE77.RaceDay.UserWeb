@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { PAGE_SHELL_FORM } from "@/lib/page-shell";
+import { PAGE_SHELL } from "@/lib/page-shell";
 import CreateEventClient from "./CreateEventClient";
 
 export const metadata = {
@@ -8,7 +8,7 @@ export const metadata = {
 
 export default function CreateEventPage() {
   return (
-    <div className={`${PAGE_SHELL_FORM} py-8 sm:py-10`}>
+    <div className={`${PAGE_SHELL} py-8 sm:py-10`}>
       <Suspense
         fallback={
           <p className="text-sm font-medium text-muted-foreground">

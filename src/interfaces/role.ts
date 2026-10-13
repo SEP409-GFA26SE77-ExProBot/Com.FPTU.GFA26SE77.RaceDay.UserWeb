@@ -4,6 +4,7 @@ export enum Role {
     RUNNER = 'RUNNER',
     ORGANIZER = 'ORGANIZER',
     STAFF = 'STAFF',
+    VOLUNTEER = 'VOLUNTEER',
     COORDINATOR = 'COORDINATOR',
 }
 

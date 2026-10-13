@@ -73,4 +73,18 @@ export const ChangePasswordSchema = z.object({
   newPassword: z.string().min(8, "Mật khẩu mới phải có ít nhất 8 ký tự"),
 });
 
-export type ChangePasswordDto = z.infer<typeof ChangePasswordSchema>;
+export type ChangePasswordDto = z.infer<typeof ChangePasswordSchema>;
+
+/** GET api/v1/iam/me */
+export interface MyProfileDto {
+  id: string;
+  email: string;
+  username: string;
+  fullName: string;
+  phone?: string | null;
+  dateOfBirth?: string | null;
+  /** 0 Unknown | 1 Male | 2 Female */
+  gender: number | string;
+  status?: number | string;
+  emailVerified?: boolean;
+}

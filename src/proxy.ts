@@ -5,6 +5,8 @@ function mapAppRole(raw: string): string {
     const r = raw.replace(/^ROLE_/i, "").trim().toUpperCase();
     if (!r) return Role.RUNNER;
     if (r === "USER" || r === "CUSTOMER" || r === "MEMBER") return Role.RUNNER;
+    // IAM seed "Volunteer" ↔ quyền staff vận hành
+    if (r === "VOLUNTEER") return Role.VOLUNTEER;
     return r;
 }
 
@@ -23,7 +25,7 @@ const ROLE_PERMISSIONS: Record<string, (Role | string)[] | '*'> = {
     '/events/create': '*',
     '/event-admin': [Role.ADMIN, Role.COORDINATOR],
     '/staff-admin': [Role.ADMIN, Role.COORDINATOR],
-    '/scan-qr': [Role.COORDINATOR, Role.STAFF, Role.ADMIN],
+    '/scan-qr': [Role.COORDINATOR, Role.STAFF, Role.VOLUNTEER, Role.PHOTOGRAPHER, Role.ADMIN],
     '/register-event': '*',
 };
 
@@ -100,9 +102,12 @@ export function proxy(request: NextRequest) {
     } else if (/^\/events\/[^/]+\/(register|payment|confirmation|pending)(\/|$)/.test(pathname)) {
         // Tuyến đăng ký giải chạy cho người dùng đã đăng nhập
         allowedRoles = '*';
+    } else if (/^\/events\/create\/package-return(\/|$)/.test(pathname)) {
+        // Return URL sau thanh toán gói tổ chức
+        allowedRoles = '*';
     } else if (
         /^\/organizer\/events\/[^/]+\/?$/.test(pathname) ||
-        /^\/organizer\/events\/[^/]+\/(setup-map|race-simulation|staff|wallet|payout-history)\/?$/.test(
+        /^\/organizer\/events\/[^/]+\/(setup-map|race-simulation|staff|wallet|payout-history|profile)(\/.*)?$/.test(
           pathname
         )
     ) {

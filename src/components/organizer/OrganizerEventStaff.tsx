@@ -7,6 +7,7 @@ import {
   RefreshCw,
   Send,
   Users,
+  X,
 } from "lucide-react";
 import {
   addEventStaff,
@@ -28,19 +29,74 @@ const ROLE_TABS: { id: EventStaffRole; label: string; hint: string }[] = [
   {
     id: "coordinator",
     label: "Coordinator",
-    hint: "Mời tài khoản · assign khu vực / checkpoint / điều hành.",
+    hint: "Gán checkpoint từ bản đồ (start / CP / finish) hoặc nhiệm vụ không gắn map (điều hành, y tế).",
   },
   {
     id: "photographer",
     label: "Photographer",
-    hint: "Mời · assign zone chụp trên cung đường.",
+    hint: "Gán điểm checkpoint trên cung đường để bố trí chụp — hoặc để di động / chưa gán map.",
   },
   {
     id: "volunteer",
     label: "Volunteer",
-    hint: "Thêm nhanh hoặc mời · MVP chỉ quầy check-in / nhận kit.",
+    hint: "Gán điểm tiếp tế (aid) đã setup trên map, hoặc quầy check-in / kit không gắn map.",
   },
 ];
+
+function StationSelect({
+  role,
+  value,
+  stations,
+  disabled,
+  onChange,
+  compact,
+}: {
+  role: EventStaffRole;
+  value: string;
+  stations: StaffStationDto[];
+  disabled?: boolean;
+  onChange: (id: string) => void;
+  compact?: boolean;
+}) {
+  const mapStations = stations.filter((s) => s.source === "map");
+  const dutyStations = stations.filter((s) => s.source !== "map");
+  const mapGroup =
+    role === "volunteer"
+      ? "Điểm tiếp tế (map)"
+      : role === "photographer"
+        ? "Checkpoint / zone chụp (map)"
+        : "Checkpoint (map)";
+  return (
+    <select
+      value={value}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.value)}
+      className={`w-full rounded-xl border border-border bg-background px-3 ${
+        compact ? "py-1.5 text-xs" : "py-2 text-sm"
+      }`}
+    >
+      <option value="">— Chưa gán —</option>
+      {mapStations.length > 0 ? (
+        <optgroup label={mapGroup}>
+          {mapStations.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.label}
+            </option>
+          ))}
+        </optgroup>
+      ) : null}
+      {dutyStations.length > 0 ? (
+        <optgroup label="Nhiệm vụ (không gán map)">
+          {dutyStations.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.label}
+            </option>
+          ))}
+        </optgroup>
+      ) : null}
+    </select>
+  );
+}
 
 function statusLabel(s: string) {
   switch (s) {
@@ -81,6 +137,9 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [stationId, setStationId] = useState("");
+  const [revokeTarget, setRevokeTarget] = useState<EventStaffMemberDto | null>(
+    null
+  );
 
   const roleMeta = useMemo(
     () => ROLE_TABS.find((t) => t.id === role)!,
@@ -92,12 +151,12 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
     try {
       const [list, st] = await Promise.all([
         listEventStaff(eventId, role),
-        listStaffStations(role),
+        listStaffStations(eventId, role),
       ]);
       setMembers(list.filter((m) => m.status !== "revoked"));
       setStations(st);
       setStationId((prev) =>
-        prev && st.some((s) => s.id === prev) ? prev : st[0]?.id || ""
+        prev && st.some((s) => s.id === prev) ? prev : ""
       );
     } catch (e) {
       setError(getApiErrorMessage(e, "Không tải được nhân sự."));
@@ -125,6 +184,9 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
     setPhone("");
   };
 
+  const stationLabelOf = (id: string) =>
+    stations.find((s) => s.id === id)?.label ?? undefined;
+
   const onInvite = async () => {
     setBusy(true);
     setError(null);
@@ -135,8 +197,9 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
         fullName,
         phone: phone || undefined,
         stationId: stationId || undefined,
+        stationLabel: stationId ? stationLabelOf(stationId) : undefined,
       });
-      setToast("Đã gửi lời mời (mock).");
+      setToast("Đã gửi lời mời nhân sự.");
       resetForm();
       await load();
     } catch (e) {
@@ -156,8 +219,9 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
         email: email || undefined,
         phone: phone || undefined,
         stationId: stationId || undefined,
+        stationLabel: stationId ? stationLabelOf(stationId) : undefined,
       });
-      setToast("Đã thêm nhân sự (active ngay — mock).");
+      setToast("Đã thêm nhân sự (active ngay).");
       resetForm();
       await load();
     } catch (e) {
@@ -173,6 +237,7 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
       await assignEventStaffStation(eventId, {
         memberId,
         stationId: nextStation || null,
+        stationLabel: nextStation ? stationLabelOf(nextStation) ?? null : null,
       });
       await load();
     } catch (e) {
@@ -182,11 +247,14 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
     }
   };
 
-  const onRevoke = async (memberId: string) => {
-    if (!window.confirm("Gỡ nhân sự khỏi giải này?")) return;
+  const confirmRevoke = async () => {
+    if (!revokeTarget) return;
+    const memberId = revokeTarget.id;
     setBusy(true);
+    setError(null);
     try {
       await revokeEventStaff(eventId, memberId);
+      setRevokeTarget(null);
       await load();
     } catch (e) {
       setError(getApiErrorMessage(e, "Gỡ thất bại."));
@@ -207,9 +275,8 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
             Quản lý nhân sự
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Coordinator · Photographer · Volunteer gắn với giải đang mở. Mock
-            local — khi BE sẵn sàng tắt{" "}
-            <code className="text-[11px]">NEXT_PUBLIC_EVENT_STAFF_USE_MOCK</code>.
+            Bố trí nhiệm vụ theo điểm đã setup ở Thiết lập bản đồ (checkpoint /
+            tiếp tế) hoặc nhiệm vụ không gắn map. Dữ liệu lưu trên BE theo giải.
           </p>
         </div>
         <button
@@ -238,6 +305,16 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
         ))}
       </div>
       <p className="text-xs text-muted-foreground">{roleMeta.hint}</p>
+      {stations.filter((s) => s.source === "map").length === 0 ? (
+        <p className="rounded-xl border border-amber-200/80 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          Chưa có điểm map phù hợp role này. Vào{" "}
+          <span className="font-semibold">Thiết lập bản đồ</span> thêm{" "}
+          {role === "volunteer"
+            ? "điểm tiếp tế (aid)"
+            : "checkpoint (start / CP / finish)"}
+          — vẫn có thể gán nhiệm vụ không gắn map bên dưới.
+        </p>
+      ) : null}
 
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -282,21 +359,18 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
               className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
             />
           </label>
-          <label className="block space-y-1 text-xs">
+          <label className="block space-y-1 text-xs sm:col-span-2 lg:col-span-1">
             <span className="font-semibold text-muted-foreground">
-              Vị trí / nhiệm vụ
+              {role === "volunteer"
+                ? "Điểm tiếp tế / nhiệm vụ"
+                : "Checkpoint / nhiệm vụ"}
             </span>
-            <select
+            <StationSelect
+              role={role}
               value={stationId}
-              onChange={(e) => setStationId(e.target.value)}
-              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
-            >
-              {stations.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
+              stations={stations}
+              onChange={setStationId}
+            />
           </label>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -352,23 +426,20 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
                   >
                     {statusLabel(m.status)}
                   </span>
-                  <select
-                    value={m.stationId || ""}
-                    disabled={busy}
-                    onChange={(e) => void onAssign(m.id, e.target.value)}
-                    className="rounded-xl border border-border bg-background px-2 py-1.5 text-xs"
-                  >
-                    <option value="">— Chưa gán —</option>
-                    {stations.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="min-w-[12rem] flex-1 sm:max-w-xs">
+                    <StationSelect
+                      role={role}
+                      value={m.stationId || ""}
+                      stations={stations}
+                      disabled={busy}
+                      compact
+                      onChange={(id) => void onAssign(m.id, id)}
+                    />
+                  </div>
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={() => void onRevoke(m.id)}
+                    onClick={() => setRevokeTarget(m)}
                     className="text-xs font-semibold text-red-600 hover:underline disabled:opacity-40"
                   >
                     Gỡ
@@ -379,6 +450,72 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
           </ul>
         )}
       </section>
+
+      {revokeTarget ? (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-zinc-950/50 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="revoke-staff-title"
+          onClick={() => !busy && setRevokeTarget(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-orange-500">
+                  Xác nhận
+                </p>
+                <h2
+                  id="revoke-staff-title"
+                  className="mt-1 text-lg font-extrabold tracking-tight"
+                >
+                  Gỡ nhân sự khỏi giải?
+                </h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  <span className="font-semibold text-foreground">
+                    {revokeTarget.fullName}
+                  </span>
+                  {revokeTarget.email ? ` · ${revokeTarget.email}` : ""} sẽ bị
+                  gỡ khỏi danh sách {roleMeta.label.toLowerCase()} của giải này.
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setRevokeTarget(null)}
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted"
+                aria-label="Đóng"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setRevokeTarget(null)}
+                className="rounded-full border border-border px-4 py-2 text-xs font-bold hover:bg-muted disabled:opacity-40"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void confirmRevoke()}
+                className="inline-flex items-center gap-1.5 rounded-full bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-40"
+              >
+                {busy ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : null}
+                Gỡ khỏi giải
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -6,20 +6,12 @@ import Image from "next/image";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Cookies from "js-cookie";
 import {
-  ArrowLeft,
   Calendar,
-  Check,
-  ChevronDown,
-  ChevronUp,
   ClipboardList,
   ExternalLink,
-  FileText,
   Loader2,
   MapPin,
-  RefreshCw,
-  User,
   Users,
-  X,
 } from "lucide-react";
 import { getEventById } from "@/api/events";
 import {
@@ -33,13 +25,12 @@ import {
   formatDate,
   formatPrice,
   getOrganizerStatusLabel,
-  getRegistrationStatusLabel,
   getStatusColor,
 } from "@/lib/format";
 import { getApiErrorMessage } from "@/lib/error";
 import { mediaDisplayUrl } from "@/lib/media-url";
-import { PAGE_SHELL } from "@/lib/page-shell";
 import EventFinancePanel from "@/components/organizer/EventFinancePanel";
+import RegistrationApprovalsPanel from "@/components/organizer/RegistrationApprovalsPanel";
 
 const DEFAULT_GRADIENT =
   "linear-gradient(135deg, #f97316 0%, #ea580c 40%, #dc2626 100%)";
@@ -49,6 +40,10 @@ type TabKey = "overview" | "approvals" | "finance";
 function isManageableOrganizerStatus(status: string): boolean {
   const key = (status || "").toLowerCase().replace(/_/g, "-");
   return (
+    key === "draft" ||
+    key === "pending" ||
+    key === "pending-approval" ||
+    key === "rejected" ||
     key === "approved" ||
     key === "published" ||
     key === "registration-open" ||
@@ -56,94 +51,6 @@ function isManageableOrganizerStatus(status: string): boolean {
     key === "completed" ||
     key === "cancelled" ||
     key === "in-progress"
-  );
-}
-
-function resolveFileUrl(url?: string | null): string | null {
-  if (!url) return null;
-  const resolved = mediaDisplayUrl(url);
-  return resolved || null;
-}
-
-function formatMedical(codes: ApiRegistration["medicalCodes"]): string {
-  if (!codes) return "—";
-  if (Array.isArray(codes)) return codes.length ? codes.join(", ") : "—";
-  if (typeof codes === "string") return codes || "—";
-  try {
-    return JSON.stringify(codes);
-  } catch {
-    return "—";
-  }
-}
-
-function DetailRow({
-  label,
-  value,
-}: {
-  label: string;
-  value?: string | number | null;
-}) {
-  if (value == null || value === "") return null;
-  return (
-    <div className="flex justify-between gap-3 text-xs sm:text-sm">
-      <span className="shrink-0 text-muted-foreground">{label}</span>
-      <span className="break-all text-right font-medium text-foreground">
-        {value}
-      </span>
-    </div>
-  );
-}
-
-function RegistrationFormDetails({ r }: { r: ApiRegistration }) {
-  return (
-    <div className="space-y-4 rounded-xl border border-border/60 bg-muted/40 p-4">
-      <div>
-        <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          Thông tin VĐV
-        </p>
-        <div className="space-y-1.5">
-          <DetailRow label="Họ tên" value={r.fullName} />
-          <DetailRow label="Email" value={r.email} />
-          <DetailRow label="SĐT" value={r.phone} />
-          <DetailRow label="Ngày sinh" value={r.dateOfBirth} />
-          <DetailRow label="Giới tính" value={r.gender} />
-          <DetailRow label="CCCD/CMND" value={r.idNumber} />
-        </div>
-      </div>
-      <div>
-        <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          Áo / Y tế
-        </p>
-        <div className="space-y-1.5">
-          <DetailRow
-            label="Áo"
-            value={
-              r.shirtType || r.shirtSize || r.shirtColor
-                ? [r.shirtType, r.shirtSize, r.shirtColor].filter(Boolean).join(" · ")
-                : "Không lấy áo"
-            }
-          />
-          <DetailRow label="Mã bệnh lý" value={formatMedical(r.medicalCodes)} />
-          <div className="flex items-start justify-between gap-3 text-xs sm:text-sm">
-            <span className="shrink-0 text-muted-foreground">Giấy khám</span>
-            {resolveFileUrl(r.healthCertUrl) ? (
-              <a
-                href={resolveFileUrl(r.healthCertUrl)!}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-right font-semibold text-orange-600 hover:underline"
-              >
-                <FileText className="h-3.5 w-3.5" />
-                {r.healthCertFileName || "Xem file"}
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            ) : (
-              <span className="font-medium">{r.healthCertFileName || "Chưa có"}</span>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -184,10 +91,8 @@ function MyEventDetailContent() {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [reason, setReason] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("pending_approval");
 
   const username = Cookies.get("username") || "User";
 
@@ -241,11 +146,6 @@ function MyEventDetailContent() {
     void loadRegs();
   }, [eventId, tab, loadRegs]);
 
-  const filteredRegs = useMemo(() => {
-    if (statusFilter === "all") return regs;
-    return regs.filter((r) => r.status === statusFilter);
-  }, [regs, statusFilter]);
-
   const pendingCount = useMemo(
     () => regs.filter((r) => r.status === "pending_approval").length,
     [regs]
@@ -295,14 +195,14 @@ function MyEventDetailContent() {
 
   if (error || !event) {
     return (
-      <div className={`${PAGE_SHELL} py-16 text-center`}>
+      <div className="py-16 text-center">
         <h1 className="text-xl font-bold text-foreground">Không tìm thấy giải</h1>
         <p className="mt-2 text-sm text-muted-foreground">{error}</p>
         <Link
           href="/my-events"
-          className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-orange-600"
+          className="mt-6 inline-block text-sm font-bold text-orange-600"
         >
-          <ArrowLeft className="h-4 w-4" /> Về danh sách
+          Về danh sách
         </Link>
       </div>
     );
@@ -317,87 +217,77 @@ function MyEventDetailContent() {
   );
 
   return (
-    <div className={`${PAGE_SHELL} py-8 sm:py-10`}>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <Link
-          href="/my-events"
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-orange-600"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" /> Danh sách giải của tôi
-        </Link>
-        <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs">
-          <User className="h-3.5 w-3.5 text-orange-500" />
-          <span className="font-semibold text-foreground">{username}</span>
-        </div>
-      </div>
-
+    <div className="space-y-6">
       {toast && (
-        <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900">
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900">
           {toast}
         </div>
       )}
 
-      <div className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm">
-        <div className="relative h-44 sm:h-52">
-          {event.bannerImage ? (
-            <Image
-              src={mediaDisplayUrl(event.bannerImage)}
-              alt={event.name}
-              fill
-              className="object-cover"
-              sizes="100vw"
-              priority
-            />
-          ) : (
-            <div
-              className="absolute inset-0"
-              style={{ background: DEFAULT_GRADIENT }}
-            />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/30 to-transparent" />
-          <div className="absolute bottom-4 left-4 right-4">
-            <span
-              className={`mb-2 inline-flex rounded-md border px-2.5 py-1 text-[11px] font-extrabold ${getStatusColor(
-                event.status
-              )}`}
-            >
-              {getOrganizerStatusLabel(event.status)}
-            </span>
-            <h1 className="text-2xl font-extrabold text-white sm:text-3xl">
-              {event.name}
-            </h1>
-            {event.tagline ? (
-              <p className="mt-1 text-sm text-white/80">{event.tagline}</p>
-            ) : null}
+      {/* Banner + tab strip — chỉ overview / finance; approvals dùng sidebar + bảng */}
+      {tab !== "approvals" && (
+        <div className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm">
+          <div className="relative h-44 sm:h-52">
+            {event.bannerImage ? (
+              <Image
+                src={mediaDisplayUrl(event.bannerImage)}
+                alt={event.name}
+                fill
+                className="object-cover"
+                sizes="100vw"
+                priority
+              />
+            ) : (
+              <div
+                className="absolute inset-0"
+                style={{ background: DEFAULT_GRADIENT }}
+              />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/30 to-transparent" />
+            <div className="absolute bottom-4 left-4 right-4">
+              <span
+                className={`mb-2 inline-flex rounded-md border px-2.5 py-1 text-[11px] font-extrabold ${getStatusColor(
+                  event.status
+                )}`}
+              >
+                {getOrganizerStatusLabel(event.status)}
+              </span>
+              <h1 className="text-2xl font-extrabold text-white sm:text-3xl">
+                {event.name}
+              </h1>
+              {event.tagline ? (
+                <p className="mt-1 text-sm text-white/80">{event.tagline}</p>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-1 border-b border-border/60 p-2">
+            {(
+              [
+                { key: "overview", label: "Tổng quan" },
+                {
+                  key: "approvals",
+                  label: `Duyệt đăng ký${pendingCount ? ` (${pendingCount})` : ""}`,
+                },
+                { key: "finance", label: "Tài chính" },
+              ] as { key: TabKey; label: string }[]
+            ).map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setTab(t.key)}
+                className={`rounded-xl px-4 py-2 text-xs font-bold transition ${
+                  tab === t.key
+                    ? "bg-orange-500/15 text-orange-600"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
         </div>
-
-        <div className="flex flex-wrap gap-1 border-b border-border/60 p-2">
-          {(
-            [
-              { key: "overview", label: "Tổng quan" },
-              {
-                key: "approvals",
-                label: `Duyệt đăng ký${pendingCount ? ` (${pendingCount})` : ""}`,
-              },
-              { key: "finance", label: "Tài chính" },
-            ] as { key: TabKey; label: string }[]
-          ).map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setTab(t.key)}
-              className={`rounded-xl px-4 py-2 text-xs font-bold transition ${
-                tab === t.key
-                  ? "bg-orange-500/15 text-orange-600"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      )}
 
       {tab === "overview" && (
         <>
@@ -475,141 +365,33 @@ function MyEventDetailContent() {
       {tab === "finance" && <EventFinancePanel eventId={eventId} />}
 
       {tab === "approvals" && (
-        <section className="mt-6 space-y-4">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-orange-500">
-                BTC · {username}
-              </p>
-              <h2 className="mt-1 text-xl font-extrabold text-foreground">
-                Duyệt đăng ký giải này
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Dữ liệu theo API tài khoản đang đăng nhập — không dùng mock.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="rounded-xl border border-border bg-card px-3 py-2 text-xs font-semibold"
-              >
-                <option value="pending_approval">Chờ duyệt</option>
-                <option value="confirmed">Đã duyệt</option>
-                <option value="rejected">Từ chối</option>
-                <option value="all">Tất cả</option>
-              </select>
-              <button
-                type="button"
-                onClick={() => void loadRegs()}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-semibold hover:bg-muted"
-              >
-                <RefreshCw
-                  className={`h-3.5 w-3.5 ${regsLoading ? "animate-spin" : ""}`}
-                />
-                Tải lại
-              </button>
-              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
-                {pendingCount} chờ duyệt
-              </span>
-            </div>
-          </div>
-
-          {regsLoading ? (
-            <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin" /> Đang tải đăng ký…
-            </div>
-          ) : filteredRegs.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
-              Không có đơn phù hợp bộ lọc. VĐV cần thanh toán PayOS trước khi vào
-              chờ duyệt.
-            </div>
-          ) : (
-            <ul className="space-y-3">
-              {filteredRegs.map((r) => {
-                const open = expandedId === r.id;
-                const canModerate = r.status === "pending_approval";
-                return (
-                  <li
-                    key={r.id}
-                    className="space-y-3 rounded-2xl border border-border/60 bg-card p-5 shadow-sm"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="font-bold text-foreground">{r.fullName}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {r.email} · {r.phone}
-                        </p>
-                        <p className="mt-2 text-sm text-foreground/80">
-                          {r.distanceLabel || r.distanceId}
-                          {r.bibNumber ? ` · BIB ${r.bibNumber}` : ""}
-                        </p>
-                        <p className="mt-1 text-sm font-semibold text-orange-600">
-                          {formatPrice(Number(r.price || 0))} ·{" "}
-                          {getRegistrationStatusLabel(r.status)}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setExpandedId(open ? null : r.id)}
-                          className="inline-flex items-center gap-1 rounded-xl border border-border px-3 py-2 text-xs font-bold hover:bg-muted"
-                        >
-                          {open ? (
-                            <ChevronUp className="h-3.5 w-3.5" />
-                          ) : (
-                            <ChevronDown className="h-3.5 w-3.5" />
-                          )}
-                          {open ? "Ẩn form" : "Xem form"}
-                        </button>
-                        {canModerate && (
-                          <>
-                            <button
-                              type="button"
-                              disabled={busyId === r.id}
-                              onClick={() => void onApprove(r.id)}
-                              className="inline-flex items-center gap-1 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-60"
-                            >
-                              {busyId === r.id ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              ) : (
-                                <Check className="h-3.5 w-3.5" />
-                              )}
-                              Duyệt
-                            </button>
-                            <button
-                              type="button"
-                              disabled={busyId === r.id}
-                              onClick={() => {
-                                setRejectId(r.id);
-                                setReason("");
-                              }}
-                              className="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700"
-                            >
-                              <X className="h-3.5 w-3.5" /> Từ chối
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    {open && <RegistrationFormDetails r={r} />}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
+        <RegistrationApprovalsPanel
+          event={event}
+          regs={regs}
+          loading={regsLoading}
+          busyId={busyId}
+          organizerUsername={username}
+          onReload={() => void loadRegs()}
+          onApprove={(id) => void onApprove(id)}
+          onRejectRequest={(id) => {
+            setRejectId(id);
+            setReason("");
+          }}
+        />
       )}
 
       {rejectId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md space-y-3 rounded-2xl bg-card p-5 shadow-xl">
             <h2 className="text-lg font-bold">Lý do từ chối</h2>
+            <p className="text-xs text-muted-foreground">
+              VĐV sẽ thấy lý do này trên vé / trang đăng ký của họ.
+            </p>
             <textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               rows={4}
-              className="w-full rounded-xl border border-border p-3 text-sm"
+              className="w-full rounded-xl border border-border p-3 text-sm outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20"
               placeholder="Tối thiểu 10 ký tự…"
             />
             <div className="flex justify-end gap-2">
@@ -626,7 +408,11 @@ function MyEventDetailContent() {
                 onClick={() => void onRejectConfirm()}
                 className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
               >
-                Xác nhận từ chối
+                {busyId === rejectId ? (
+                  <Loader2 className="mx-auto h-4 w-4 animate-spin" />
+                ) : (
+                  "Xác nhận từ chối"
+                )}
               </button>
             </div>
           </div>

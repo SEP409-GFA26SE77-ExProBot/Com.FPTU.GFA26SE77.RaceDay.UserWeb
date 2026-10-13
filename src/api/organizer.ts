@@ -1,7 +1,7 @@
 import api from "@/config/axios";
 import { getApiErrorMessage } from "@/lib/error";
 import { resolveStoredFileUrl } from "@/lib/media-url";
-import { getEventById } from "@/api/events";
+import { getEventById, invalidateEventCache } from "@/api/events";
 import type { RaceEventDto, RaceEventListItemDto } from "@/dto/event.dto";
 import type {
   ApiRegistration,
@@ -36,9 +36,11 @@ export async function createRaceEvent(
 /** Gửi duyệt từ nháp / bị từ chối — POST /organizer/{id}/submit */
 export async function submitRaceEvent(eventId: string): Promise<RaceEventDto> {
   try {
-    return (await api.post(
+    const result = (await api.post(
       `${EVENT_API}/organizer/${eventId}/submit`
     )) as RaceEventDto;
+    invalidateEventCache(eventId);
+    return result;
   } catch (e) {
     throw new Error(getApiErrorMessage(e, "Gửi duyệt thất bại."));
   }

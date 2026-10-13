@@ -23,6 +23,10 @@ export interface EventDistanceDto {
   price: number;
   currency: string;
   color?: string;
+  /** Giờ xuất phát cự ly (HH:mm:ss) */
+  startAt?: string | null;
+  /** Giờ kết thúc / cutoff cự ly */
+  endAt?: string | null;
   startLocation?: DistanceLocationDto;
   finishLocation?: DistanceLocationDto;
   checkpoints?: unknown[] | null;
@@ -31,6 +35,33 @@ export interface EventDistanceDto {
   geoJson?: unknown | null;
   // Computed / returned by BE
   registeredCount?: number;
+}
+
+/** ticketPricing JSON — ma trận phase × cự ly (key = tên cự ly) */
+export interface TicketPricingPhaseDto {
+  key: string;
+  name: string;
+  dateFrom: string;
+  dateTo: string;
+  pricesByDistanceName: Record<string, number>;
+}
+
+export interface TicketPricingByDistanceDto {
+  basePrice?: number;
+  phases?: Array<{
+    key?: string;
+    name?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    price?: number;
+  }>;
+}
+
+export interface TicketPricingDto {
+  /** Legacy matrix phase × distance name */
+  phases?: TicketPricingPhaseDto[];
+  /** Format hồ sơ distances hiện tại */
+  byDistanceName?: Record<string, TicketPricingByDistanceDto>;
 }
 
 export interface OrganizerInfoDto {
@@ -67,6 +98,8 @@ export interface RaceEventDto {
   coordinates?: CoordinatesDto;
   date: string;
   startTime?: string;
+  /** Ngày kết thúc giải (yyyy-MM-dd) */
+  endDate?: string | null;
   description?: string;
   totalRunners?: number;
   status: string;
@@ -82,6 +115,11 @@ export interface RaceEventDto {
   organizerUserId?: string;
   /** Lý do từ chối hồ sơ giải (khi status = rejected) */
   rejectionReason?: string | null;
+  /** Gói đã mua — quy mô VĐV khóa theo ParticipantCap gói */
+  packagePurchaseId?: string | null;
+  packageExpiresAtUtc?: string | null;
+  registrationOpensAtUtc?: string | null;
+  registrationClosesAtUtc?: string | null;
   createdAt?: string;
   updatedAt?: string;
   createdAtUtc?: string;
@@ -95,7 +133,9 @@ export interface RaceEventListItemDto {
   bannerImage?: string;
   location: string;
   date: string;
+  endDate?: string | null;
   status: string;
+  registrationOpensAtUtc?: string | null;
   totalRunners?: number;
   activeRunners?: number;
   /** List API đôi khi trả mảng string thay vì full distances */
@@ -154,12 +194,21 @@ export interface RegistrationDto {
   bibNumber?: string;
   qrPayload?: string;
   rejectionReason?: string;
+  reviewedByName?: string | null;
+  reviewedBy?: string | null;
+  reviewedAtUtc?: string | null;
   createdAt?: string;
   updatedAt?: string;
+  createdAtUtc?: string;
+  updatedAtUtc?: string;
   // Populated by BE join
   eventName?: string;
   distanceName?: string;
   distanceKm?: number;
+  /** Giá chốt lúc tạo ĐK (phase) — không phải list price gốc */
+  price?: number | null;
+  pricePhaseKey?: string | null;
+  pricePhaseName?: string | null;
   distancePrice?: number;
   distanceCurrency?: string;
 }

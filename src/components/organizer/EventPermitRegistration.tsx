@@ -38,40 +38,40 @@ import {
 
 const requiredDocuments = [
   {
-    id: "plan",
-    title: "Kế hoạch tổ chức sự kiện",
-    description: "Mục tiêu, quy mô, thời gian, địa điểm và các đơn vị phối hợp.",
-    required: true,
-  },
-  {
-    id: "program",
-    title: "Chương trình và nội dung thi đấu",
-    description: "Lịch trình, nội dung cự ly, khung giờ xuất phát và đích.",
-    required: true,
-  },
-  {
-    id: "rules",
-    title: "Điều lệ giải và trọng tài",
-    description: "Điều lệ thi đấu, bộ phận chuyên môn và danh sách trọng tài.",
-    required: true,
-  },
-  {
     id: "official-letter",
     title: "Công văn đề nghị cấp phép",
     description: "Văn bản của doanh nghiệp gửi UBND Thành phố/Sở Văn hóa và Thể thao.",
     required: true,
   },
   {
-    id: "foreign-list",
-    title: "Danh sách người nước ngoài tham dự",
-    description: "Họ tên, quốc tịch, hộ chiếu và đơn vị liên hệ (nếu có).",
-    required: false,
-  },
-  {
     id: "security",
     title: "Phương án an ninh, trật tự và PCCC",
     description: "Bảo vệ, phân luồng, y tế, phòng cháy chữa cháy và môi trường.",
     required: true,
+  },
+  {
+    id: "plan",
+    title: "Kế hoạch tổ chức sự kiện",
+    description: "Mục tiêu, quy mô, thời gian, địa điểm và các đơn vị phối hợp.",
+    required: false,
+  },
+  {
+    id: "program",
+    title: "Chương trình và nội dung thi đấu",
+    description: "Lịch trình, nội dung cự ly, khung giờ xuất phát và đích.",
+    required: false,
+  },
+  {
+    id: "rules",
+    title: "Điều lệ giải và trọng tài",
+    description: "Điều lệ thi đấu, bộ phận chuyên môn và danh sách trọng tài.",
+    required: false,
+  },
+  {
+    id: "foreign-list",
+    title: "Danh sách người nước ngoài tham dự",
+    description: "Họ tên, quốc tịch, hộ chiếu và đơn vị liên hệ (nếu có).",
+    required: false,
   },
 ];
 
