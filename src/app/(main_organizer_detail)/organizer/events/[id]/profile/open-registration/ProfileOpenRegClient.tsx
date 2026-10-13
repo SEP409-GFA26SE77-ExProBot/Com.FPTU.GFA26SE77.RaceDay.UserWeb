@@ -9,6 +9,7 @@ import {
   Circle,
   Loader2,
   Lock,
+  Send,
   Unlock,
 } from "lucide-react";
 import { getEventById } from "@/api/events";
@@ -16,6 +17,7 @@ import {
   closeEventRegistration,
   openEventRegistration,
 } from "@/api/event-packages";
+import { submitRaceEvent } from "@/api/organizer";
 import { listEventStaff } from "@/api/event-staff";
 import { hasEventCourse } from "@/api/race-map";
 import type { RaceEventDto, TicketPricingDto } from "@/dto/event.dto";
@@ -23,6 +25,7 @@ import { getApiErrorMessage } from "@/lib/error";
 import { getOrganizerStatusLabel, getStatusColor } from "@/lib/format";
 import {
   canOpenRegistration,
+  canSubmitForApproval,
   PROFILE_DOC_TYPES,
   statusKey,
   utcToLocalInput,
@@ -217,6 +220,28 @@ export default function ProfileOpenRegClient() {
   const sk = event ? statusKey(event.status) : "";
   const isOpen = sk === "registration-open";
   const canOpen = event ? canOpenRegistration(event.status) && requiredReady : false;
+  const canSubmit = event ? canSubmitForApproval(event.status) : false;
+  const isPending =
+    sk === "pending" || sk === "pending-approval";
+
+  const handleSubmitApproval = async () => {
+    if (!canSubmit || acting) return;
+    if (!requiredReady) {
+      setError("Hoàn thành checklist bắt buộc trước khi gửi admin duyệt.");
+      return;
+    }
+    setActing(true);
+    setError(null);
+    try {
+      await submitRaceEvent(eventId);
+      await load();
+      notify("Đã gửi hồ sơ cho admin duyệt.");
+    } catch (e) {
+      setError(getApiErrorMessage(e, "Gửi duyệt thất bại."));
+    } finally {
+      setActing(false);
+    }
+  };
 
   const handleOpen = async () => {
     if (!canOpen || acting) return;
@@ -273,7 +298,7 @@ export default function ProfileOpenRegClient() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-orange-500">
-            Chi tiết giải
+            Hồ sơ giải
           </p>
           <h1 className="mt-1 text-2xl font-extrabold">Xét mở chính thức</h1>
           <span
@@ -283,6 +308,31 @@ export default function ProfileOpenRegClient() {
           </span>
         </div>
         <div className="flex flex-wrap gap-2">
+          {canSubmit && (
+            <button
+              type="button"
+              disabled={acting || !requiredReady}
+              onClick={() => void handleSubmitApproval()}
+              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-orange-500 to-red-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-orange-500/20 disabled:opacity-50"
+              title={
+                requiredReady
+                  ? "Gửi hồ sơ cho admin duyệt"
+                  : "Hoàn thành checklist bắt buộc trước"
+              }
+            >
+              {acting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+              Gửi admin duyệt giải
+            </button>
+          )}
+          {isPending && (
+            <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-800">
+              Đang chờ admin duyệt
+            </span>
+          )}
           {isOpen ? (
             <button
               type="button"
@@ -297,7 +347,7 @@ export default function ProfileOpenRegClient() {
               )}
               Đóng ĐK ngay
             </button>
-          ) : (
+          ) : canOpenRegistration(event.status) || sk === "approved" ? (
             <button
               type="button"
               disabled={!canOpen || acting}
@@ -311,7 +361,7 @@ export default function ProfileOpenRegClient() {
               )}
               Mở ĐK ngay
             </button>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -358,9 +408,20 @@ export default function ProfileOpenRegClient() {
           <code>registrationOpensAtUtc</code> và tự đóng lúc{" "}
           <code>registrationClosesAtUtc</code>. Nút bên trên mở/đóng thủ công.
         </p>
-        {sk !== "approved" && sk !== "registration-open" && sk !== "closed" && (
+        {canSubmit && (
           <p className="mt-2 text-xs font-medium text-amber-700">
-            Cần admin duyệt giải (Approved) trước khi mở đăng ký.
+            Checklist xong → bấm <strong>Gửi admin duyệt giải</strong>. Sau khi
+            admin Approved mới mở được ĐK.
+          </p>
+        )}
+        {isPending && (
+          <p className="mt-2 text-xs font-medium text-amber-700">
+            Hồ sơ đã gửi — chờ admin duyệt. Không cần gửi lại trừ khi bị từ chối.
+          </p>
+        )}
+        {sk === "approved" && (
+          <p className="mt-2 text-xs font-medium text-emerald-700">
+            Admin đã duyệt — có thể mở ĐK thủ công hoặc chờ lịch tự mở.
           </p>
         )}
       </section>
@@ -394,6 +455,12 @@ export default function ProfileOpenRegClient() {
             </li>
           ))}
         </ul>
+        {!requiredReady && canSubmit && (
+          <p className="mt-3 text-xs text-amber-700">
+            Hoàn thành các mục bắt buộc (trừ khuyến nghị lịch ĐK) trước khi gửi
+            admin duyệt.
+          </p>
+        )}
         {!requiredReady && canOpenRegistration(event.status) && (
           <p className="mt-3 text-xs text-amber-700">
             Hoàn thành các mục bắt buộc trước khi mở ĐK thủ công.

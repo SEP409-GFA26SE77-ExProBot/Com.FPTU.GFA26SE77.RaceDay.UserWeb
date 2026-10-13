@@ -13,12 +13,11 @@ import {
   Loader2,
   MapPin,
   Save,
-  Send,
   Users,
 } from "lucide-react";
 import Link from "next/link";
 import { getEventById } from "@/api/events";
-import { submitRaceEvent, uploadOrganizerFile } from "@/api/organizer";
+import { uploadOrganizerFile } from "@/api/organizer";
 import { updateEventProfile } from "@/api/event-packages";
 import type { RaceEventDto } from "@/dto/event.dto";
 import { getApiErrorMessage } from "@/lib/error";
@@ -37,11 +36,6 @@ function canEdit(status: string) {
   return k === "draft" || k === "rejected";
 }
 
-function canSubmitForApproval(status: string) {
-  const k = statusKey(status);
-  return k === "draft" || k === "rejected";
-}
-
 export default function EventProfileClient() {
   const params = useParams();
   const eventId = String(params?.id || "");
@@ -51,7 +45,6 @@ export default function EventProfileClient() {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [submittingApproval, setSubmittingApproval] = useState(false);
 
   // Form fields
   const [name, setName] = useState("");
@@ -138,22 +131,37 @@ export default function EventProfileClient() {
         ...(event.packagePurchaseId
           ? {}
           : { totalRunners: totalRunners || undefined }),
-        ...(hasBank && org?.name && org?.email && org?.phone
-          ? {
-              organizer: {
-                name: org.name,
-                email: org.email,
-                phone: org.phone,
-                legalEntity: org.legalEntity,
-                website: org.website,
-                beneficiaryAccount: {
-                  accountHolder: accountHolder.trim() || undefined,
-                  accountNumber: accountNumber.trim() || undefined,
-                  bankName: bankName.trim() || undefined,
-                  branch: branch.trim() || undefined,
+        ...(hasBank && org?.name && org?.email
+          ? (() => {
+              const phone = String(org.phone || "").trim();
+              const digits = phone.replace(/\D/g, "");
+              const phoneOk =
+                phone.length > 0 &&
+                !/^0+$/.test(digits) &&
+                /^(0|\+84)(3|5|7|8|9)\d{8}$/.test(
+                  phone.replace(/[\s.\-()]/g, "")
+                );
+              if (!phoneOk) {
+                throw new Error(
+                  "Cần SĐT ban tổ chức hợp lệ (VD: 0901234567) trước khi lưu tài khoản giải ngân. Vào Thông tin cơ bản để cập nhật."
+                );
+              }
+              return {
+                organizer: {
+                  name: org.name,
+                  email: org.email,
+                  phone,
+                  legalEntity: org.legalEntity,
+                  website: org.website,
+                  beneficiaryAccount: {
+                    accountHolder: accountHolder.trim() || undefined,
+                    accountNumber: accountNumber.trim() || undefined,
+                    bankName: bankName.trim() || undefined,
+                    branch: branch.trim() || undefined,
+                  },
                 },
-              },
-            }
+              };
+            })()
           : {}),
       });
       const refreshed = await getEventById(eventId);
@@ -179,22 +187,6 @@ export default function EventProfileClient() {
     bankName,
     branch,
   ]);
-
-  // Submit for approval
-  const handleSubmitApproval = useCallback(async () => {
-    if (submittingApproval) return;
-    setSubmittingApproval(true);
-    setError(null);
-    try {
-      const updated = await submitRaceEvent(eventId);
-      setEvent(updated);
-      notify("Đã gửi duyệt hồ sơ giải.");
-    } catch (e) {
-      setError(getApiErrorMessage(e, "Gửi duyệt thất bại."));
-    } finally {
-      setSubmittingApproval(false);
-    }
-  }, [submittingApproval, eventId]);
 
   if (loading) {
     return (
@@ -222,7 +214,6 @@ export default function EventProfileClient() {
   }
 
   const editable = canEdit(event.status);
-  const showSubmit = canSubmitForApproval(event.status);
   const bannerUrl = bannerImage ? mediaDisplayUrl(bannerImage) : null;
 
   return (
@@ -241,6 +232,18 @@ export default function EventProfileClient() {
           >
             {getOrganizerStatusLabel(event.status)}
           </span>
+          {editable && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Gửi admin duyệt tại{" "}
+              <Link
+                href={`/organizer/events/${eventId}/profile/open-registration`}
+                className="font-bold text-orange-600 hover:underline"
+              >
+                Xét mở chính thức
+              </Link>
+              .
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           {editable && (
@@ -252,17 +255,6 @@ export default function EventProfileClient() {
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Lưu hồ sơ
-            </button>
-          )}
-          {showSubmit && (
-            <button
-              type="button"
-              disabled={submittingApproval || !name.trim()}
-              onClick={() => void handleSubmitApproval()}
-              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-orange-500 to-red-600 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-orange-500/20 disabled:opacity-50"
-            >
-              {submittingApproval ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              Gửi duyệt
             </button>
           )}
         </div>
