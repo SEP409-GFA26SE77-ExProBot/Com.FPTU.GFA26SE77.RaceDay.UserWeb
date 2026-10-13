@@ -65,6 +65,10 @@ const nextConfig: NextConfig = {
         source: "/organizer/:id/profile/addition",
         destination: "/organizer/events/:id/profile/addition",
       },
+      {
+        source: "/organizer/:id/profile/supplies",
+        destination: "/organizer/events/:id/profile/supplies",
+      },
     ];
   },
 };

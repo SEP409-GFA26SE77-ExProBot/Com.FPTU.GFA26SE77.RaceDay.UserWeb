@@ -7,6 +7,8 @@ import type {
   ApiRegistration,
   CreateRaceEventRequest,
   ProfileAdditionDto,
+  EventSupplyItemDto,
+  UpdateEventSuppliesRequest,
 } from "@/dto/organizer.dto";
 
 const EVENT_API = "api/v1/event";
@@ -170,3 +172,11 @@ export async function updateProfileAddition(eventId: string, data: ProfileAdditi
     throw new Error(getApiErrorMessage(e, "Cập nhật thông tin bổ sung thất bại."));
   }
 }
+
+export {
+  getEventSupplies,
+  updateEventSupplies,
+  addEventSupply,
+  deleteEventSupply,
+} from "./supplies";
+

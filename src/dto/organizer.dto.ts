@@ -126,3 +126,15 @@ export interface ProfileAdditionDto {
   notes?: string;
   [key: string]: unknown;
 }
+
+export interface EventSupplyItemDto {
+  id: string;
+  name: string;
+  quantity: number;
+  unit?: string;
+  notes?: string;
+}
+
+export interface UpdateEventSuppliesRequest {
+  supplies: EventSupplyItemDto[];
+}

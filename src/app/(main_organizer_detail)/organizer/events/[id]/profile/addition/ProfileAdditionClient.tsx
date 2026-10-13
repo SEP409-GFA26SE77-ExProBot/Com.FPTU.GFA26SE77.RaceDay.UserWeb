@@ -178,10 +178,13 @@ export default function ProfileAdditionClient() {
       {/* HEADER */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-widest text-[#b6e61f] bg-[#222222] px-2.5 py-1 rounded-md">
-              Chi tiết giải
-            </span>
+          <p className="text-xs font-bold uppercase tracking-widest text-orange-500">
+            Chi tiết giải
+          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl md:text-3xl font-extrabold text-foreground tracking-tight">
+              Dịch vụ &amp; Vật phẩm bổ sung
+            </h1>
             <span
               className={`inline-flex rounded-md border px-2.5 py-0.5 text-[11px] font-extrabold ${getStatusColor(
                 event.status
@@ -190,10 +193,7 @@ export default function ProfileAdditionClient() {
               {getOrganizerStatusLabel(event.status)}
             </span>
           </div>
-          <h1 className="mt-2 text-2xl md:text-3xl font-extrabold font-condensed tracking-wide uppercase text-foreground">
-            Dịch vụ &amp; Vật phẩm bổ sung
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-sm text-muted-foreground mt-2 max-w-3xl">
             Chọn các vật phẩm vận động viên (BIB, áo Finisher, huy chương) và thiết bị ban tổ chức (chip, hệ thống tính giờ) cho giải chạy.
           </p>
         </div>
@@ -203,7 +203,7 @@ export default function ProfileAdditionClient() {
             type="button"
             disabled={saving}
             onClick={() => void handleSave()}
-            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 px-6 py-2.5 text-sm font-bold text-white shadow-md disabled:opacity-50 transition-all cursor-pointer"
+            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 px-6 py-2.5 text-sm font-bold text-white shadow-sm disabled:opacity-50 transition-all cursor-pointer"
           >
             {saving ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -230,19 +230,19 @@ export default function ProfileAdditionClient() {
       )}
 
       {/* SUMMARY BANNER */}
-      <div className="rounded-2xl border border-border/80 bg-gradient-to-r from-[#222222] via-[#2a2a2c] to-[#3a3a3c] p-5 shadow-lg text-white">
+      <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#b6e61f]/20 text-[#b6e61f] border border-[#b6e61f]/40">
-              <PackagePlus className="h-6 w-6" />
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-50 text-orange-600 border border-orange-200 shrink-0">
+              <PackagePlus className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-[#b6e61f]">
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Trạng thái cấu hình
               </p>
-              <h3 className="text-lg font-bold font-condensed uppercase tracking-wide">
+              <h3 className="text-base font-bold text-foreground">
                 Đã chọn:{" "}
-                <span className="text-[#b6e61f]">
+                <span className="text-orange-600 font-extrabold">
                   {selectedIds.length} / {ADDITION_PRODUCTS.length}
                 </span>{" "}
                 hạng mục bổ sung
@@ -256,14 +256,14 @@ export default function ProfileAdditionClient() {
               onClick={() =>
                 setSelectedIds(ADDITION_PRODUCTS.map((p) => p.id))
               }
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-bold text-white hover:bg-white/20 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-border/80 bg-background px-3.5 py-2 text-xs font-semibold text-foreground hover:border-orange-500/50 hover:bg-orange-50/40 transition-colors cursor-pointer"
             >
-              <Check className="h-3.5 w-3.5 text-[#b6e61f]" /> Chọn tất cả (5)
+              <Check className="h-3.5 w-3.5 text-orange-600" /> Chọn tất cả (5)
             </button>
             <button
               type="button"
               onClick={() => setSelectedIds([])}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-xs font-bold text-white/80 hover:bg-white/10 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-border/80 bg-background px-3.5 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted transition-colors cursor-pointer"
             >
               <RotateCcw className="h-3.5 w-3.5" /> Bỏ chọn hết
             </button>
@@ -272,40 +272,40 @@ export default function ProfileAdditionClient() {
       </div>
 
       {/* GROUP 1: DÀNH CHO VẬN ĐỘNG VIÊN */}
-      <section className="mt-8 md:mt-12 space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/80 pb-4">
+      <section className="mt-8 md:mt-10 space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/70 pb-4">
           <div>
-            <div className="mb-3">
-              <span className="inline-block text-xs font-bold uppercase tracking-widest text-[#b6e61f] bg-[#222222] px-3.5 py-1.5 rounded-lg border border-[#b6e61f]/25 shadow-sm">
+            <div className="mb-2">
+              <span className="inline-block text-xs font-bold uppercase tracking-wider text-orange-600 bg-orange-50 px-2.5 py-1 rounded-md border border-orange-200">
                 Gói Race-Kit &amp; Quà tặng
               </span>
             </div>
-            <h2 className="text-2xl md:text-3xl font-extrabold text-foreground tracking-wide font-condensed uppercase">
+            <h2 className="text-xl md:text-2xl font-bold text-foreground tracking-tight">
               Dành cho vận động viên
             </h2>
-            <p className="mt-1.5 text-xs text-muted-foreground">
+            <p className="mt-1 text-xs text-muted-foreground">
               Có thể chọn riêng lẻ từng vật phẩm theo nhu cầu thực tế của sự kiện.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            <label className="inline-flex items-center gap-2 cursor-pointer rounded-lg border border-border px-3.5 py-2 text-xs font-semibold hover:bg-muted/50 select-none transition-colors">
+            <label className="inline-flex items-center gap-2 cursor-pointer rounded-xl border border-border/80 bg-card px-3.5 py-2 text-xs font-semibold hover:border-orange-500/40 hover:bg-orange-50/30 select-none transition-colors">
               <input
                 type="checkbox"
                 checked={allAthleteSelected}
                 onChange={(e) =>
                   handleSelectGroup(athleteProducts, e.target.checked)
                 }
-                className="h-4 w-4 rounded text-[#b6e61f] accent-[#b6e61f] cursor-pointer"
+                className="h-4 w-4 rounded text-orange-600 accent-orange-600 cursor-pointer"
               />
-              <span>
+              <span className="text-foreground">
                 {allAthleteSelected ? "Bỏ chọn nhóm" : "Chọn cả 3 vật phẩm"}
               </span>
             </label>
           </div>
         </div>
 
-        <div className="flex flex-col gap-8 max-w-[1450px] mx-auto">
+        <div className="flex flex-col gap-6 max-w-[1450px] mx-auto">
           {athleteProducts.map((item) => (
             <ProductCard
               key={item.id}
@@ -322,40 +322,40 @@ export default function ProfileAdditionClient() {
       </section>
 
       {/* GROUP 2: DÀNH CHO BAN TỔ CHỨC */}
-      <section className="mt-14 md:mt-20 pt-8 border-t border-border/60 space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/80 pb-4">
+      <section className="mt-12 md:mt-16 pt-8 border-t border-border/70 space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/70 pb-4">
           <div>
-            <div className="mb-3">
-              <span className="inline-block text-xs font-bold uppercase tracking-widest text-[#b6e61f] bg-[#222222] px-3.5 py-1.5 rounded-lg border border-[#b6e61f]/25 shadow-sm">
+            <div className="mb-2">
+              <span className="inline-block text-xs font-bold uppercase tracking-wider text-orange-600 bg-orange-50 px-2.5 py-1 rounded-md border border-orange-200">
                 Thiết bị &amp; Hệ thống kỹ thuật
               </span>
             </div>
-            <h2 className="text-2xl md:text-3xl font-extrabold text-foreground tracking-wide font-condensed uppercase">
+            <h2 className="text-xl md:text-2xl font-bold text-foreground tracking-tight">
               Dành cho ban tổ chức
             </h2>
-            <p className="mt-1.5 text-xs text-muted-foreground">
+            <p className="mt-1 text-xs text-muted-foreground">
               *Áp dụng trọn bộ toàn bộ thiết bị (không áp dụng chọn riêng lẻ) để bảo đảm đồng bộ phần mềm và thảm ăng-ten chip tính giờ.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            <label className="inline-flex items-center gap-2.5 cursor-pointer rounded-xl border-2 border-[#b6e61f]/50 bg-[#222222] px-4 py-2 text-xs font-bold text-white hover:border-[#b6e61f] transition-all select-none shadow-sm">
+            <label className="inline-flex items-center gap-2.5 cursor-pointer rounded-xl border border-orange-300 bg-orange-50 px-4 py-2 text-xs font-bold text-orange-700 hover:bg-orange-100 transition-all select-none shadow-2xs">
               <input
                 type="checkbox"
                 checked={allOrganizerSelected}
                 onChange={(e) =>
                   handleSelectGroup(organizerProducts, e.target.checked)
                 }
-                className="h-4.5 w-4.5 rounded text-[#b6e61f] accent-[#b6e61f] cursor-pointer"
+                className="h-4 w-4 rounded text-orange-600 accent-orange-600 cursor-pointer"
               />
-              <span className={allOrganizerSelected ? "text-[#b6e61f]" : "text-white/90"}>
+              <span>
                 {allOrganizerSelected ? "Đã chọn trọn bộ (2/2)" : "Chọn trọn bộ thiết bị BTC (2/2)"}
               </span>
             </label>
           </div>
         </div>
 
-        <div className="flex flex-col gap-8 max-w-[1450px] mx-auto">
+        <div className="flex flex-col gap-6 max-w-[1450px] mx-auto">
           {organizerProducts.map((item) => (
             <ProductCard
               key={item.id}
