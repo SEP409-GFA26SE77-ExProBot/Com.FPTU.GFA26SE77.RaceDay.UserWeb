@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { getMyProfile } from "@/api/auth";
 import { getPackageCatalog, createPackagePurchase } from "@/api/event-packages";
-import { createPackageCheckout, syncPayment, mockPay } from "@/api/payments";
+import { createPackageCheckout } from "@/api/payments";
 import type { MyProfileDto } from "@/dto/auth.dto";
 import type {
   PackageCatalogDto,
@@ -29,8 +29,10 @@ import type {
 import type { CheckoutResponseDto } from "@/dto/payment.dto";
 import { formatPrice } from "@/lib/format";
 import { getApiErrorMessage } from "@/lib/error";
-import { VietQrCheckout } from "@/components/payment/VietQrCheckout";
-import { PayOsEmbedded } from "@/components/payment/PayOsEmbedded";
+import {
+  PaymentCheckoutView,
+  PaymentSuccessView,
+} from "@/components/payment";
 
 type Step = "form" | "paying" | "success";
 
@@ -77,8 +79,6 @@ export default function EventPackageCheckout() {
   const [step, setStep] = useState<Step>("form");
   const [checkout, setCheckout] = useState<CheckoutResponseDto | null>(null);
   const [purchaseId, setPurchaseId] = useState<string | null>(null);
-  const [mockPaying, setMockPaying] = useState(false);
-  const [mockError, setMockError] = useState<string | null>(null);
 
   // Load catalog + profile
   useEffect(() => {
@@ -200,58 +200,17 @@ export default function EventPackageCheckout() {
     ? `${typeof window !== "undefined" ? window.location.origin : ""}/events/create/package-return?purchaseId=${purchaseId}`
     : "";
 
-  // Poll VietQR sync
-  const activePaymentId = checkout?.paymentId || null;
-  const useNativeVietQr = Boolean(checkout?.qrCode);
-
-  useEffect(() => {
-    if (step !== "paying" || !useNativeVietQr || !activePaymentId) return;
-    let cancelled = false;
-    const tick = async () => {
-      try {
-        const p = await syncPayment(activePaymentId);
-        if (cancelled) return;
-        if (String(p.status).toLowerCase() === "paid") {
-          setStep("success");
-          setTimeout(() => {
-            router.push(`/events/create/package-return?purchaseId=${purchaseId}&paymentId=${activePaymentId}`);
-          }, 800);
-        }
-      } catch { /* wait next tick */ }
-    };
-    const id = window.setInterval(tick, 3500);
-    void tick();
-    return () => { cancelled = true; window.clearInterval(id); };
-  }, [step, useNativeVietQr, activePaymentId, purchaseId, router]);
-
-  const handleEmbedSuccess = useCallback(() => {
-    setStep("success");
-    setTimeout(() => {
-      router.push(`/events/create/package-return?purchaseId=${purchaseId}&paymentId=${activePaymentId}`);
-    }, 800);
-  }, [purchaseId, activePaymentId, router]);
-
-  const handleMockPay = useCallback(async () => {
-    if (!activePaymentId) {
-      setMockError("Không tìm thấy mã thanh toán (paymentId).");
-      return;
-    }
-    setMockPaying(true);
-    setMockError(null);
-    try {
-      await mockPay(activePaymentId);
+  const handlePaymentSuccess = useCallback(
+    (paymentId: string) => {
       setStep("success");
       setTimeout(() => {
         router.push(
-          `/events/create/package-return?purchaseId=${purchaseId}&paymentId=${activePaymentId}`
+          `/events/create/package-return?purchaseId=${purchaseId}&paymentId=${paymentId}`
         );
       }, 800);
-    } catch (e) {
-      setMockError(getApiErrorMessage(e, "Giả lập thanh toán thất bại."));
-    } finally {
-      setMockPaying(false);
-    }
-  }, [activePaymentId, purchaseId, router]);
+    },
+    [purchaseId, router]
+  );
 
   // ── Loading ──
   if (loading) {
@@ -265,122 +224,44 @@ export default function EventPackageCheckout() {
 
   // ── Success ──
   if (step === "success") {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/10">
-          <CheckCircle2 className="h-12 w-12 text-emerald-500" />
-        </div>
-        <h2 className="mt-5 text-xl font-bold text-foreground">Thanh toán thành công!</h2>
-        <p className="mt-2 text-sm text-muted-foreground">Đang tạo giải nháp của bạn…</p>
-        <Loader2 className="mt-3 h-5 w-5 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <PaymentSuccessView subtitle="Đang tạo giải nháp của bạn…" />;
   }
 
   // ── Payment ──
   if (step === "paying" && checkout) {
     const amountToPay = checkout.amount ?? totalPrice;
     return (
-      <div className="space-y-5">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-orange-500">Thanh toán gói</p>
-          <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-foreground">
-            Thanh toán gói tổ chức
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Quét VietQR hoặc chuyển khoản bên dưới. Sau khi xong giải nháp sẽ được tạo tự động.
-          </p>
-        </div>
-        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px]">
-            <div className="min-w-0 border-b border-border lg:border-b-0 lg:border-r">
-              {useNativeVietQr ? (
-                <VietQrCheckout
-                  qrCode={checkout.qrCode}
-                  accountNumber={checkout.accountNumber}
-                  accountName={checkout.accountName}
-                  bin={checkout.bin}
-                  transferDescription={checkout.transferDescription}
-                  amount={amountToPay}
-                  polling
-                />
-              ) : (
-                <PayOsEmbedded
-                  key={checkout.checkoutUrl}
-                  checkoutUrl={checkout.checkoutUrl}
-                  returnUrl={returnUrl}
-                  onSuccess={handleEmbedSuccess}
-                  onCancel={() => router.push("/events/create")}
-                  onExit={() => setStep("form")}
-                  className="h-[min(480px,62vh)] w-full bg-white"
-                />
-              )}
-            </div>
-            <aside className="space-y-4 bg-muted/20 p-5">
-              <h3 className="text-sm font-bold text-foreground">Chi tiết đơn hàng</h3>
-              <div className="space-y-2.5 text-sm">
-                <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">Tổ chức</span>
-                  <span className="text-right font-medium text-foreground">{orgName}</span>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">Thời hạn</span>
-                  <span className="font-medium text-foreground">{selectedDuration?.months} tháng</span>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">Quy mô</span>
-                  <span className="font-medium text-foreground">{selectedCapacity?.maxParticipants} VĐV</span>
-                </div>
-                {promoValid && (
-                  <div className="flex justify-between gap-3">
-                    <span className="text-muted-foreground">Mã giảm giá</span>
-                    <span className="font-semibold text-emerald-600">{promoCode}</span>
-                  </div>
-                )}
-              </div>
-              <div className="h-px bg-border" />
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-sm font-bold text-foreground">Tổng</span>
-                <span className="text-xl font-extrabold text-orange-600">{formatPrice(amountToPay)}</span>
-              </div>
-              <p className="text-[11px] leading-relaxed text-muted-foreground">
-                PayOS xác nhận xong sẽ tự chuyển trang. Giải nháp được tạo sau khi thanh toán thành công.
-              </p>
-
-              {/* Mock pay button for dev / testing */}
-              <div className="rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/5 p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider">
-                    Thử nghiệm / Test
-                  </span>
-                  <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                    MOCK MODE
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  disabled={mockPaying || !activePaymentId}
-                  onClick={() => void handleMockPay()}
-                  className="w-full flex items-center justify-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 text-xs font-bold shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {mockPaying ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                  )}
-                  {mockPaying ? "Đang giả lập thanh toán…" : "Giả lập thanh toán (Mock Pay)"}
-                </button>
-                {mockError && (
-                  <p className="text-[11px] text-red-500 font-medium">{mockError}</p>
-                )}
-                <p className="text-[10px] leading-tight text-muted-foreground">
-                  Bấm để gọi API <code className="font-mono text-emerald-700 dark:text-emerald-400">mockPay()</code> xác nhận đơn đã thanh toán.
-                </p>
-              </div>
-            </aside>
-          </div>
-        </div>
-      </div>
+      <PaymentCheckoutView
+        kicker="Thanh toán gói"
+        title="Thanh toán gói tổ chức"
+        subtitle="Quét VietQR hoặc chuyển khoản bên dưới. Sau khi xong giải nháp sẽ được tạo tự động."
+        checkout={checkout}
+        returnUrl={returnUrl}
+        amount={amountToPay}
+        orderSummaryItems={[
+          { label: "Tổ chức", value: orgName },
+          { label: "Thời hạn", value: `${selectedDuration?.months} tháng` },
+          { label: "Quy mô", value: `${selectedCapacity?.maxParticipants} VĐV` },
+          ...(promoValid
+            ? [
+                {
+                  label: "Mã giảm giá",
+                  value: (
+                    <span className="font-semibold text-emerald-600">
+                      {promoCode}
+                    </span>
+                  ),
+                },
+              ]
+            : []),
+        ]}
+        orderSummaryNotes="PayOS xác nhận xong sẽ tự chuyển trang. Giải nháp được tạo sau khi thanh toán thành công."
+        onSuccess={handlePaymentSuccess}
+        onCancel={() => router.push("/events/create")}
+        onExit={() => setStep("form")}
+        exitLabel="Quay lại chọn gói"
+        enableMockPay={true}
+      />
     );
   }
 

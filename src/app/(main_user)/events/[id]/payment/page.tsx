@@ -2,23 +2,18 @@
 
 import { useState, useEffect, Suspense, useCallback, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import {
-  ArrowLeft,
-  CreditCard,
-  Lock,
-  Loader2,
-  CheckCircle2,
-  AlertCircle,
-} from "lucide-react";
+import { ArrowLeft, AlertCircle, Loader2 } from "lucide-react";
 import { getEventById, getRegistrationById, cancelRegistration } from "@/api/events";
-import { createCheckout, syncPayment, mockCancel } from "@/api/payments";
+import { createCheckout, mockCancel } from "@/api/payments";
 import { RaceEventDto, RegistrationDto } from "@/dto/event.dto";
 import type { CheckoutResponseDto } from "@/dto/payment.dto";
-import { formatPrice } from "@/lib/format";
 import { getApiErrorMessage } from "@/lib/error";
 import { PAGE_SHELL_FORM } from "@/lib/page-shell";
-import { PayOsEmbedded } from "@/components/payment/PayOsEmbedded";
-import { VietQrCheckout } from "@/components/payment/VietQrCheckout";
+import {
+  PaymentCheckoutView,
+  PaymentBootingView,
+  PaymentSuccessView,
+} from "@/components/payment";
 
 type PaymentState = "booting" | "checkout" | "success" | "error";
 
@@ -91,9 +86,12 @@ function PaymentContent() {
   const goPending = useCallback(
     (paymentId: string) => {
       const id = registration?.id || regId;
-      router.push(
-        `/events/${eventId}/pending?regId=${id}&paymentId=${paymentId}&status=PAID`
-      );
+      setPaymentState("success");
+      setTimeout(() => {
+        router.push(
+          `/events/${eventId}/pending?regId=${id}&paymentId=${paymentId}&status=PAID`
+        );
+      }, 600);
     },
     [router, eventId, registration?.id, regId]
   );
@@ -218,73 +216,12 @@ function PaymentContent() {
     };
   }, [eventId, regId, abandon]);
 
-  const useNativeVietQr = Boolean(checkout?.qrCode);
-  const activePaymentId = checkout?.paymentId || null;
-
-  // Poll sync khi dùng khung VietQR tự vẽ
-  useEffect(() => {
-    if (paymentState !== "checkout" || !useNativeVietQr || !activePaymentId) return;
-
-    let cancelled = false;
-    const tick = async () => {
-      try {
-        const p = await syncPayment(activePaymentId);
-        if (cancelled) return;
-        if (String(p.status).toLowerCase() === "paid") {
-          setPaymentState("success");
-          setTimeout(() => goPending(activePaymentId), 600);
-        }
-      } catch {
-        /* chờ lần sau */
-      }
-    };
-
-    const id = window.setInterval(tick, 3500);
-    void tick();
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-    };
-  }, [paymentState, useNativeVietQr, activePaymentId, goPending]);
-
-  const handleEmbedSuccess = useCallback(() => {
-    setPaymentState("success");
-    if (activePaymentId) setTimeout(() => goPending(activePaymentId), 600);
-    else returnToFormKeepDraft();
-  }, [activePaymentId, goPending, returnToFormKeepDraft]);
-
   if (paymentState === "booting") {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-        <div className="relative mb-6">
-          <div className="h-20 w-20 rounded-full border-4 border-orange-500/20 border-t-orange-500 animate-spin" />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <CreditCard className="h-7 w-7 text-orange-500" />
-          </div>
-        </div>
-        <h2 className="text-xl font-bold text-foreground mb-1">Đang mở thanh toán…</h2>
-        <p className="text-sm text-muted-foreground max-w-sm">
-          Chuẩn bị mã VietQR và thông tin chuyển khoản trong cùng một khung.
-        </p>
-        <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
-          <Lock className="h-3.5 w-3.5" />
-          <span>Bảo mật PayOS SSL</span>
-        </div>
-      </div>
-    );
+    return <PaymentBootingView />;
   }
 
   if (paymentState === "success") {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-        <div className="h-20 w-20 rounded-full bg-emerald-500/10 flex items-center justify-center mb-5">
-          <CheckCircle2 className="h-12 w-12 text-emerald-500" />
-        </div>
-        <h2 className="text-xl font-bold text-foreground mb-1">Thanh toán thành công!</h2>
-        <p className="text-sm text-muted-foreground">Đang chuyển tới trang chờ duyệt…</p>
-        <Loader2 className="mt-3 h-5 w-5 text-muted-foreground animate-spin" />
-      </div>
-    );
+    return <PaymentSuccessView subtitle="Đang chuyển tới trang chờ duyệt…" />;
   }
 
   if (paymentState === "error" || !checkout) {
@@ -307,7 +244,6 @@ function PaymentContent() {
     );
   }
 
-  const amountToPay = checkout.amount ?? registration?.distancePrice ?? 0;
   const effectiveRegistrationId = registration?.id || regId;
 
   return (
@@ -316,20 +252,11 @@ function PaymentContent() {
         <button
           type="button"
           onClick={returnToFormKeepDraft}
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           Quay lại form đăng ký
         </button>
-      </div>
-
-      <div className="mb-5">
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
-          Thanh toán đơn đăng ký
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Quét VietQR hoặc chuyển khoản — cùng một khung bên dưới.
-        </p>
       </div>
 
       {error && (
@@ -339,90 +266,49 @@ function PaymentContent() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px]">
-          <div className="min-w-0 border-b lg:border-b-0 lg:border-r border-border">
-            {useNativeVietQr ? (
-              <VietQrCheckout
-                qrCode={checkout.qrCode}
-                accountNumber={checkout.accountNumber}
-                accountName={checkout.accountName}
-                bin={checkout.bin}
-                transferDescription={checkout.transferDescription}
-                amount={amountToPay}
-                polling
-              />
-            ) : (
-              <PayOsEmbedded
-                key={checkout.checkoutUrl}
-                checkoutUrl={checkout.checkoutUrl}
-                returnUrl={returnUrl}
-                onSuccess={handleEmbedSuccess}
-                onCancel={() => void cancelAndWipe()}
-                onExit={returnToFormKeepDraft}
-                className="w-full h-[min(480px,62vh)] bg-white"
-              />
-            )}
-          </div>
-
-          <aside className="p-5 space-y-4 bg-muted/20">
-            <h2 className="font-bold text-foreground text-sm">Thông tin đơn hàng</h2>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground shrink-0">Giải chạy</span>
-                <span className="font-medium text-foreground text-right line-clamp-2">
-                  {registration?.eventName || event?.name}
-                </span>
-              </div>
-              {registration?.distanceKm ? (
-                <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">Khoảng cách</span>
-                  <span className="font-medium text-foreground">
-                    {registration.distanceKm} km
-                  </span>
-                </div>
-              ) : null}
-              {registration?.fullName && (
-                <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">VĐV</span>
-                  <span className="font-medium text-foreground text-right line-clamp-2">
-                    {registration.fullName}
-                  </span>
-                </div>
-              )}
-              {effectiveRegistrationId && (
-                <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">Mã ĐK</span>
-                  <span className="font-mono text-[11px] text-muted-foreground text-right break-all max-w-[130px]">
-                    {effectiveRegistrationId}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            <div className="h-px bg-border" />
-
-            <div className="flex justify-between items-baseline gap-2">
-              <span className="text-sm font-bold text-foreground">Tổng</span>
-              <span className="text-xl font-extrabold text-orange-600">
-                {formatPrice(amountToPay)}
+      <PaymentCheckoutView
+        title="Thanh toán đơn đăng ký"
+        subtitle="Quét VietQR hoặc chuyển khoản — cùng một khung bảo mật bên dưới."
+        checkout={checkout}
+        returnUrl={returnUrl}
+        amount={checkout.amount ?? registration?.distancePrice ?? 0}
+        orderSummaryTitle="Thông tin đơn hàng"
+        orderSummaryItems={[
+          {
+            label: "Giải chạy",
+            value: (
+              <span className="line-clamp-2">
+                {registration?.eventName || event?.name}
               </span>
-            </div>
-
-            <p className="text-[11px] text-muted-foreground leading-relaxed">
-              PayOS xác nhận xong sẽ tự chuyển trang. «Quay lại form» giữ thông tin + đơn chờ thanh toán; «Hủy thanh toán» xóa đơn và form trống.
-            </p>
-
-            <button
-              type="button"
-              onClick={() => void cancelAndWipe()}
-              className="w-full rounded-xl border border-border py-2.5 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-            >
-              Hủy thanh toán
-            </button>
-          </aside>
-        </div>
-      </div>
+            ),
+          },
+          ...(registration?.distanceKm
+            ? [{ label: "Khoảng cách", value: `${registration.distanceKm} km` }]
+            : []),
+          ...(registration?.fullName
+            ? [{ label: "VĐV", value: registration.fullName }]
+            : []),
+          ...(effectiveRegistrationId
+            ? [
+                {
+                  label: "Mã ĐK",
+                  value: (
+                    <span className="font-mono text-[11px] text-muted-foreground break-all">
+                      {effectiveRegistrationId}
+                    </span>
+                  ),
+                },
+              ]
+            : []),
+        ]}
+        orderSummaryNotes="PayOS xác nhận xong sẽ tự chuyển trang. «Quay lại form» giữ thông tin + đơn chờ thanh toán; «Hủy thanh toán» xóa đơn và form trống."
+        onSuccess={goPending}
+        onCancel={() => void cancelAndWipe()}
+        onExit={returnToFormKeepDraft}
+        cancelLabel="Hủy thanh toán"
+        exitLabel="Quay lại form đăng ký"
+        enableMockPay={true}
+      />
     </div>
   );
 }
