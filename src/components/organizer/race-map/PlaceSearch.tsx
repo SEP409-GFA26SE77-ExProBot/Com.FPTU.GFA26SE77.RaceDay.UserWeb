@@ -2,15 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, MapPinned, Search, X } from "lucide-react";
+import { searchGeocode, type GeocodeHit } from "@/api/geocode";
 import type { LatLng } from "@/api/race-map.mock-data";
 
-export interface PlaceHit {
-  lat: number;
-  lng: number;
-  label: string;
-  type: string;
-  bbox: { south: number; north: number; west: number; east: number } | null;
-}
+export type PlaceHit = GeocodeHit;
 
 export default function PlaceSearch({
   onSelect,
@@ -33,10 +28,8 @@ export default function PlaceSearch({
     setLoading(true);
     setErr(null);
     try {
-      const res = await fetch(`/api/geocode?q=${encodeURIComponent(term.trim())}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Search failed");
-      setHits(data.results ?? []);
+      const results = await searchGeocode(term.trim());
+      setHits(results);
       setOpen(true);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Không tìm được");
