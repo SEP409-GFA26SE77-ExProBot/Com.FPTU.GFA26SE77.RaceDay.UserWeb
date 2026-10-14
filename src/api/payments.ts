@@ -50,8 +50,27 @@ export async function getPaymentStatus(): Promise<PaymentStatusDto> {
 
 /** Create checkout link for a pending_payment registration */
 export async function createCheckout(data: CheckoutDto): Promise<CheckoutResponseDto> {
-  const raw = (await api.post(`${PAYMENT_API}/checkout`, data)) as RawCheckout;
-  return normalizeCheckout(raw);
+  try {
+    // PayOS live có thể >15s; mock nhanh. Timeout riêng tránh axios mặc định → "Network Error".
+    const raw = (await api.post(`${PAYMENT_API}/checkout`, data, {
+      timeout: 45000,
+    })) as RawCheckout;
+    return normalizeCheckout(raw);
+  } catch (e) {
+    const err = e as { code?: string; message?: string; response?: unknown };
+    if (!err.response) {
+      const msg = (err.message || "").toLowerCase();
+      if (err.code === "ECONNABORTED" || msg.includes("timeout")) {
+        throw new Error(
+          "Hết thời gian chờ PayOS. Kiểm tra API/Docker mạng, hoặc bật PayOS__UseMock=true."
+        );
+      }
+      throw new Error(
+        "Không kết nối được máy chủ thanh toán (API). Kiểm tra Docker :5080 còn chạy."
+      );
+    }
+    throw e;
+  }
 }
 
 /** Get my payment history */

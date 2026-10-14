@@ -398,7 +398,7 @@ function ManageEventCard({
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-black/35" />
         <span
-          className={`absolute left-3 top-3 inline-flex rounded-md border px-2.5 py-1 text-[11px] font-extrabold shadow-md backdrop-blur-sm ${getMyEventsCardStatusColor(
+          className={`absolute left-3 top-3 inline-flex items-center rounded-md px-2.5 py-1 text-[11px] font-extrabold shadow-md ring-1 ring-white/40 ${getMyEventsCardStatusColor(
             statusLabel
           )}`}
         >

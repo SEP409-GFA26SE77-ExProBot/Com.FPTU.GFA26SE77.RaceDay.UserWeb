@@ -11,7 +11,6 @@ import {
   FileText,
   ImageIcon,
   Loader2,
-  MapPin,
   Save,
   Users,
 } from "lucide-react";
@@ -19,11 +18,13 @@ import { getEventById } from "@/api/events";
 import { uploadOrganizerFile } from "@/api/organizer";
 import { updateEventProfile } from "@/api/event-packages";
 import { getOrganizerWallet, saveOrganizerBankAccount } from "@/api/finance";
+import OrganizerLocationFields from "@/components/organizer/OrganizerLocationFields";
 import type { RaceEventDto } from "@/dto/event.dto";
 import { getApiErrorMessage } from "@/lib/error";
 import { todayYmdLocal, tomorrowYmdLocal } from "@/lib/event-lifecycle";
 import { getOrganizerStatusLabel, getStatusColor } from "@/lib/format";
 import { mediaDisplayUrl } from "@/lib/media-url";
+import { composeLocation, splitLocation } from "@/lib/vn-provinces";
 import {
   canEditProfile,
   localInputToUtcIso,
@@ -46,7 +47,8 @@ export default function ProfileBasicClient() {
 
   const [name, setName] = useState("");
   const [tagline, setTagline] = useState("");
-  const [location, setLocation] = useState("");
+  const [provinceKey, setProvinceKey] = useState("");
+  const [locationDetail, setLocationDetail] = useState("");
   const [date, setDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [description, setDescription] = useState("");
@@ -82,7 +84,11 @@ export default function ProfileBasicClient() {
         setEvent(data);
         setName(data.name || "");
         setTagline(data.tagline || "");
-        setLocation(data.location || "");
+        {
+          const loc = splitLocation(data.location || "");
+          setProvinceKey(loc.provinceKey);
+          setLocationDetail(loc.detail);
+        }
         setDate(data.date ? data.date.split("T")[0] : "");
         setEndDate(data.endDate ? String(data.endDate).split("T")[0] : "");
         setDescription(data.description || "");
@@ -153,6 +159,10 @@ export default function ProfileBasicClient() {
     const editable = canEditProfile(event.status);
     const today = todayYmdLocal();
     if (editable) {
+      if (!provinceKey) {
+        setError("Vui lòng chọn tỉnh / thành phố.");
+        return;
+      }
       if (!date) {
         setError("Vui lòng chọn ngày tổ chức.");
         return;
@@ -242,7 +252,7 @@ export default function ProfileBasicClient() {
         await updateEventProfile(eventId, {
           name: name.trim() || undefined,
           tagline: tagline.trim() || undefined,
-          location: location.trim() || undefined,
+          location: composeLocation(locationDetail, provinceKey) || undefined,
           date: date || undefined,
           endDate: endDate || undefined,
           clearEndDate: !endDate,
@@ -304,7 +314,8 @@ export default function ProfileBasicClient() {
     eventId,
     name,
     tagline,
-    location,
+    provinceKey,
+    locationDetail,
     date,
     endDate,
     description,
@@ -392,16 +403,6 @@ export default function ProfileBasicClient() {
         </div>
       </div>
 
-      {statusKey(event.status) === "rejected" && event.rejectionReason && (
-        <div className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/5 p-4">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
-          <div>
-            <p className="text-sm font-bold text-red-700">Lý do từ chối</p>
-            <p className="mt-1 text-sm text-red-600">{event.rejectionReason}</p>
-          </div>
-        </div>
-      )}
-
       {toast && (
         <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900">
           <CheckCircle2 className="h-4 w-4 shrink-0" />
@@ -485,15 +486,14 @@ export default function ProfileBasicClient() {
                 className={inputClass}
               />
             </Field>
-            <Field label="Địa điểm" required icon={MapPin}>
-              <input
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                disabled={!editable}
-                className={inputClass}
-              />
-            </Field>
+            <OrganizerLocationFields
+              provinceKey={provinceKey}
+              detail={locationDetail}
+              onProvinceChange={setProvinceKey}
+              onDetailChange={setLocationDetail}
+              disabled={!editable}
+              inputClassName={inputClass}
+            />
             <div className="grid grid-cols-2 gap-3">
               <Field label="Ngày tổ chức" required icon={Calendar}>
                 <input

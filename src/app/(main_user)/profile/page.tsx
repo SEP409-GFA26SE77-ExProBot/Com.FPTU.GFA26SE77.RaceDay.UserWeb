@@ -3,8 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Cookies from "js-cookie";
-import { User, Ticket, LogIn, KeyRound } from "lucide-react";
+import { User, Ticket, LogIn, Pencil } from "lucide-react";
+import { getMyProfile, persistAvatarCookie } from "@/api/auth";
 import { getMyRegistrations } from "@/api/events";
+import {
+  genderToFormValue,
+  profileDobToDateInput,
+  type MyProfileDto,
+} from "@/dto/auth.dto";
 import { RegistrationDto } from "@/dto/event.dto";
 import {
   formatPrice,
@@ -12,12 +18,21 @@ import {
   getRegistrationStatusColor,
 } from "@/lib/format";
 import { getApiErrorMessage } from "@/lib/error";
+import { mediaDisplayUrl } from "@/lib/media-url";
 import { PAGE_SHELL_FORM } from "@/lib/page-shell";
 import PageLoading from "@/components/ui/PageLoading";
 
+function genderLabel(g: unknown): string {
+  const v = genderToFormValue(g);
+  if (v === "Male") return "Nam";
+  if (v === "Female") return "Nữ";
+  if (v === "Other") return "Khác";
+  return "—";
+}
+
 export default function ProfilePage() {
   const [username, setUsername] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [me, setMe] = useState<MyProfileDto | null>(null);
   const [regs, setRegs] = useState<RegistrationDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +41,6 @@ export default function ProfilePage() {
     const token = Cookies.get("access_token");
     const name = Cookies.get("username") || null;
     setUsername(token ? name : null);
-    setUserId(token ? Cookies.get("user_id") || null : null);
 
     if (!token) {
       setLoading(false);
@@ -36,9 +50,16 @@ export default function ProfilePage() {
     let cancelled = false;
     (async () => {
       try {
-        const list = await getMyRegistrations();
+        const [list, profile] = await Promise.all([
+          getMyRegistrations().catch((e) => {
+            throw e;
+          }),
+          getMyProfile().catch(() => null),
+        ]);
         if (!cancelled) {
           setRegs(Array.isArray(list) ? list : []);
+          setMe(profile);
+          if (profile?.avatarUrl) persistAvatarCookie(profile.avatarUrl);
           setError(null);
         }
       } catch (e) {
@@ -97,36 +118,67 @@ export default function ProfilePage() {
       </div>
 
       <section className="rounded-2xl border border-border bg-white p-5 space-y-4">
-        <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 text-xl font-bold text-white">
-            {username.charAt(0).toUpperCase()}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-4">
+            {me?.avatarUrl ? (
+              <span className="relative inline-flex h-14 w-14 overflow-hidden rounded-full border border-orange-500/30 bg-muted shadow-xs">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={mediaDisplayUrl(me.avatarUrl)}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              </span>
+            ) : (
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 text-xl font-bold text-white">
+                {(me?.fullName || username).charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <h2 className="text-xl font-bold">
+                {me?.fullName || username}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                @{me?.username || username}
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-xl font-bold">{username}</h2>
-            <p className="text-sm text-muted-foreground">Đã đăng nhập</p>
-          </div>
+          <Link
+            href="/profile/edit"
+            className="inline-flex items-center gap-1.5 rounded-full border border-orange-500/30 bg-orange-500/10 px-3.5 py-2 text-sm font-semibold text-orange-700 hover:bg-orange-500/15"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Chỉnh sửa hồ sơ
+          </Link>
         </div>
         <div className="grid sm:grid-cols-2 gap-3 text-sm">
           <div className="rounded-xl bg-muted/40 p-3">
             <p className="text-[10px] uppercase text-muted-foreground font-semibold">
-              Tên đăng nhập
+              Email
             </p>
-            <p className="font-medium">{username}</p>
+            <p className="font-medium break-all">{me?.email || "—"}</p>
           </div>
           <div className="rounded-xl bg-muted/40 p-3">
             <p className="text-[10px] uppercase text-muted-foreground font-semibold">
-              User ID
+              Số điện thoại
             </p>
-            <p className="font-medium font-mono text-xs truncate">{userId || "—"}</p>
+            <p className="font-medium">{me?.phone || "—"}</p>
+          </div>
+          <div className="rounded-xl bg-muted/40 p-3">
+            <p className="text-[10px] uppercase text-muted-foreground font-semibold">
+              Giới tính
+            </p>
+            <p className="font-medium">{genderLabel(me?.gender)}</p>
+          </div>
+          <div className="rounded-xl bg-muted/40 p-3">
+            <p className="text-[10px] uppercase text-muted-foreground font-semibold">
+              Ngày sinh
+            </p>
+            <p className="font-medium">
+              {profileDobToDateInput(me?.dateOfBirth) || "—"}
+            </p>
           </div>
         </div>
-        <Link
-          href="/profile/edit"
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-orange-600 hover:underline"
-        >
-          <KeyRound className="h-3.5 w-3.5" />
-          Đổi mật khẩu
-        </Link>
       </section>
 
       <section className="rounded-2xl border border-border bg-card p-6 space-y-4">

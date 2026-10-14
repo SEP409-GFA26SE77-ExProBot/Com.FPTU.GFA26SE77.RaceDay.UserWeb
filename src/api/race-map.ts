@@ -5,12 +5,28 @@
  * MOCK: `NEXT_PUBLIC_RACE_MAP_USE_MOCK` === "true" (mặc định tắt khi có API URL).
  */
 import api from "@/config/axios";
+import { BASE_URL } from "@/config/global-config";
 import type { CourseConfigDto } from "@/dto/race-map.dto";
+import Cookies from "js-cookie";
 
 const MAP_API = "api/v1/map";
 
 export const RACE_MAP_USE_MOCK =
   process.env.NEXT_PUBLIC_RACE_MAP_USE_MOCK === "true";
+
+function isUsableCourse(c: CourseConfigDto | null | undefined): c is CourseConfigDto {
+  return Boolean(c?.polyline && c.polyline.length >= 2 && (c.distanceKm ?? 0) > 0);
+}
+
+/** Unwrap body nếu BE bọc { data } / { result }. */
+function unwrapCourse(body: unknown): CourseConfigDto | null {
+  if (!body || typeof body !== "object") return null;
+  const o = body as Record<string, unknown>;
+  if (Array.isArray(o.polyline)) return body as CourseConfigDto;
+  if (o.data && typeof o.data === "object") return unwrapCourse(o.data);
+  if (o.result && typeof o.result === "object") return unwrapCourse(o.result);
+  return null;
+}
 
 export async function getEventCourse(
   eventId: string,
@@ -24,6 +40,44 @@ export async function getEventCourse(
   return api.get(
     `${MAP_API}/events/${eventId}/distances/${distanceId}/course`
   ) as Promise<CourseConfigDto>;
+}
+
+/**
+ * Đọc course cho trang public — dùng fetch (không qua axios interceptor)
+ * để 401/403 không redirect login/403 khi guest xem detail.
+ */
+export async function getEventCoursePublic(
+  eventId: string,
+  distanceId: string,
+  distanceTitle?: string
+): Promise<CourseConfigDto | null> {
+  if (RACE_MAP_USE_MOCK) {
+    try {
+      const c = await getEventCourse(eventId, distanceId, distanceTitle);
+      return isUsableCourse(c) ? c : null;
+    } catch {
+      return null;
+    }
+  }
+
+  const base = (BASE_URL || "").replace(/\/$/, "");
+  if (!base) return null;
+  const url = `${base}/${MAP_API}/events/${encodeURIComponent(eventId)}/distances/${encodeURIComponent(distanceId)}/course`;
+
+  try {
+    const headers: HeadersInit = { Accept: "application/json" };
+    if (typeof window !== "undefined") {
+      const token = Cookies.get("access_token");
+      if (token) headers.Authorization = `Bearer ${token}`;
+    }
+    const res = await fetch(url, { headers, credentials: "omit" });
+    if (!res.ok) return null;
+    const body: unknown = await res.json();
+    const c = unwrapCourse(body);
+    return isUsableCourse(c) ? c : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function saveEventCourse(
@@ -53,7 +107,7 @@ export async function hasEventCourse(
     const c = (await api.get(
       `${MAP_API}/events/${eventId}/distances/${distanceId}/course`
     )) as CourseConfigDto;
-    return Boolean(c?.polyline && c.polyline.length >= 2 && c.distanceKm > 0);
+    return isUsableCourse(c);
   } catch {
     return false;
   }

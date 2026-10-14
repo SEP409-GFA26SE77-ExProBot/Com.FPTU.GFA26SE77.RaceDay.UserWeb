@@ -7,6 +7,7 @@ import Cookies from "js-cookie";
 import { logout } from "@/api/auth";
 import { Role } from "@/interfaces/role";
 import { mapAppRole } from "@/lib/role";
+import { mediaDisplayUrl } from "@/lib/media-url";
 import {
   Flag,
   User,
@@ -73,6 +74,7 @@ let cachedAuthState = {
   isLoggedIn: false,
   username: null as string | null,
   role: null as string | null,
+  avatarUrl: null as string | null,
 };
 
 function roleFromJwt(token: string): string | null {
@@ -100,6 +102,7 @@ function getAuthSnapshot() {
   const token = Cookies.get("access_token") || "";
   const username = Cookies.get("username") || "Racer";
   const rawRole = Cookies.get("role") || "";
+  const avatarUrl = Cookies.get("avatar_url") || "";
   // USER (IAM) / trống → RUNNER để hiện Vé, Chứng nhận, menu runner
   const role = token
     ? mapAppRole(rawRole || roleFromJwt(token) || Role.RUNNER)
@@ -108,13 +111,14 @@ function getAuthSnapshot() {
   if (token && rawRole && mapAppRole(rawRole) !== rawRole.toUpperCase()) {
     Cookies.set("role", role, { sameSite: "lax", path: "/" });
   }
-  const raw = `${token}:${username}:${role}`;
+  const raw = `${token}:${username}:${role}:${avatarUrl}`;
   if (raw !== cachedAuthRaw) {
     cachedAuthRaw = raw;
     cachedAuthState = {
       isLoggedIn: Boolean(token),
       username: token ? username : null,
       role: token && role ? role : null,
+      avatarUrl: token && avatarUrl ? avatarUrl : null,
     };
   }
   return cachedAuthState;
@@ -122,8 +126,9 @@ function getAuthSnapshot() {
 
 const SERVER_AUTH_SNAPSHOT = {
   isLoggedIn: false,
-  username: null,
-  role: null,
+  username: null as string | null,
+  role: null as string | null,
+  avatarUrl: null as string | null,
 };
 
 function subscribeAuth(callback: () => void) {
@@ -138,9 +143,41 @@ function subscribeAuth(callback: () => void) {
   };
 }
 
+function UserAvatarMark({
+  username,
+  avatarUrl,
+  sizeClass = "h-7 w-7",
+  textClass = "text-xs",
+}: {
+  username: string | null;
+  avatarUrl: string | null;
+  sizeClass?: string;
+  textClass?: string;
+}) {
+  const src = avatarUrl ? mediaDisplayUrl(avatarUrl) : null;
+  const letter = username ? username.charAt(0).toUpperCase() : "U";
+  if (src) {
+    return (
+      <span
+        className={`relative inline-flex ${sizeClass} overflow-hidden rounded-full border border-orange-500/30 bg-muted shadow-xs`}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt="" className="h-full w-full object-cover" />
+      </span>
+    );
+  }
+  return (
+    <span
+      className={`inline-flex ${sizeClass} items-center justify-center rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 ${textClass} font-bold text-white shadow-xs`}
+    >
+      {letter}
+    </span>
+  );
+}
+
 export default function Header() {
   const pathname = usePathname();
-  const { isLoggedIn, username, role } = useSyncExternalStore(
+  const { isLoggedIn, username, role, avatarUrl } = useSyncExternalStore(
     subscribeAuth,
     getAuthSnapshot,
     () => SERVER_AUTH_SNAPSHOT
@@ -248,9 +285,7 @@ export default function Header() {
                 className="flex items-center gap-2.5 rounded-full border border-border/80 bg-background/80 py-1.5 pl-2 pr-3 text-sm shadow-xs transition-all hover:bg-muted/60 hover:border-border focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
                 aria-expanded={userMenuOpen}
               >
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 text-xs font-bold text-white shadow-xs">
-                  {username ? username.charAt(0).toUpperCase() : "U"}
-                </div>
+                <UserAvatarMark username={username} avatarUrl={avatarUrl} />
                 <div className="flex flex-col items-start leading-tight">
                   <span className="font-medium text-foreground max-w-[120px] truncate">
                     {username}
@@ -413,9 +448,11 @@ export default function Header() {
         {/* Mobile Hamburger Button */}
         <div className="flex md:hidden items-center gap-2">
           {isLoggedIn && (
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 text-xs font-bold text-white shadow-xs">
-              {username ? username.charAt(0).toUpperCase() : "U"}
-            </div>
+            <UserAvatarMark
+              username={username}
+              avatarUrl={avatarUrl}
+              sizeClass="h-8 w-8"
+            />
           )}
           <button
             type="button"
@@ -439,9 +476,12 @@ export default function Header() {
           {isLoggedIn && (
             <div className="flex items-center justify-between rounded-xl bg-muted/60 p-3">
               <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 text-sm font-bold text-white shadow-xs">
-                  {username ? username.charAt(0).toUpperCase() : "U"}
-                </div>
+                <UserAvatarMark
+                  username={username}
+                  avatarUrl={avatarUrl}
+                  sizeClass="h-9 w-9"
+                  textClass="text-sm"
+                />
                 <div>
                   <p className="text-sm font-semibold text-foreground">
                     {username}

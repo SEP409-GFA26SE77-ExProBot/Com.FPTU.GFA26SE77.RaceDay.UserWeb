@@ -8,6 +8,7 @@ import {
   ResetPasswordDto,
   ChangePasswordDto,
   MyProfileDto,
+  UpdateMyProfileDto,
 } from "@/dto/auth.dto";
 import Cookies from 'js-cookie';
 import { mapAppRole } from "@/lib/role";
@@ -77,6 +78,13 @@ export async function login(data: LoginDto): Promise<LoginResponse> {
     Cookies.set("role", role, { expires: days, sameSite: "lax", path: "/" });
     if (username) Cookies.set("username", username, { expires: days, sameSite: "lax", path: "/" });
     if (userId) Cookies.set("user_id", userId.toString(), { expires: days, sameSite: "lax", path: "/" });
+    // Avatar không có trong login response — lấy nhẹ từ /me (không chặn login nếu fail)
+    try {
+      const me = await getMyProfile();
+      persistAvatarCookie(me.avatarUrl);
+    } catch {
+      /* ignore */
+    }
   }
   return res;
 }
@@ -103,9 +111,47 @@ export async function changePassword(data: ChangePasswordDto): Promise<void> {
   await api.post(`${PUBLIC_API}/auth/change-password`, data);
 }
 
-/** Hồ sơ user đang đăng nhập */
+/** Hồ sơ user đang đăng nhập — GET api/v1/iam/me */
 export async function getMyProfile(): Promise<MyProfileDto> {
   return api.get(`${PUBLIC_API}/me`) as Promise<MyProfileDto>;
+}
+
+/**
+ * Cập nhật hồ sơ cá nhân — PUT api/v1/iam/me
+ * (BE cần implement; FE đã sẵn contract).
+ */
+export async function updateMyProfile(
+  data: UpdateMyProfileDto
+): Promise<MyProfileDto> {
+  return api.put(`${PUBLIC_API}/me`, {
+    fullName: data.fullName.trim(),
+    phone: data.phone?.trim() || null,
+    dateOfBirth: data.dateOfBirth || null,
+    gender: data.gender ?? 0,
+    ...(data.avatarUrl !== undefined ? { avatarUrl: data.avatarUrl } : {}),
+  }) as Promise<MyProfileDto>;
+}
+
+/** POST api/v1/iam/me/avatar — upload ảnh + cập nhật hồ sơ */
+export async function uploadMyAvatar(file: File): Promise<MyProfileDto> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return api.post(`${PUBLIC_API}/me/avatar`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  }) as Promise<MyProfileDto>;
+}
+
+/** Cookie avatar để Header hiện ảnh sau khi đổi hồ sơ */
+export function persistAvatarCookie(avatarUrl?: string | null) {
+  if (avatarUrl) {
+    Cookies.set("avatar_url", avatarUrl, {
+      expires: 7,
+      sameSite: "lax",
+      path: "/",
+    });
+  } else {
+    Cookies.remove("avatar_url");
+  }
 }
 
 export async function logout(): Promise<void> {
@@ -113,5 +159,6 @@ export async function logout(): Promise<void> {
   Cookies.remove('role');
   Cookies.remove('username');
   Cookies.remove('user_id');
+  persistAvatarCookie(null);
   window.location.href = '/';
 }

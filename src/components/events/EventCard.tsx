@@ -16,6 +16,7 @@ import {
 } from "@/lib/format";
 import {
   getPublicEventStatusLabel,
+  getPublicEventStatusBadgeClass,
   isPublicRegistrationLive,
 } from "@/lib/event-lifecycle";
 import { mediaDisplayUrl } from "@/lib/media-url";
@@ -29,6 +30,8 @@ interface EventCardProps {
   statusMode?: "event" | "registration";
   /** Status đăng ký của user trên giải này (dùng khi statusMode = registration) */
   myRegistrationStatus?: string | null;
+  /** Id đơn ĐK — dùng để deep-link tiếp tục thanh toán / chờ duyệt */
+  registrationId?: string | null;
 }
 
 const DEFAULT_GRADIENT =
@@ -46,29 +49,40 @@ function DistanceChip({ label }: { label: string }) {
   );
 }
 
-function myRegPrimaryLabel(status: string): string {
-  return getRegistrationStatusLabel(status);
+const SURFACE_TYPE_LABELS = new Set([
+  "road",
+  "trail",
+  "ultra",
+  "track",
+  "other",
+  "mixed",
+]);
+
+/** Chip cự ly trên card list — ưu tiên distances → labels → distanceKms. */
+function listDistanceChipLabels(event: RaceEventListItemDto): string[] {
+  const distances = event.distances || [];
+  if (distances.length) {
+    return distances
+      .map((d) => {
+        const name = (d.name || "").trim();
+        if (name) return name;
+        return d.distanceKm > 0 ? `${d.distanceKm}K` : "";
+      })
+      .filter(Boolean);
+  }
+
+  const fromTypes = (event.distanceTypes || [])
+    .map((t) => (t || "").trim())
+    .filter((t) => t && !SURFACE_TYPE_LABELS.has(t.toLowerCase()));
+  if (fromTypes.length) return [...new Set(fromTypes)];
+
+  return (event.distanceKms || [])
+    .filter((km) => Number.isFinite(km) && km > 0)
+    .map((km) => `${km}K`);
 }
 
-function overlayPublicLabelClass(label: string): string {
-  switch (label) {
-    case "Đang mở":
-      return "bg-emerald-600 text-white";
-    case "Sắp mở":
-    case "Chờ mở":
-      return "bg-amber-500 text-zinc-950";
-    case "Đang diễn ra":
-      return "bg-rose-600 text-white";
-    case "Hết slot":
-    case "Đã hủy":
-    case "Từ chối":
-      return "bg-red-600 text-white";
-    case "Đã đóng":
-    case "Đã kết thúc":
-      return "bg-zinc-800 text-white";
-    default:
-      return "bg-zinc-950 text-white";
-  }
+function myRegPrimaryLabel(status: string): string {
+  return getRegistrationStatusLabel(status);
 }
 
 function overlayRegStatusClass(status: string): string {
@@ -93,11 +107,17 @@ export default function EventCard({
   event,
   statusMode = "event",
   myRegistrationStatus = null,
+  registrationId = null,
 }: EventCardProps) {
   const distances = event.distances || [];
-  const lowestPrice = distances.length
-    ? Math.min(...distances.map((d) => d.price))
+  const fromList =
+    typeof event.minPrice === "number" && Number.isFinite(event.minPrice)
+      ? event.minPrice
+      : null;
+  const fromDistances = distances.length
+    ? Math.min(...distances.map((d) => Number(d.price) || 0))
     : 0;
+  const lowestPrice = fromList != null ? fromList : fromDistances;
 
   const totalCapacity =
     distances.reduce((s, d) => s + d.capacity, 0) || event.totalRunners || 0;
@@ -114,10 +134,23 @@ export default function EventCard({
   const regLive = isPublicRegistrationLive(event);
   const showRegBadge =
     statusMode === "registration" && Boolean(myRegistrationStatus);
+  const regStatus = (myRegistrationStatus || "").toLowerCase();
   const href =
-    publicLabel === "Đang diễn ra" || eventStatusKey === "in-progress"
-      ? `/race-day?eventId=${event.id}`
-      : `/events/${event.id}`;
+    statusMode === "registration" &&
+    registrationId &&
+    regStatus === "pending_payment"
+      ? `/events/${event.id}/payment?regId=${registrationId}`
+      : statusMode === "registration" &&
+          registrationId &&
+          regStatus === "pending_approval"
+        ? `/events/${event.id}/pending?regId=${registrationId}`
+        : statusMode === "registration" &&
+            registrationId &&
+            (regStatus === "confirmed" || regStatus === "finished")
+          ? `/my-registrations/${registrationId}`
+          : publicLabel === "Đang diễn ra" || eventStatusKey === "in-progress"
+            ? `/race-day?eventId=${event.id}`
+            : `/events/${event.id}`;
 
   return (
     <Link
@@ -158,7 +191,7 @@ export default function EventCard({
             </span>
           ) : (
             <span
-              className={`${BADGE_BASE} ${overlayPublicLabelClass(publicLabel)}`}
+              className={`${BADGE_BASE} ${getPublicEventStatusBadgeClass(publicLabel)}`}
             >
               {publicLabel}
             </span>
@@ -186,13 +219,9 @@ export default function EventCard({
         </div>
 
         <div className="absolute bottom-3 left-3 right-3 flex flex-wrap gap-1.5">
-          {distances.map((d) => (
-            <DistanceChip key={d.id} label={`${d.distanceKm}K`} />
+          {listDistanceChipLabels(event).map((label) => (
+            <DistanceChip key={label} label={label} />
           ))}
-          {!distances.length &&
-            (event.distanceTypes || []).map((t) => (
-              <DistanceChip key={t} label={t} />
-            ))}
         </div>
       </div>
 

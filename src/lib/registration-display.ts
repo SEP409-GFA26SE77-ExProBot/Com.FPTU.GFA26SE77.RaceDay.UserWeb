@@ -21,23 +21,37 @@ export function readConfirmationSession(): ConfirmationSession | null {
 /**
  * BE registration detail thường chỉ có `distanceId` — bổ sung tên/giá từ
  * event.distances, số tiền PayOS, hoặc session checkout.
+ *
+ * Giá ưu tiên: `price` (QuotedAmount / phase lúc ĐK) → PayOS paidAmount →
+ * session checkout → mới tới list price `distance.price` (có thể cao hơn early bird).
  */
 export function resolveDistanceDisplay(
   reg: Pick<
     RegistrationDto,
-    "id" | "distanceId" | "distanceName" | "distanceKm" | "distancePrice"
+    | "id"
+    | "distanceId"
+    | "distanceName"
+    | "distanceKm"
+    | "distancePrice"
+    | "price"
+    | "pricePhaseName"
   >,
   event?: Pick<RaceEventDto, "distances"> | null,
   opts?: {
     session?: ConfirmationSession | null;
     paidAmount?: number | null;
   }
-): { name: string; km?: number; price: number } {
+): { name: string; km?: number; price: number; phaseName?: string | null } {
   const d = event?.distances?.find((x) => x.id === reg.distanceId);
   const session =
     opts?.session &&
     (!opts.session.registrationId || opts.session.registrationId === reg.id)
       ? opts.session
+      : null;
+
+  const quoted =
+    reg.price != null && Number.isFinite(Number(reg.price))
+      ? Number(reg.price)
       : null;
 
   return {
@@ -49,10 +63,12 @@ export function resolveDistanceDisplay(
       "",
     km: reg.distanceKm ?? d?.distanceKm ?? session?.distanceKm,
     price:
-      reg.distancePrice ??
+      quoted ??
       opts?.paidAmount ??
-      d?.price ??
+      (reg.distancePrice != null ? Number(reg.distancePrice) : null) ??
       session?.price ??
+      d?.price ??
       0,
+    phaseName: reg.pricePhaseName ?? null,
   };
 }

@@ -384,9 +384,6 @@ export default function ProfileContentClient() {
           <h2 className="mt-1 text-base font-extrabold sm:text-lg">
             Giống khối nội dung trang public
           </h2>
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            Layout bám `/events/[id]` (lịch · thể lệ · hướng dẫn · giải thưởng · hình phạt).
-          </p>
           {preview && (
             <div className="mt-5 space-y-6">
               <section>

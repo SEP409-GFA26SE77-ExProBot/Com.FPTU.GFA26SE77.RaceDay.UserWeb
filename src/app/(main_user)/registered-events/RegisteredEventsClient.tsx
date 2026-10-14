@@ -433,6 +433,7 @@ export default function RegisteredEventsClient() {
                 event={row.event}
                 statusMode="registration"
                 myRegistrationStatus={row.regStatus}
+                registrationId={row.regId}
               />
             ))}
           </div>

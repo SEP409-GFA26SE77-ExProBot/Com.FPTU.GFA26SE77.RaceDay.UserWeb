@@ -25,7 +25,7 @@ const ROLE_PERMISSIONS: Record<string, (Role | string)[] | '*'> = {
     '/events/create': '*',
     '/event-admin': [Role.ADMIN, Role.COORDINATOR],
     '/staff-admin': [Role.ADMIN, Role.COORDINATOR],
-    '/scan-qr': [Role.COORDINATOR, Role.STAFF, Role.VOLUNTEER, Role.PHOTOGRAPHER, Role.ADMIN],
+    '/scan-qr': [Role.ORGANIZER, Role.COORDINATOR, Role.STAFF, Role.VOLUNTEER, Role.PHOTOGRAPHER, Role.ADMIN],
     '/register-event': '*',
 };
 

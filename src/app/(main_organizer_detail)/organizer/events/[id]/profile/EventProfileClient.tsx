@@ -11,7 +11,6 @@ import {
   FileText,
   ImageIcon,
   Loader2,
-  MapPin,
   Save,
   Users,
 } from "lucide-react";
@@ -19,10 +18,12 @@ import Link from "next/link";
 import { getEventById } from "@/api/events";
 import { uploadOrganizerFile } from "@/api/organizer";
 import { updateEventProfile } from "@/api/event-packages";
+import OrganizerLocationFields from "@/components/organizer/OrganizerLocationFields";
 import type { RaceEventDto } from "@/dto/event.dto";
 import { getApiErrorMessage } from "@/lib/error";
 import { getOrganizerStatusLabel, getStatusColor } from "@/lib/format";
 import { mediaDisplayUrl } from "@/lib/media-url";
+import { composeLocation, splitLocation } from "@/lib/vn-provinces";
 
 const DEFAULT_GRADIENT =
   "linear-gradient(135deg, #f97316 0%, #ea580c 40%, #dc2626 100%)";
@@ -48,7 +49,8 @@ export default function EventProfileClient() {
 
   // Form fields
   const [name, setName] = useState("");
-  const [location, setLocation] = useState("");
+  const [provinceKey, setProvinceKey] = useState("");
+  const [locationDetail, setLocationDetail] = useState("");
   const [date, setDate] = useState("");
   const [description, setDescription] = useState("");
   const [bannerImage, setBannerImage] = useState("");
@@ -76,7 +78,11 @@ export default function EventProfileClient() {
         if (cancelled) return;
         setEvent(data);
         setName(data.name || "");
-        setLocation(data.location || "");
+        {
+          const loc = splitLocation(data.location || "");
+          setProvinceKey(loc.provinceKey);
+          setLocationDetail(loc.detail);
+        }
         setDate(data.date ? data.date.split("T")[0] : "");
         setDescription(data.description || "");
         setBannerImage(data.bannerImage || "");
@@ -112,6 +118,10 @@ export default function EventProfileClient() {
   // Save profile — body khớp UpdateDraftProfileRequest (organizer + beneficiaryAccount)
   const handleSave = useCallback(async () => {
     if (saving || !event) return;
+    if (!provinceKey) {
+      setError("Vui lòng chọn tỉnh / thành phố.");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -123,7 +133,7 @@ export default function EventProfileClient() {
         branch.trim();
       await updateEventProfile(eventId, {
         name: name.trim() || undefined,
-        location: location.trim() || undefined,
+        location: composeLocation(locationDetail, provinceKey) || undefined,
         date: date || undefined,
         description: description.trim() || undefined,
         bannerImage: bannerImage || undefined,
@@ -177,7 +187,8 @@ export default function EventProfileClient() {
     event,
     eventId,
     name,
-    location,
+    provinceKey,
+    locationDetail,
     date,
     description,
     bannerImage,
@@ -344,15 +355,13 @@ export default function EventProfileClient() {
                 className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm disabled:opacity-60 focus:border-orange-500/50 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
               />
             </Field>
-            <Field label="Địa điểm" required disabled={!editable} icon={MapPin}>
-              <input
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                disabled={!editable}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm disabled:opacity-60 focus:border-orange-500/50 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-              />
-            </Field>
+            <OrganizerLocationFields
+              provinceKey={provinceKey}
+              detail={locationDetail}
+              onProvinceChange={setProvinceKey}
+              onDetailChange={setLocationDetail}
+              disabled={!editable}
+            />
             <Field label="Ngày tổ chức" required disabled={!editable} icon={Calendar}>
               <input
                 type="date"

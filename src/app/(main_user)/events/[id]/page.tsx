@@ -24,23 +24,25 @@ import {
 } from "lucide-react";
 import { RaceEventDto, RegistrationDto } from "@/dto/event.dto";
 import { getEventById, getMyRegistrations } from "@/api/events";
-import {
-  formatPrice,
-  formatDate,
-  getStatusColor,
-} from "@/lib/format";
+import { formatPrice, formatDate } from "@/lib/format";
 import {
   getPublicEventStatusLabel,
+  getPublicEventStatusBadgeClass,
   isPublicRegistrationLive,
 } from "@/lib/event-lifecycle";
 import { getRaceDetails } from "@/lib/race-details";
 import { resolveDistanceTicketPrice } from "@/lib/ticket-pricing";
 import TicketPriceDisplay from "@/components/events/TicketPriceDisplay";
+import PublicEventCourseMap from "@/components/events/PublicEventCourseMap";
 import { mediaDisplayUrl } from "@/lib/media-url";
 import { PAGE_SHELL } from "@/lib/page-shell";
 
 const DEFAULT_GRADIENT =
   "linear-gradient(135deg, #f97316 0%, #ea580c 40%, #dc2626 100%)";
+
+/** Card trắng giống sidebar đăng ký */
+const SECTION_CARD =
+  "scroll-mt-28 rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6";
 
 export default function EventDetailPage() {
   const params = useParams();
@@ -52,6 +54,12 @@ export default function EventDetailPage() {
   const [myReg, setMyReg] = useState<RegistrationDto | null>(null);
   const registerCardRef = useRef<HTMLDivElement>(null);
   const [showStickyCta, setShowStickyCta] = useState(false);
+  const [activeSection, setActiveSection] = useState<string>("");
+  const [hasCourseMap, setHasCourseMap] = useState(false);
+
+  useEffect(() => {
+    setHasCourseMap(false);
+  }, [eventId]);
 
   useEffect(() => {
     if (!eventId) return;
@@ -118,6 +126,27 @@ export default function EventDetailPage() {
     io.observe(el);
     return () => io.disconnect();
   }, [event]);
+
+  useEffect(() => {
+    if (!event) return;
+    const nodes = Array.from(
+      document.querySelectorAll<HTMLElement>("[data-event-section]")
+    );
+    if (!nodes.length) return;
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        const id = visible[0]?.target.getAttribute("id");
+        if (id) setActiveSection(id);
+      },
+      { rootMargin: "-20% 0px -55% 0px", threshold: [0, 0.25, 0.5] }
+    );
+    nodes.forEach((n) => io.observe(n));
+    return () => io.disconnect();
+  }, [event, hasCourseMap]);
 
   if (loading) {
     return (
@@ -189,6 +218,33 @@ export default function EventDetailPage() {
 
   const details = getRaceDetails(event);
 
+  const sectionNav: { id: string; label: string }[] = [];
+  if (event.description?.trim() || details.tags.length > 0) {
+    sectionNav.push({ id: "gioi-thieu", label: "Giới thiệu" });
+  }
+  if (distances.length > 0) {
+    sectionNav.push({ id: "bang-gia", label: "Bảng giá" });
+  }
+  sectionNav.push({ id: "thong-tin", label: "Thông tin" });
+  if (details.schedule.length > 0) {
+    sectionNav.push({ id: "lich-trinh", label: "Lịch trình" });
+  }
+  if (hasCourseMap) {
+    sectionNav.push({ id: "ban-do", label: "Bản đồ" });
+  }
+  if (details.rules.length > 0) {
+    sectionNav.push({ id: "quy-dinh", label: "Quy định" });
+  }
+  if (details.guidelines.length > 0) {
+    sectionNav.push({ id: "huong-dan", label: "Hướng dẫn" });
+  }
+  if (details.prizes.length > 0) {
+    sectionNav.push({ id: "giai-thuong", label: "Giải thưởng" });
+  }
+  if (details.penalties.length > 0) {
+    sectionNav.push({ id: "hinh-phat", label: "Hình phạt" });
+  }
+
   return (
     <div className="pb-24 lg:pb-0">
       {/* Hero Banner */}
@@ -217,17 +273,17 @@ export default function EventDetailPage() {
           </Link>
         </div>
 
-        {/* Status + slots badge */}
+        {/* Status + slots badge — nền đặc như EventCard (không translucent trên banner) */}
         <div className="absolute top-4 right-4 sm:top-5 sm:right-8 flex flex-wrap gap-1.5 justify-end">
           <span
-            className={`inline-flex items-center rounded-md border px-3 py-1.5 text-xs font-bold backdrop-blur-md ${getStatusColor(
-              event.status
+            className={`inline-flex items-center rounded-md px-3 py-1.5 text-xs font-extrabold shadow-md ring-1 ring-white/40 ${getPublicEventStatusBadgeClass(
+              publicStatusLabel
             )}`}
           >
             {publicStatusLabel}
           </span>
           {canRegister && slotsLeft > 0 && (
-            <span className="inline-flex items-center rounded-md bg-black/80 text-white border border-white/25 px-3 py-1.5 text-xs font-bold">
+            <span className="inline-flex items-center rounded-md bg-zinc-950 px-3 py-1.5 text-xs font-extrabold text-white shadow-md ring-1 ring-white/40">
               Còn {slotsLeft.toLocaleString("vi-VN")} chỗ
             </span>
           )}
@@ -257,23 +313,58 @@ export default function EventDetailPage() {
         </div>
       </div>
 
+      {/* Sticky section nav — ngay dưới banner, bám header khi scroll */}
+      {sectionNav.length > 1 ? (
+        <div className="sticky top-16 z-40 border-b border-orange-800/15 bg-background/90 backdrop-blur-md">
+          <div className={`${PAGE_SHELL} py-2.5`}>
+            <nav
+              aria-label="Mục trên trang"
+              className="flex gap-1 overflow-x-auto rounded-xl bg-gradient-to-r from-orange-600 to-red-700 p-1.5 shadow-md shadow-orange-600/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+              {sectionNav.map((item) => {
+                const active = activeSection === item.id;
+                return (
+                  <a
+                    key={item.id}
+                    href={`#${item.id}`}
+                    onClick={() => setActiveSection(item.id)}
+                    className={`shrink-0 rounded-lg px-3 py-2 text-xs font-bold transition-colors sm:text-[13px] ${
+                      active
+                        ? "bg-white text-orange-700 shadow-sm"
+                        : "text-white/90 hover:bg-white/15 hover:text-white"
+                    }`}
+                  >
+                    {item.label}
+                  </a>
+                );
+              })}
+            </nav>
+          </div>
+        </div>
+      ) : null}
+
       {/* Content */}
       <div className={`${PAGE_SHELL} py-7 sm:py-8`}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-7 lg:gap-8">
           {/* Main content */}
-          <div className="lg:col-span-2 space-y-7 order-2 lg:order-1">
-            {/* Description */}
+          <div className="lg:col-span-2 space-y-5 order-2 lg:order-1 sm:space-y-6">
             {(event.description?.trim() || details.tags.length > 0) && (
-              <section>
-                <h2 className="text-xl font-bold text-foreground mb-2">Giới thiệu giải</h2>
+              <section
+                id="gioi-thieu"
+                data-event-section
+                className={SECTION_CARD}
+              >
+                <h2 className="mb-3 text-xl font-bold text-foreground">
+                  Giới thiệu giải
+                </h2>
                 {event.description?.trim() ? (
-                  <p className="text-muted-foreground leading-relaxed text-sm sm:text-[15px]">
+                  <p className="text-sm leading-relaxed text-muted-foreground sm:text-[15px]">
                     {event.description}
                   </p>
                 ) : null}
                 {details.tags.length > 0 && (
                   <>
-                    <p className="mt-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <p className="mt-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                       Loại hình
                     </p>
                     <div className="mt-1.5 flex flex-wrap gap-2">
@@ -281,7 +372,7 @@ export default function EventDetailPage() {
                         <Link
                           key={tag}
                           href={`/events?tag=${encodeURIComponent(tag.toLowerCase().replace(/\s+/g, "-"))}`}
-                          className="rounded-full bg-orange-500/10 text-orange-700 border border-orange-500/20 px-3 py-1 text-xs font-semibold hover:bg-orange-500/20 transition-colors"
+                          className="rounded-full border border-orange-500/20 bg-orange-500/10 px-3 py-1 text-xs font-semibold text-orange-700 transition-colors hover:bg-orange-500/20"
                         >
                           {tag}
                         </Link>
@@ -292,30 +383,33 @@ export default function EventDetailPage() {
               </section>
             )}
 
-            {/* Distances table */}
             {distances.length > 0 && (
-              <section>
-                <h2 className="text-xl font-bold text-foreground mb-3">
+              <section
+                id="bang-gia"
+                data-event-section
+                className={SECTION_CARD}
+              >
+                <h2 className="mb-3 text-xl font-bold text-foreground">
                   Hạng mục &amp; lệ phí
                 </h2>
-                <div className="rounded-xl border border-border overflow-hidden">
+                <div className="overflow-hidden rounded-xl border border-border">
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="bg-muted/50">
-                          <th className="text-left px-4 py-3 font-semibold text-foreground">
+                          <th className="px-4 py-3 text-left font-semibold text-foreground">
                             Hạng mục
                           </th>
-                          <th className="text-center px-4 py-3 font-semibold text-foreground">
+                          <th className="px-4 py-3 text-center font-semibold text-foreground">
                             Cự ly
                           </th>
-                          <th className="text-center px-4 py-3 font-semibold text-foreground">
+                          <th className="px-4 py-3 text-center font-semibold text-foreground">
                             Giá hiện tại
                           </th>
-                          <th className="text-center px-4 py-3 font-semibold text-foreground">
+                          <th className="px-4 py-3 text-center font-semibold text-foreground">
                             Slot
                           </th>
-                          <th className="text-center px-4 py-3 font-semibold text-foreground">
+                          <th className="px-4 py-3 text-center font-semibold text-foreground">
                             Trạng thái
                           </th>
                         </tr>
@@ -332,7 +426,7 @@ export default function EventDetailPage() {
                           return (
                             <tr
                               key={d.id}
-                              className="hover:bg-muted/30 transition-colors"
+                              className="transition-colors hover:bg-muted/30"
                             >
                               <td className="px-4 py-3 font-medium text-foreground">
                                 <div className="flex items-center gap-2">
@@ -365,15 +459,15 @@ export default function EventDetailPage() {
                               </td>
                               <td className="px-4 py-3 text-center">
                                 {soldOut ? (
-                                  <span className="rounded-md bg-red-600 text-white px-2.5 py-0.5 text-xs font-bold">
+                                  <span className="rounded-md bg-red-600 px-2.5 py-0.5 text-xs font-bold text-white">
                                     Hết slot
                                   </span>
                                 ) : left < 20 ? (
-                                  <span className="rounded-md bg-amber-500 text-white px-2.5 py-0.5 text-xs font-bold">
+                                  <span className="rounded-md bg-amber-500 px-2.5 py-0.5 text-xs font-bold text-white">
                                     Còn {left}
                                   </span>
                                 ) : (
-                                  <span className="rounded-md bg-emerald-600 text-white px-2.5 py-0.5 text-xs font-bold">
+                                  <span className="rounded-md bg-emerald-600 px-2.5 py-0.5 text-xs font-bold text-white">
                                     Còn chỗ
                                   </span>
                                 )}
@@ -388,10 +482,15 @@ export default function EventDetailPage() {
               </section>
             )}
 
-            {/* Event Info */}
-            <section>
-              <h2 className="text-xl font-bold text-foreground mb-3">Thông tin giải</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <section
+              id="thong-tin"
+              data-event-section
+              className={SECTION_CARD}
+            >
+              <h2 className="mb-3 text-xl font-bold text-foreground">
+                Thông tin giải
+              </h2>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {(
                   [
                     {
@@ -422,14 +521,18 @@ export default function EventDetailPage() {
                       icon: Calendar,
                       label: "Mở đăng ký",
                       value: event.registrationOpensAtUtc
-                        ? new Date(event.registrationOpensAtUtc).toLocaleString("vi-VN")
+                        ? new Date(event.registrationOpensAtUtc).toLocaleString(
+                            "vi-VN"
+                          )
                         : "",
                     },
                     {
                       icon: Calendar,
                       label: "Đóng đăng ký",
                       value: event.registrationClosesAtUtc
-                        ? new Date(event.registrationClosesAtUtc).toLocaleString("vi-VN")
+                        ? new Date(
+                            event.registrationClosesAtUtc
+                          ).toLocaleString("vi-VN")
                         : "",
                     },
                     {
@@ -439,20 +542,22 @@ export default function EventDetailPage() {
                     },
                   ] as const
                 )
-                  .filter((item) => Boolean(item.value && String(item.value).trim()))
+                  .filter((item) =>
+                    Boolean(item.value && String(item.value).trim())
+                  )
                   .map((item) => (
                     <div
                       key={item.label}
-                      className="flex items-start gap-3 rounded-xl border border-border/60 bg-card p-3.5"
+                      className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/30 p-3.5"
                     >
-                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-500/10 shrink-0">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-orange-500/10">
                         <item.icon className="h-4 w-4 text-orange-600" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                           {item.label}
                         </p>
-                        <p className="text-sm font-semibold text-foreground mt-0.5 leading-snug">
+                        <p className="mt-0.5 text-sm font-semibold leading-snug text-foreground">
                           {item.value}
                         </p>
                       </div>
@@ -462,40 +567,66 @@ export default function EventDetailPage() {
             </section>
 
             {details.schedule.length > 0 && (
-              <section>
-                <div className="flex items-center gap-2 mb-3">
+              <section
+                id="lich-trinh"
+                data-event-section
+                className={SECTION_CARD}
+              >
+                <div className="mb-3 flex items-center gap-2">
                   <Clock className="h-5 w-5 text-orange-500" />
-                  <h2 className="text-xl font-bold text-foreground">Lịch trình race day</h2>
+                  <h2 className="text-xl font-bold text-foreground">
+                    Lịch trình race day
+                  </h2>
                 </div>
-                <ol className="rounded-xl border border-border divide-y divide-border overflow-hidden">
+                <ol className="divide-y divide-border overflow-hidden rounded-xl border border-border">
                   {details.schedule.map((row) => (
                     <li
                       key={`${row.time}-${row.activity}`}
-                      className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 px-4 py-3 bg-card"
+                      className="flex flex-col gap-1 bg-muted/20 px-4 py-3 sm:flex-row sm:items-center sm:gap-4"
                     >
-                      <span className="text-xs font-bold text-orange-600 sm:w-48 shrink-0">
+                      <span className="shrink-0 text-xs font-bold text-orange-600 sm:w-48">
                         {row.time}
                       </span>
-                      <span className="text-sm text-foreground">{row.activity}</span>
+                      <span className="text-sm text-foreground">
+                        {row.activity}
+                      </span>
                     </li>
                   ))}
                 </ol>
               </section>
             )}
 
+            {distances.length > 0 ? (
+              <PublicEventCourseMap
+                eventId={event.id}
+                distances={distances.map((d) => ({
+                  id: d.id,
+                  name: d.name || d.type || "Cự ly",
+                }))}
+                onAvailabilityChange={setHasCourseMap}
+                sectionClassName={SECTION_CARD}
+              />
+            ) : null}
+
             {details.rules.length > 0 && (
-              <section>
-                <div className="flex items-center gap-2 mb-3">
+              <section
+                id="quy-dinh"
+                data-event-section
+                className={SECTION_CARD}
+              >
+                <div className="mb-3 flex items-center gap-2">
                   <ScrollText className="h-5 w-5 text-orange-500" />
-                  <h2 className="text-xl font-bold text-foreground">Thể lệ &amp; quy định</h2>
+                  <h2 className="text-xl font-bold text-foreground">
+                    Thể lệ &amp; quy định
+                  </h2>
                 </div>
-                <ul className="space-y-2 rounded-xl border border-border bg-card p-4 sm:p-5">
+                <ul className="space-y-2">
                   {details.rules.map((rule) => (
                     <li
                       key={rule}
-                      className="flex gap-2.5 text-sm text-muted-foreground leading-relaxed"
+                      className="flex gap-2.5 text-sm leading-relaxed text-muted-foreground"
                     >
-                      <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-orange-500 shrink-0" />
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-orange-500" />
                       <span>{rule}</span>
                     </li>
                   ))}
@@ -504,18 +635,24 @@ export default function EventDetailPage() {
             )}
 
             {details.guidelines.length > 0 && (
-              <section>
-                <div className="flex items-center gap-2 mb-3">
+              <section
+                id="huong-dan"
+                data-event-section
+                className={SECTION_CARD}
+              >
+                <div className="mb-3 flex items-center gap-2">
                   <BookOpen className="h-5 w-5 text-orange-500" />
-                  <h2 className="text-xl font-bold text-foreground">Hướng dẫn VĐV</h2>
+                  <h2 className="text-xl font-bold text-foreground">
+                    Hướng dẫn VĐV
+                  </h2>
                 </div>
-                <ul className="space-y-2 rounded-xl border border-border bg-card p-4 sm:p-5">
+                <ul className="space-y-2">
                   {details.guidelines.map((g) => (
                     <li
                       key={g}
-                      className="flex gap-2.5 text-sm text-muted-foreground leading-relaxed"
+                      className="flex gap-2.5 text-sm leading-relaxed text-muted-foreground"
                     >
-                      <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-sky-500 shrink-0" />
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-500" />
                       <span>{g}</span>
                     </li>
                   ))}
@@ -524,26 +661,38 @@ export default function EventDetailPage() {
             )}
 
             {details.prizes.length > 0 && (
-              <section>
-                <div className="flex items-center gap-2 mb-3">
+              <section
+                id="giai-thuong"
+                data-event-section
+                className={SECTION_CARD}
+              >
+                <div className="mb-3 flex items-center gap-2">
                   <Gift className="h-5 w-5 text-orange-500" />
-                  <h2 className="text-xl font-bold text-foreground">Giải thưởng chi tiết</h2>
+                  <h2 className="text-xl font-bold text-foreground">
+                    Giải thưởng chi tiết
+                  </h2>
                 </div>
-                <div className="rounded-xl border border-border overflow-hidden">
+                <div className="overflow-hidden rounded-xl border border-border">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-muted/50">
-                        <th className="text-left px-4 py-3 font-semibold">Hạng mục</th>
-                        <th className="text-left px-4 py-3 font-semibold">Phần thưởng</th>
+                        <th className="px-4 py-3 text-left font-semibold">
+                          Hạng mục
+                        </th>
+                        <th className="px-4 py-3 text-left font-semibold">
+                          Phần thưởng
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
                       {details.prizes.map((p) => (
                         <tr key={p.category}>
-                          <td className="px-4 py-3 font-medium text-foreground whitespace-nowrap align-top">
+                          <td className="whitespace-nowrap px-4 py-3 align-top font-medium text-foreground">
                             {p.category}
                           </td>
-                          <td className="px-4 py-3 text-muted-foreground">{p.reward}</td>
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {p.reward}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -553,18 +702,24 @@ export default function EventDetailPage() {
             )}
 
             {details.penalties.length > 0 && (
-              <section>
-                <div className="flex items-center gap-2 mb-3">
+              <section
+                id="hinh-phat"
+                data-event-section
+                className={SECTION_CARD}
+              >
+                <div className="mb-3 flex items-center gap-2">
                   <AlertTriangle className="h-5 w-5 text-red-500" />
-                  <h2 className="text-xl font-bold text-foreground">Hình phạt / DSQ</h2>
+                  <h2 className="text-xl font-bold text-foreground">
+                    Hình phạt / DSQ
+                  </h2>
                 </div>
-                <ul className="space-y-2 rounded-xl border border-red-500/20 bg-red-500/[0.04] p-4 sm:p-5">
+                <ul className="space-y-2 rounded-xl border border-red-500/20 bg-red-500/[0.04] p-4">
                   {details.penalties.map((p) => (
                     <li
                       key={p}
-                      className="flex gap-2.5 text-sm text-foreground/80 leading-relaxed"
+                      className="flex gap-2.5 text-sm leading-relaxed text-foreground/80"
                     >
-                      <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-red-500 shrink-0" />
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
                       <span>{p}</span>
                     </li>
                   ))}

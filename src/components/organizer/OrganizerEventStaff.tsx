@@ -1,16 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Check,
+  ChevronDown,
   Loader2,
+  Mail,
+  Phone,
   Plus,
   RefreshCw,
+  Search,
   Send,
+  User,
   Users,
   X,
 } from "lucide-react";
 import {
-  addEventStaff,
   assignEventStaffStation,
   inviteEventStaff,
   listEventStaff,
@@ -43,7 +48,7 @@ const ROLE_TABS: { id: EventStaffRole; label: string; hint: string }[] = [
   },
 ];
 
-function StationSelect({
+function StationPicker({
   role,
   value,
   stations,
@@ -58,6 +63,21 @@ function StationSelect({
   onChange: (id: string) => void;
   compact?: boolean;
 }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
   const mapStations = stations.filter((s) => s.source === "map");
   const dutyStations = stations.filter((s) => s.source !== "map");
   const mapGroup =
@@ -66,44 +86,129 @@ function StationSelect({
       : role === "photographer"
         ? "Checkpoint / zone chụp (map)"
         : "Checkpoint (map)";
+
+  const selected = stations.find((s) => s.id === value);
+  const needle = q.trim().toLowerCase();
+  const filterList = (list: StaffStationDto[]) =>
+    needle
+      ? list.filter(
+          (s) =>
+            s.label.toLowerCase().includes(needle) ||
+            (s.distanceName || "").toLowerCase().includes(needle)
+        )
+      : list;
+  const filteredMap = filterList(mapStations);
+  const filteredDuty = filterList(dutyStations);
+
+  const pick = (id: string) => {
+    onChange(id);
+    setOpen(false);
+    setQ("");
+  };
+
   return (
-    <select
-      value={value}
-      disabled={disabled}
-      onChange={(e) => onChange(e.target.value)}
-      className={`w-full rounded-xl border border-border bg-background px-3 ${
-        compact ? "py-1.5 text-xs" : "py-2 text-sm"
-      }`}
-    >
-      <option value="">— Chưa gán —</option>
-      {mapStations.length > 0 ? (
-        <optgroup label={mapGroup}>
-          {mapStations.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.label}
-            </option>
-          ))}
-        </optgroup>
+    <div className="relative" ref={rootRef}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((v) => !v)}
+        className={`flex w-full items-center justify-between gap-2 rounded-xl border border-border bg-background px-3 text-left hover:border-orange-300 disabled:opacity-50 ${
+          compact ? "py-1.5 text-xs" : "py-2 text-sm"
+        }`}
+      >
+        <span className={`truncate ${selected ? "text-foreground" : "text-muted-foreground"}`}>
+          {selected?.label || "— Chưa gán —"}
+        </span>
+        <ChevronDown
+          className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open ? (
+        <div className="absolute left-0 right-0 z-40 mt-1 overflow-hidden rounded-xl border border-border bg-card shadow-xl">
+          <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+            <Search className="h-3.5 w-3.5 text-muted-foreground" />
+            <input
+              autoFocus
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Tìm checkpoint / nhiệm vụ…"
+              className="w-full bg-transparent text-xs outline-none"
+            />
+          </div>
+          <div className="max-h-56 overflow-y-auto py-1">
+            <button
+              type="button"
+              onClick={() => pick("")}
+              className="flex w-full items-center justify-between px-3 py-2 text-left text-xs hover:bg-muted"
+            >
+              <span className="text-muted-foreground">— Chưa gán —</span>
+              {!value ? <Check className="h-3.5 w-3.5 text-orange-500" /> : null}
+            </button>
+            {filteredMap.length > 0 ? (
+              <>
+                <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                  {mapGroup}
+                </p>
+                {filteredMap.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => pick(s.id)}
+                    className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs hover:bg-orange-500/10"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium">{s.label}</span>
+                      {s.distanceName ? (
+                        <span className="text-[10px] text-muted-foreground">
+                          {s.distanceName}
+                        </span>
+                      ) : null}
+                    </span>
+                    {value === s.id ? (
+                      <Check className="h-3.5 w-3.5 shrink-0 text-orange-500" />
+                    ) : null}
+                  </button>
+                ))}
+              </>
+            ) : null}
+            {filteredDuty.length > 0 ? (
+              <>
+                <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                  Nhiệm vụ (không gán map)
+                </p>
+                {filteredDuty.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => pick(s.id)}
+                    className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs hover:bg-orange-500/10"
+                  >
+                    <span className="truncate font-medium">{s.label}</span>
+                    {value === s.id ? (
+                      <Check className="h-3.5 w-3.5 shrink-0 text-orange-500" />
+                    ) : null}
+                  </button>
+                ))}
+              </>
+            ) : null}
+            {filteredMap.length === 0 && filteredDuty.length === 0 ? (
+              <p className="px-3 py-4 text-center text-xs text-muted-foreground">
+                Không có kết quả.
+              </p>
+            ) : null}
+          </div>
+        </div>
       ) : null}
-      {dutyStations.length > 0 ? (
-        <optgroup label="Nhiệm vụ (không gán map)">
-          {dutyStations.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.label}
-            </option>
-          ))}
-        </optgroup>
-      ) : null}
-    </select>
+    </div>
   );
 }
 
 function statusLabel(s: string) {
   switch (s) {
     case "invited":
-      return "Đã mời";
+      return "Chờ kích hoạt";
     case "active":
-      return "Đang hoạt động";
+      return "Đã hoạt động";
     case "revoked":
       return "Đã gỡ";
     default:
@@ -131,12 +236,13 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
 
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [stationId, setStationId] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<EventStaffMemberDto | null>(
     null
   );
@@ -182,50 +288,47 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
     setFullName("");
     setEmail("");
     setPhone("");
+    setStationId("");
+    setFormError(null);
+  };
+
+  const closeInvite = () => {
+    if (busy) return;
+    setInviteOpen(false);
+    resetForm();
   };
 
   const stationLabelOf = (id: string) =>
     stations.find((s) => s.id === id)?.label ?? undefined;
 
   const onInvite = async () => {
+    const name = fullName.trim();
+    const mail = email.trim();
+    if (!name) {
+      setFormError("Vui lòng nhập họ tên.");
+      return;
+    }
+    if (!mail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) {
+      setFormError("Email không hợp lệ.");
+      return;
+    }
     setBusy(true);
+    setFormError(null);
     setError(null);
     try {
       await inviteEventStaff(eventId, {
         role,
-        email,
-        fullName,
-        phone: phone || undefined,
+        email: mail,
+        fullName: name,
+        phone: phone.trim() || undefined,
         stationId: stationId || undefined,
         stationLabel: stationId ? stationLabelOf(stationId) : undefined,
       });
-      setToast("Đã gửi lời mời nhân sự.");
+      setInviteOpen(false);
       resetForm();
       await load();
     } catch (e) {
-      setError(getApiErrorMessage(e, "Mời thất bại."));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const onAdd = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await addEventStaff(eventId, {
-        role,
-        fullName,
-        email: email || undefined,
-        phone: phone || undefined,
-        stationId: stationId || undefined,
-        stationLabel: stationId ? stationLabelOf(stationId) : undefined,
-      });
-      setToast("Đã thêm nhân sự (active ngay).");
-      resetForm();
-      await load();
-    } catch (e) {
-      setError(getApiErrorMessage(e, "Thêm thất bại."));
+      setFormError(getApiErrorMessage(e, "Mời thất bại."));
     } finally {
       setBusy(false);
     }
@@ -275,17 +378,29 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
             Quản lý nhân sự
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Bố trí nhiệm vụ theo điểm đã setup ở Thiết lập bản đồ (checkpoint /
-            tiếp tế) hoặc nhiệm vụ không gắn map. Dữ liệu lưu trên BE theo giải.
+            Mời tài khoản theo role — mật khẩu mặc định chỉ gửi qua email. Sau
+            khi họ đăng nhập lần đầu sẽ chuyển sang Đã hoạt động.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void load()}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-bold hover:bg-muted"
-        >
-          <RefreshCw className="h-3.5 w-3.5" /> Làm mới
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-bold hover:bg-muted"
+          >
+            <RefreshCw className="h-3.5 w-3.5" /> Làm mới
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              resetForm();
+              setInviteOpen(true);
+            }}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-red-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm"
+          >
+            <Plus className="h-3.5 w-3.5" /> Mời / thêm
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-1 border-b border-border/60 pb-px">
@@ -312,7 +427,7 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
           {role === "volunteer"
             ? "điểm tiếp tế (aid)"
             : "checkpoint (start / CP / finish)"}
-          — vẫn có thể gán nhiệm vụ không gắn map bên dưới.
+          — vẫn có thể gán nhiệm vụ không gắn map khi mời.
         </p>
       ) : null}
 
@@ -321,77 +436,6 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
           {error}
         </div>
       ) : null}
-      {toast ? (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          {toast}
-        </div>
-      ) : null}
-
-      <section className="space-y-3 rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
-        <h2 className="text-sm font-bold">
-          {role === "volunteer" ? "Thêm / mời volunteer" : "Mời / thêm"}
-        </h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <label className="block space-y-1 text-xs">
-            <span className="font-semibold text-muted-foreground">Họ tên</span>
-            <input
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
-            />
-          </label>
-          <label className="block space-y-1 text-xs">
-            <span className="font-semibold text-muted-foreground">
-              Email {role !== "volunteer" ? "*" : "(tuỳ chọn nếu thêm nhanh)"}
-            </span>
-            <input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              type="email"
-              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
-            />
-          </label>
-          <label className="block space-y-1 text-xs">
-            <span className="font-semibold text-muted-foreground">SĐT</span>
-            <input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
-            />
-          </label>
-          <label className="block space-y-1 text-xs sm:col-span-2 lg:col-span-1">
-            <span className="font-semibold text-muted-foreground">
-              {role === "volunteer"
-                ? "Điểm tiếp tế / nhiệm vụ"
-                : "Checkpoint / nhiệm vụ"}
-            </span>
-            <StationSelect
-              role={role}
-              value={stationId}
-              stations={stations}
-              onChange={setStationId}
-            />
-          </label>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={busy || !email.trim()}
-            onClick={() => void onInvite()}
-            className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-orange-500 to-red-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-40"
-          >
-            <Send className="h-3.5 w-3.5" /> Mời qua email
-          </button>
-          <button
-            type="button"
-            disabled={busy || !fullName.trim()}
-            onClick={() => void onAdd()}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-xs font-bold hover:border-orange-300 disabled:opacity-40"
-          >
-            <Plus className="h-3.5 w-3.5" /> Thêm trực tiếp
-          </button>
-        </div>
-      </section>
 
       <section className="space-y-3">
         <h2 className="text-sm font-bold">
@@ -404,7 +448,9 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
           </div>
         ) : members.length === 0 ? (
           <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-            Chưa có {roleMeta.label.toLowerCase()} cho giải này.
+            Chưa có {roleMeta.label.toLowerCase()} cho giải này. Bấm{" "}
+            <span className="font-semibold text-foreground">Mời / thêm</span> để
+            cấp tài khoản.
           </div>
         ) : (
           <ul className="space-y-2">
@@ -426,8 +472,8 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
                   >
                     {statusLabel(m.status)}
                   </span>
-                  <div className="min-w-[12rem] flex-1 sm:max-w-xs">
-                    <StationSelect
+                  <div className="min-w-[14rem] flex-1 sm:max-w-xs">
+                    <StationPicker
                       role={role}
                       value={m.stationId || ""}
                       stations={stations}
@@ -450,6 +496,139 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
           </ul>
         )}
       </section>
+
+      {inviteOpen ? (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-zinc-950/50 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="invite-staff-title"
+          onClick={closeInvite}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl border border-border bg-card p-5 shadow-2xl sm:p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-orange-500">
+                  {roleMeta.label}
+                </p>
+                <h2
+                  id="invite-staff-title"
+                  className="mt-1 text-lg font-extrabold tracking-tight"
+                >
+                  Mời / thêm nhân sự
+                </h2>
+                <p className="mt-1.5 text-sm text-muted-foreground">
+                  Tài khoản đăng nhập và mật khẩu mặc định sẽ được gửi qua email
+                  bên dưới.
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={closeInvite}
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted"
+                aria-label="Đóng"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {formError ? (
+              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                {formError}
+              </div>
+            ) : null}
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <label className="mb-1.5 block text-xs font-semibold text-foreground">
+                  <User className="mr-1 inline h-3.5 w-3.5 text-orange-500" />
+                  Họ tên *
+                </label>
+                <input
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  disabled={busy}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none transition-all focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20"
+                  placeholder="Nguyễn Văn A"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="mb-1.5 block text-xs font-semibold text-foreground">
+                  <Mail className="mr-1 inline h-3.5 w-3.5 text-orange-500" />
+                  Email *
+                </label>
+                <input
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  type="email"
+                  disabled={busy}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none transition-all focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20"
+                  placeholder="email@example.com"
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Email nhận thông tin đăng nhập. Tài khoản tạo riêng, không
+                  trùng email VĐV.
+                </p>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-foreground">
+                  <Phone className="mr-1 inline h-3.5 w-3.5 text-orange-500" />
+                  Số điện thoại
+                </label>
+                <input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  disabled={busy}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none transition-all focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20"
+                  placeholder="09xxxxxxxx"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-foreground">
+                  {role === "volunteer"
+                    ? "Điểm tiếp tế / nhiệm vụ"
+                    : "Checkpoint / nhiệm vụ"}
+                </label>
+                <StationPicker
+                  role={role}
+                  value={stationId}
+                  stations={stations}
+                  disabled={busy}
+                  onChange={setStationId}
+                />
+              </div>
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={closeInvite}
+                className="rounded-full border border-border px-4 py-2 text-xs font-bold hover:bg-muted disabled:opacity-40"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void onInvite()}
+                className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-orange-500 to-red-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-40"
+              >
+                {busy ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Send className="h-3.5 w-3.5" />
+                )}
+                Gửi lời mời
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {revokeTarget ? (
         <div

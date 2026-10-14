@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   Download,
   Camera,
+  Maximize2,
   Ticket,
   Clock,
   XCircle,
@@ -32,12 +33,14 @@ import {
 } from "@/lib/registration-medical";
 import { mediaDisplayUrl } from "@/lib/media-url";
 import { PAGE_SHELL_FORM } from "@/lib/page-shell";
+import { buildCheckInQrValue } from "@/lib/registration-qr";
 import PageLoading from "@/components/ui/PageLoading";
 
 export default function RegistrationDetailPage() {
   const params = useParams();
   const id = String(params.id);
   const qrRef = useRef<HTMLDivElement>(null);
+  const [showQrFullscreen, setShowQrFullscreen] = useState(false);
   const [reg, setReg] = useState<RegistrationDto | null | undefined>(undefined);
   const [event, setEvent] = useState<RaceEventDto | undefined>(undefined);
 
@@ -275,14 +278,27 @@ export default function RegistrationDetailPage() {
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
           <Link
+            href={`/my-registrations/${reg.id}/resubmit`}
+            className="flex-1 inline-flex items-center justify-center rounded-full bg-gradient-to-r from-orange-500 to-red-600 px-4 py-2.5 text-sm font-bold text-white"
+          >
+            Chỉnh sửa & nộp lại
+          </Link>
+          <Link
             href={`/events/${reg.eventId}`}
             className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-4 py-2.5 text-sm font-semibold"
           >
             Chi tiết giải <ExternalLink className="h-3.5 w-3.5" />
           </Link>
+        </div>
+        <p className="text-center text-[11px] text-muted-foreground">
+          Đã thanh toán — sửa hồ sơ theo lý do BTC rồi nộp lại, không cần trả tiền
+          lại. Hoàn tiền chỉ khi BTC/bạn yêu cầu riêng.
+        </p>
+        {/* keep payments link below for edge cases */}
+        <div className="flex flex-col sm:flex-row gap-2">
           <Link
             href="/payments"
-            className="flex-1 inline-flex items-center justify-center rounded-full bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white"
+            className="flex-1 inline-flex items-center justify-center rounded-full border px-4 py-2.5 text-sm font-semibold"
           >
             Lịch sử thanh toán
           </Link>
@@ -291,15 +307,13 @@ export default function RegistrationDetailPage() {
     );
   }
 
-  const qrPayload =
-    typeof reg.qrPayload === "string" && reg.qrPayload
-      ? reg.qrPayload
-      : JSON.stringify({
-          registrationId: reg.id,
-          eventId: reg.eventId,
-          bib: reg.bibNumber,
-          fullName: reg.fullName,
-        });
+  const qrPayload = buildCheckInQrValue({
+    userId: reg.userId,
+    bibNumber: reg.bibNumber,
+    eventId: reg.eventId,
+    distanceKm: reg.distanceKm,
+    qrPayload: reg.qrPayload,
+  });
 
   const handleDownload = () => {
     if (!qrRef.current || !reg.bibNumber) return;
@@ -374,27 +388,46 @@ export default function RegistrationDetailPage() {
               <p className="font-medium">{event ? formatDate(event.date) : "—"}</p>
             </div>
             <div>
-              <p className="text-[10px] uppercase text-muted-foreground font-semibold">Thanh toán</p>
+              <p className="text-[10px] uppercase text-muted-foreground font-semibold">
+                Đã thanh toán
+              </p>
               <p className="font-bold text-orange-600">
                 {formatPrice(distance.price)}
               </p>
+              {distance.phaseName ? (
+                <p className="mt-0.5 text-[10px] font-medium text-muted-foreground">
+                  {distance.phaseName}
+                </p>
+              ) : null}
             </div>
           </div>
 
           <div className="rounded-xl bg-muted/40 p-4 text-sm space-y-1">
-            <div className="flex justify-between">
+            <div className="flex justify-between gap-2">
               <span className="text-muted-foreground">VĐV</span>
-              <span className="font-semibold">{reg.fullName}</span>
+              <span className="font-semibold text-right">{reg.fullName}</span>
             </div>
-            <div className="flex justify-between">
+            {reg.bibName?.trim() ? (
+              <div className="flex justify-between gap-2">
+                <span className="text-muted-foreground">Tên trên BIB</span>
+                <span className="font-medium text-right">{reg.bibName.trim()}</span>
+              </div>
+            ) : null}
+            <div className="flex justify-between gap-2">
               <span className="text-muted-foreground">SĐT</span>
               <span>{reg.phone || "—"}</span>
+            </div>
+            <div className="flex justify-between gap-2">
+              <span className="text-muted-foreground">Email</span>
+              <span className="break-all text-right text-xs">{reg.email || "—"}</span>
             </div>
             {(reg.shirtType || reg.shirtSize) && (
               <div className="flex justify-between gap-2">
                 <span className="text-muted-foreground">Áo</span>
                 <span className="text-right text-xs">
-                  {[reg.shirtType, reg.shirtSize, reg.shirtColor].filter(Boolean).join(" · ")}
+                  {[reg.shirtType, reg.shirtSize, reg.shirtColor]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </span>
               </div>
             )}
@@ -404,12 +437,32 @@ export default function RegistrationDetailPage() {
             <>
               <div className="flex flex-col items-center gap-3">
                 <p className="text-sm font-semibold">Mã QR check-in</p>
-                <div ref={qrRef} className="rounded-2xl border-2 bg-white p-4">
-                  <QRCodeSVG value={qrPayload} size={200} level="H" />
+                <div
+                  ref={qrRef}
+                  className="rounded-2xl border-2 border-border bg-white p-5 shadow-sm"
+                >
+                  <QRCodeSVG
+                    value={qrPayload}
+                    size={220}
+                    level="M"
+                    includeMargin
+                  />
                 </div>
+                <p className="max-w-xs text-center text-[11px] text-muted-foreground">
+                  Webcam laptop khó quét màn hình: dùng «Hiện QR full màn»,
+                  «Tải mã QR» cho volunteer chọn ảnh, hoặc đọc số BIB.
+                </p>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => setShowQrFullscreen(true)}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-orange-300/80 bg-orange-50 py-2.5 text-sm font-bold text-orange-800 hover:bg-orange-100"
+                >
+                  <Maximize2 className="h-4 w-4" />
+                  Hiện QR full màn
+                </button>
                 <button
                   type="button"
                   onClick={handleDownload}
@@ -430,6 +483,39 @@ export default function RegistrationDetailPage() {
           )}
         </div>
       </div>
+
+      {showQrFullscreen && reg.bibNumber ? (
+        <div
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-white p-6"
+          role="dialog"
+          aria-modal
+          aria-label="QR check-in toàn màn hình"
+        >
+          <p className="text-sm font-semibold text-zinc-500">RaceDay · check-in</p>
+          <QRCodeSVG
+            value={qrPayload}
+            size={Math.min(360, typeof window !== "undefined" ? window.innerWidth - 48 : 320)}
+            level="M"
+            includeMargin
+            bgColor="#ffffff"
+            fgColor="#000000"
+          />
+          <p className="text-5xl font-extrabold tracking-tight text-zinc-950">
+            {reg.bibNumber}
+          </p>
+          <p className="max-w-sm text-center text-xs text-zinc-500">
+            Giảm độ sáng màn hình nếu camera khó bắt. Volunteer có thể nhập BIB
+            thay vì quét.
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowQrFullscreen(false)}
+            className="rounded-full bg-zinc-900 px-6 py-2.5 text-sm font-bold text-white"
+          >
+            Đóng
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

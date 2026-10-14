@@ -30,11 +30,13 @@ import type {
   CreateRaceEventDocumentInput,
   CreateRaceEventRequest,
 } from "@/dto/organizer.dto";
+import OrganizerLocationFields from "@/components/organizer/OrganizerLocationFields";
 import { getApiErrorMessage } from "@/lib/error";
 import {
   mediaDisplayUrl,
   resolveStoredFileUrl,
 } from "@/lib/media-url";
+import { composeLocation, splitLocation } from "@/lib/vn-provinces";
 
 const requiredDocuments = [
   {
@@ -332,7 +334,7 @@ function collectDraftErrors(
   if (!form.title.trim()) keys.push("title");
   if (!form.date) keys.push("date");
   if (!form.startTime) keys.push("startTime");
-  if (!form.location.trim()) keys.push("location");
+  if (!splitLocation(form.location).provinceKey) keys.push("location");
   if (!form.organizer.trim()) keys.push("organizer");
   if (!form.phone.trim() || !isValidPhone(form.phone)) keys.push("phone");
   if (!form.email.trim() || !isValidEmail(form.email)) keys.push("email");
@@ -1113,12 +1115,30 @@ function BasicInfoStep({
             invalid={invalid("startTime")}
             onChange={(v) => onChange("startTime", v)}
           />
-          <Field
-            label="Địa điểm / tỉnh thành *"
-            value={form.location}
-            invalid={invalid("location")}
-            onChange={(v) => onChange("location", v)}
-          />
+          {(() => {
+            const loc = splitLocation(form.location);
+            return (
+              <div className={invalid("location") ? "rounded-xl ring-1 ring-red-300 p-2" : ""}>
+                <OrganizerLocationFields
+                  provinceKey={loc.provinceKey}
+                  detail={loc.detail}
+                  invalid={invalid("location")}
+                  onProvinceChange={(key) =>
+                    onChange("location", composeLocation(loc.detail, key))
+                  }
+                  onDetailChange={(d) =>
+                    onChange("location", composeLocation(d, loc.provinceKey))
+                  }
+                  inputClassName="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+                />
+                {invalid("location") ? (
+                  <p className="mt-1 text-[11px] text-red-600">
+                    Vui lòng chọn tỉnh / thành phố.
+                  </p>
+                ) : null}
+              </div>
+            );
+          })()}
           <Field
             label="Quy mô dự kiến (số VĐV)"
             value={form.scale}

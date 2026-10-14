@@ -7,6 +7,7 @@ import Cookies from "js-cookie";
 import { logout } from "@/api/auth";
 import { getEventById } from "@/api/events";
 import { getPackagePurchase } from "@/api/event-packages";
+import { mediaDisplayUrl } from "@/lib/media-url";
 import { mapAppRole } from "@/lib/role";
 import { Role } from "@/interfaces/role";
 import {
@@ -170,16 +171,19 @@ function useLoggedInUser() {
     username: "User",
     role: Role.RUNNER as string,
     initial: "U",
+    avatarUrl: null as string | null,
   });
 
   useEffect(() => {
     const username = Cookies.get("username") || "User";
     const rawRole = Cookies.get("role") || "";
     const role = mapAppRole(rawRole || Role.RUNNER);
+    const avatarUrl = Cookies.get("avatar_url") || null;
     setUser({
       username,
       role,
       initial: username.charAt(0).toUpperCase() || "U",
+      avatarUrl,
     });
   }, []);
 
@@ -225,7 +229,8 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
     "Chi tiết giải": true,
   });
   const userMenuRef = useRef<HTMLDivElement>(null);
-  const { username, role, initial } = useLoggedInUser();
+  const { username, role, initial, avatarUrl } = useLoggedInUser();
+  const avatarSrc = avatarUrl ? mediaDisplayUrl(avatarUrl) : null;
   const eventId = useMemo(() => eventIdFromPath(pathname), [pathname]);
   const groups = useMemo(
     () => (eventId ? eventWorkspaceGroups(eventId) : []),
@@ -342,29 +347,34 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
   }, [packageExpiresAtUtc, packageTitle]);
 
   const linkClass = (active: boolean) =>
-    `group flex items-center rounded-xl text-sm font-medium transition-colors ${active
-      ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg shadow-orange-950/20"
-      : "text-slate-400 hover:bg-white/[0.07] hover:text-white"
-    } ${collapsed
-      ? "gap-3 px-3 py-3 lg:justify-center lg:px-0 lg:py-3"
-      : "gap-3 px-3 py-2.5"
+    `group flex items-center rounded-xl text-sm font-medium transition-colors ${
+      active
+        ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg shadow-orange-950/20"
+        : "text-slate-400 hover:bg-white/[0.07] hover:text-white"
+    } ${
+      collapsed
+        ? "gap-3 px-3 py-3 lg:justify-center lg:px-0 lg:py-3"
+        : "gap-3 px-3 py-2.5"
     }`;
 
   return (
     <div className="min-h-screen bg-[#f7f5f1] text-slate-950">
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex flex-col bg-[#121827] text-white shadow-2xl shadow-slate-950/10 transition-[width,transform] duration-300 lg:translate-x-0 ${collapsed ? "w-[272px] lg:w-[72px]" : "w-[272px]"
-          } ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed inset-y-0 left-0 z-50 flex flex-col bg-[#121827] text-white shadow-2xl shadow-slate-950/10 transition-[width,transform] duration-300 lg:translate-x-0 ${
+          collapsed ? "w-[272px] lg:w-[72px]" : "w-[272px]"
+        } ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div
-          className={`flex h-20 items-center border-b border-white/10 ${collapsed ? "justify-between px-5 lg:justify-center lg:px-0" : "justify-between px-5"
-            }`}
+          className={`flex h-20 items-center border-b border-white/10 ${
+            collapsed ? "justify-between px-5 lg:justify-center lg:px-0" : "justify-between px-5"
+          }`}
         >
           <Link
             href="/"
             onClick={closeMobile}
-            className={`flex items-center overflow-hidden ${collapsed ? "gap-0 lg:justify-center" : "gap-3"
-              }`}
+            className={`flex items-center overflow-hidden ${
+              collapsed ? "gap-0 lg:justify-center" : "gap-3"
+            }`}
           >
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-orange-400 to-red-600 shadow-lg shadow-orange-500/25">
               <Flag className="h-5 w-5" />
@@ -384,8 +394,9 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
           </button>
         </div>
         <nav
-          className={`flex-1 space-y-4 overflow-y-auto py-5 ${collapsed ? "px-3 lg:px-2" : "px-3"
-            }`}
+          className={`flex-1 space-y-4 overflow-y-auto py-5 ${
+            collapsed ? "px-3 lg:px-2" : "px-3"
+          }`}
         >
           {groups.map((group) => {
             const isOpen = openGroups[group.heading] !== false;
@@ -408,8 +419,9 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
                       }));
                     }
                   }}
-                  className={`flex w-full items-center gap-1 px-3 pb-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 transition-colors hover:text-slate-300 ${collapsed ? "lg:justify-center lg:px-0" : ""
-                    }`}
+                  className={`flex w-full items-center gap-1 px-3 pb-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 transition-colors hover:text-slate-300 ${
+                    collapsed ? "lg:justify-center lg:px-0" : ""
+                  }`}
                   title={isOpen ? `Thu gọn ${group.heading}` : `Mở ${group.heading}`}
                 >
                   <span className={collapsed ? "lg:hidden" : ""}>
@@ -453,17 +465,19 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
         </nav>
 
         <div
-          className={`mt-auto border-t border-white/10 py-3 ${collapsed ? "px-3 lg:px-2" : "px-3"
-            }`}
+          className={`mt-auto border-t border-white/10 py-3 ${
+            collapsed ? "px-3 lg:px-2" : "px-3"
+          }`}
         >
           <Link
             href="/my-events"
             onClick={closeMobile}
             title={collapsed ? "Quay về quản lý giải" : undefined}
-            className={`flex items-center rounded-xl text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.07] hover:text-white ${collapsed
+            className={`flex items-center rounded-xl text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.07] hover:text-white ${
+              collapsed
                 ? "gap-3 px-3 py-3 lg:justify-center lg:px-0"
                 : "gap-3 px-3 py-3"
-              }`}
+            }`}
           >
             <ArrowLeft className="h-[18px] w-[18px] shrink-0 text-orange-400" />
             <span className={collapsed ? "lg:hidden" : ""}>
@@ -480,8 +494,9 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
         />
       )}
       <div
-        className={`min-h-screen transition-[padding] duration-300 ${collapsed ? "lg:pl-[72px]" : "lg:pl-[272px]"
-          }`}
+        className={`min-h-screen transition-[padding] duration-300 ${
+          collapsed ? "lg:pl-[72px]" : "lg:pl-[272px]"
+        }`}
       >
         <header className="sticky top-0 z-40 flex h-20 items-center justify-between border-b border-slate-200/80 bg-[#f7f5f1]/90 px-5 backdrop-blur-md sm:px-8">
           <div className="flex items-center gap-3">
@@ -514,10 +529,11 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
                 </span>
                 {packageLabel && (
                   <span
-                    className={`min-w-0 truncate text-[11px] font-medium ${packageLabel.includes("hết hạn")
+                    className={`min-w-0 truncate text-[11px] font-medium ${
+                      packageLabel.includes("hết hạn")
                         ? "text-red-600"
                         : "text-slate-500"
-                      }`}
+                    }`}
                     title={packageLabel}
                   >
                     · {packageLabel}
@@ -534,15 +550,23 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
               className="flex items-center gap-2.5 rounded-full border border-slate-200 bg-white py-1.5 pl-2 pr-3 text-sm shadow-xs transition-all hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
               aria-expanded={userMenuOpen}
             >
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 text-xs font-bold text-white shadow-xs">
-                {initial}
-              </div>
+              {avatarSrc ? (
+                <span className="relative inline-flex h-7 w-7 overflow-hidden rounded-full border border-orange-500/30 bg-muted shadow-xs">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={avatarSrc} alt="" className="h-full w-full object-cover" />
+                </span>
+              ) : (
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 text-xs font-bold text-white shadow-xs">
+                  {initial}
+                </div>
+              )}
               <span className="hidden max-w-[120px] truncate font-medium text-slate-900 sm:inline">
                 {username}
               </span>
               <ChevronDown
-                className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${userMenuOpen ? "rotate-180" : ""
-                  }`}
+                className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${
+                  userMenuOpen ? "rotate-180" : ""
+                }`}
               />
             </button>
 
@@ -633,15 +657,15 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
                   {(role === Role.COORDINATOR ||
                     role === Role.STAFF ||
                     role === Role.ADMIN) && (
-                      <Link
-                        href="/scan-qr"
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-800 transition-colors hover:bg-slate-50"
-                        onClick={closeUserMenu}
-                      >
-                        <QrCode className="h-4 w-4 text-slate-400" />
-                        Quét QR Check-in
-                      </Link>
-                    )}
+                    <Link
+                      href="/scan-qr"
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-800 transition-colors hover:bg-slate-50"
+                      onClick={closeUserMenu}
+                    >
+                      <QrCode className="h-4 w-4 text-slate-400" />
+                      Quét QR Check-in
+                    </Link>
+                  )}
                 </div>
 
                 <div className="border-t border-slate-100 pt-1">
@@ -662,10 +686,11 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
           </div>
         </header>
         <main
-          className={`mx-auto max-w-[1540px] ${isMapWorkspace
+          className={`mx-auto max-w-[1540px] ${
+            isMapWorkspace
               ? "px-5 pb-4 pt-3 sm:px-8 sm:pb-5 sm:pt-4"
               : "p-5 sm:p-8"
-            }`}
+          }`}
         >
           {children}
         </main>
