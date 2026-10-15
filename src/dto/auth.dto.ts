@@ -1,24 +1,47 @@
 import * as z from "zod";
 
+const USERNAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
+
 export const LoginSchema = z.object({
-  username: z.string().optional(),
-  email: z.string().optional(),
+  username: z.string().trim().min(1, "Vui lòng nhập tên đăng nhập"),
   password: z.string().min(1, "Vui lòng nhập mật khẩu"),
 });
 
 export type LoginDto = z.infer<typeof LoginSchema>;
 
 export const RegisterSchema = z.object({
-  username: z.string().min(3, "Tên đăng nhập phải có ít nhất 3 ký tự"),
-  email: z.string().email("Địa chỉ email không hợp lệ"),
+  username: z
+    .string()
+    .trim()
+    .min(3, "Tên đăng nhập phải có ít nhất 3 ký tự")
+    .regex(
+      USERNAME_PATTERN,
+      "Tên đăng nhập chỉ gồm chữ cái, số, dấu chấm, gạch dưới hoặc gạch ngang."
+    ),
+  email: z
+    .string()
+    .trim()
+    .min(1, "Vui lòng nhập địa chỉ email hợp lệ")
+    .pipe(z.email("Địa chỉ email không hợp lệ")),
   password: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự"),
-  fullName: z.string().min(1, "Họ và tên không được để trống"),
-  phone: z.string().optional(),
-  gender: z.number().optional(),
-  dateOfBirth: z.string().optional(),
+  fullName: z.string().trim().min(1, "Họ và tên không được để trống"),
+  phone: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => (value ? value : undefined)),
 });
 
 export type RegisterDto = z.infer<typeof RegisterSchema>;
+
+export const RegisterFormSchema = RegisterSchema.extend({
+  confirmPassword: z.string().min(1, "Vui lòng xác nhận mật khẩu"),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Mật khẩu xác nhận không khớp.",
+  path: ["confirmPassword"],
+});
+
+export type RegisterFormDto = z.infer<typeof RegisterFormSchema>;
 
 export const LoginResponseSchema = z.object({
   userId: z.union([z.string(), z.number()]).optional(),
@@ -123,4 +146,4 @@ export function profileDobToDateInput(iso?: string | null): string {
   if (!iso) return "";
   const m = String(iso).match(/^(\d{4}-\d{2}-\d{2})/);
   return m ? m[1] : "";
-}
+}
