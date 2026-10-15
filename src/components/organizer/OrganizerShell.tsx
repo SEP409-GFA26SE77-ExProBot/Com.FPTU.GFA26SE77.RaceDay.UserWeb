@@ -8,16 +8,11 @@ import { logout } from "@/api/auth";
 import { getEventById } from "@/api/events";
 import { getPackagePurchase } from "@/api/event-packages";
 import { mediaDisplayUrl } from "@/lib/media-url";
-import { mapAppRole } from "@/lib/role";
-import { Role } from "@/interfaces/role";
 import {
-  AlertTriangle,
   ArrowLeft,
-  Award,
   ChevronDown,
   ChevronRight,
   ClipboardCheck,
-  CreditCard,
   Flag,
   FolderOpen,
   LayoutDashboard,
@@ -26,9 +21,7 @@ import {
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
-  QrCode,
   History,
-  Ticket,
   User,
   Users,
   Wallet,
@@ -169,19 +162,15 @@ function eventWorkspaceGroups(eventId: string): NavGroup[] {
 function useLoggedInUser() {
   const [user, setUser] = useState({
     username: "User",
-    role: Role.RUNNER as string,
     initial: "U",
     avatarUrl: null as string | null,
   });
 
   useEffect(() => {
     const username = Cookies.get("username") || "User";
-    const rawRole = Cookies.get("role") || "";
-    const role = mapAppRole(rawRole || Role.RUNNER);
     const avatarUrl = Cookies.get("avatar_url") || null;
     setUser({
       username,
-      role,
       initial: username.charAt(0).toUpperCase() || "U",
       avatarUrl,
     });
@@ -229,7 +218,7 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
     "Chi tiết giải": true,
   });
   const userMenuRef = useRef<HTMLDivElement>(null);
-  const { username, role, initial, avatarUrl } = useLoggedInUser();
+  const { username, initial, avatarUrl } = useLoggedInUser();
   const avatarSrc = avatarUrl ? mediaDisplayUrl(avatarUrl) : null;
   const eventId = useMemo(() => eventIdFromPath(pathname), [pathname]);
   const groups = useMemo(
@@ -589,51 +578,6 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
                     Hồ sơ của tôi
                   </Link>
 
-                  {role === Role.RUNNER && (
-                    <>
-                      <Link
-                        href="/my-registrations"
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-800 transition-colors hover:bg-slate-50"
-                        onClick={closeUserMenu}
-                      >
-                        <Ticket className="h-4 w-4 text-slate-400" />
-                        Vé của tôi
-                      </Link>
-                      <Link
-                        href="/payments"
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-800 transition-colors hover:bg-slate-50"
-                        onClick={closeUserMenu}
-                      >
-                        <CreditCard className="h-4 w-4 text-slate-400" />
-                        Thanh toán
-                      </Link>
-                      <Link
-                        href="/certificates"
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-800 transition-colors hover:bg-slate-50"
-                        onClick={closeUserMenu}
-                      >
-                        <Award className="h-4 w-4 text-slate-400" />
-                        Chứng nhận
-                      </Link>
-                      <Link
-                        href="/disputes"
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-800 transition-colors hover:bg-slate-50"
-                        onClick={closeUserMenu}
-                      >
-                        <AlertTriangle className="h-4 w-4 text-slate-400" />
-                        Khiếu nại
-                      </Link>
-                      <Link
-                        href="/registered-events"
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-800 transition-colors hover:bg-slate-50"
-                        onClick={closeUserMenu}
-                      >
-                        <Flag className="h-4 w-4 text-slate-400" />
-                        Giải đã đăng ký
-                      </Link>
-                    </>
-                  )}
-
                   <Link
                     href="/my-events"
                     className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-800 transition-colors hover:bg-slate-50"
@@ -643,29 +587,15 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
                     Quản lý giải của tôi
                   </Link>
 
-                  {(role === Role.ADMIN || role === Role.COORDINATOR) && (
-                    <Link
-                      href="/event-admin"
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-800 transition-colors hover:bg-slate-50"
-                      onClick={closeUserMenu}
-                    >
-                      <LayoutDashboard className="h-4 w-4 text-slate-400" />
-                      Bảng điều khiển sự kiện
-                    </Link>
-                  )}
+                  <Link
+                    href="/wallet"
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-800 transition-colors hover:bg-slate-50"
+                    onClick={closeUserMenu}
+                  >
+                    <Wallet className="h-4 w-4 text-slate-400" />
+                    Ví & giải ngân
+                  </Link>
 
-                  {(role === Role.COORDINATOR ||
-                    role === Role.STAFF ||
-                    role === Role.ADMIN) && (
-                    <Link
-                      href="/scan-qr"
-                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-800 transition-colors hover:bg-slate-50"
-                      onClick={closeUserMenu}
-                    >
-                      <QrCode className="h-4 w-4 text-slate-400" />
-                      Quét QR Check-in
-                    </Link>
-                  )}
                 </div>
 
                 <div className="border-t border-slate-100 pt-1">

@@ -17,17 +17,16 @@ import {
   ChevronDown,
   Calendar,
   Trophy,
-  QrCode,
-  ShieldCheck,
-  LayoutDashboard,
   Camera,
   Award,
   CreditCard,
   Ticket,
   AlertTriangle,
   PlusCircle,
+  LayoutDashboard,
   Wallet,
 } from "lucide-react";
+import { extractRoleFromToken } from "@/lib/jwt";
 
 interface NavLink {
   label: string;
@@ -49,76 +48,37 @@ const NAV_LINKS: NavLink[] = [
   },
   { label: "Kết quả", href: "/results", icon: Trophy },
   { label: "Tìm ảnh", href: "/photos", icon: Camera },
-  {
-    label: "Quét QR",
-    href: "/scan-qr",
-    icon: QrCode,
-    roles: [Role.COORDINATOR, Role.STAFF, Role.ADMIN],
-  },
-  {
-    label: "Quản trị giải",
-    href: "/event-admin",
-    icon: LayoutDashboard,
-    roles: [Role.ADMIN, Role.COORDINATOR],
-  },
-  {
-    label: "Quản trị nhân sự",
-    href: "/staff-admin",
-    icon: ShieldCheck,
-    roles: [Role.ADMIN, Role.COORDINATOR],
-  },
 ];
 
 let cachedAuthRaw = "";
 let cachedAuthState = {
   isLoggedIn: false,
-  username: null as string | null,
+  username: null as string | null | undefined,
   role: null as string | null,
   avatarUrl: null as string | null,
 };
 
-function roleFromJwt(token: string): string | null {
-  try {
-    const parts = token.split(".");
-    if (parts.length < 2) return null;
-    const payload = JSON.parse(
-      atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"))
-    );
-    const raw =
-      payload.role ||
-      payload["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] ||
-      payload.roles?.[0] ||
-      (Array.isArray(payload.role) ? payload.role[0] : undefined);
-    if (typeof raw === "string" && raw.trim()) {
-      return raw.replace(/^ROLE_/i, "").trim().toUpperCase();
-    }
-  } catch {
-    /* ignore */
-  }
-  return null;
-}
-
 function getAuthSnapshot() {
-  const token = Cookies.get("access_token") || "";
-  const username = Cookies.get("username") || "Racer";
+  const accessToken = Cookies.get("accessToken") || "";
+  const username = Cookies.get("username");
   const rawRole = Cookies.get("role") || "";
   const avatarUrl = Cookies.get("avatar_url") || "";
   // USER (IAM) / trống → RUNNER để hiện Vé, Chứng nhận, menu runner
-  const role = token
-    ? mapAppRole(rawRole || roleFromJwt(token) || Role.RUNNER)
+  const role = accessToken
+    ? mapAppRole(rawRole || extractRoleFromToken(accessToken) || Role.RUNNER)
     : "";
   // Đồng bộ cookie nếu còn lưu USER cũ
-  if (token && rawRole && mapAppRole(rawRole) !== rawRole.toUpperCase()) {
+  if (accessToken && rawRole && mapAppRole(rawRole) !== rawRole.toUpperCase()) {
     Cookies.set("role", role, { sameSite: "lax", path: "/" });
   }
-  const raw = `${token}:${username}:${role}:${avatarUrl}`;
+  const raw = `${accessToken}:${username}:${role}:${avatarUrl}`;
   if (raw !== cachedAuthRaw) {
     cachedAuthRaw = raw;
     cachedAuthState = {
-      isLoggedIn: Boolean(token),
-      username: token ? username : null,
-      role: token && role ? role : null,
-      avatarUrl: token && avatarUrl ? avatarUrl : null,
+      isLoggedIn: Boolean(accessToken),
+      username: accessToken ? username : null,
+      role: accessToken && role ? role : null,
+      avatarUrl: accessToken && avatarUrl ? avatarUrl : null,
     };
   }
   return cachedAuthState;
@@ -149,7 +109,7 @@ function UserAvatarMark({
   sizeClass = "h-7 w-7",
   textClass = "text-xs",
 }: {
-  username: string | null;
+  username: string | null | undefined;
   avatarUrl: string | null;
   sizeClass?: string;
   textClass?: string;
@@ -180,7 +140,7 @@ export default function Header() {
   const { isLoggedIn, username, role, avatarUrl } = useSyncExternalStore(
     subscribeAuth,
     getAuthSnapshot,
-    () => SERVER_AUTH_SNAPSHOT
+    () => SERVER_AUTH_SNAPSHOT,
   );
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -302,7 +262,9 @@ export default function Header() {
               {userMenuOpen && (
                 <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-xl border border-border bg-card p-1.5 shadow-xl ring-1 ring-black/5 animate-in fade-in-0 zoom-in-95">
                   <div className="px-3 py-2 border-b border-border/60">
-                    <p className="text-xs text-muted-foreground">Đã đăng nhập với</p>
+                    <p className="text-xs text-muted-foreground">
+                      Đã đăng nhập với
+                    </p>
                     <p className="text-sm font-semibold text-foreground truncate">
                       {username}
                     </p>
@@ -318,7 +280,7 @@ export default function Header() {
                       Hồ sơ của tôi
                     </Link>
 
-                    {role === Role.RUNNER && (
+                    {isLoggedIn && (
                       <>
                         <Link
                           href="/my-registrations"
@@ -363,7 +325,7 @@ export default function Header() {
                       </>
                     )}
 
-                    {isLoggedIn && (
+                    {isLoggedIn && role === Role.ORGANIZER && (
                       <>
                         <Link
                           href="/my-events"
@@ -382,30 +344,6 @@ export default function Header() {
                           Ví & giải ngân
                         </Link>
                       </>
-                    )}
-
-                    {(role === Role.ADMIN || role === Role.COORDINATOR) && (
-                      <Link
-                        href="/event-admin"
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
-                        onClick={closeMenus}
-                      >
-                        <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
-                        Bảng điều khiển sự kiện
-                      </Link>
-                    )}
-
-                    {(role === Role.COORDINATOR ||
-                      role === Role.STAFF ||
-                      role === Role.ADMIN) && (
-                      <Link
-                        href="/scan-qr"
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
-                        onClick={closeMenus}
-                      >
-                        <QrCode className="h-4 w-4 text-muted-foreground" />
-                        Quét QR Check-in
-                      </Link>
                     )}
                   </div>
 
@@ -472,7 +410,7 @@ export default function Header() {
 
       {/* Mobile Drawer Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-border/60 bg-background/95 backdrop-blur-xl px-4 pt-3 pb-6 space-y-4 animate-in slide-in-from-top-4 duration-200">
+        <div className="md:hidden max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t border-border/60 bg-background/95 px-4 pt-3 pb-6 backdrop-blur-xl space-y-4 animate-in slide-in-from-top-4 duration-200">
           {isLoggedIn && (
             <div className="flex items-center justify-between rounded-xl bg-muted/60 p-3">
               <div className="flex items-center gap-3">
@@ -535,31 +473,92 @@ export default function Header() {
                   <User className="h-4 w-4" />
                   Hồ sơ của tôi
                 </Link>
-                {role === Role.RUNNER && (
+                <>
+                  <Link
+                    href="/my-registrations"
+                    onClick={closeMenus}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      pathname.startsWith("/my-registrations")
+                        ? "bg-orange-500/10 text-orange-600 font-semibold"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
+                    }`}
+                  >
+                    <Ticket className="h-4 w-4" />
+                    Vé của tôi
+                  </Link>
+                  <Link
+                    href="/payments"
+                    onClick={closeMenus}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      pathname.startsWith("/payments")
+                        ? "bg-orange-500/10 text-orange-600 font-semibold"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
+                    }`}
+                  >
+                    <CreditCard className="h-4 w-4 text-muted-foreground" />
+                    Thanh toán
+                  </Link>
+                  <Link
+                    href="/certificates"
+                    onClick={closeMenus}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      pathname.startsWith("/certificates")
+                        ? "bg-orange-500/10 text-orange-600 font-semibold"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
+                    }`}
+                  >
+                    <Award className="h-4 w-4" />
+                    Chứng nhận
+                  </Link>
+                  <Link
+                    href="/disputes"
+                    onClick={closeMenus}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      pathname.startsWith("/disputes")
+                        ? "bg-orange-500/10 text-orange-600 font-semibold"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
+                    }`}
+                  >
+                    <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                    Khiếu nại
+                  </Link>
+                  <Link
+                    href="/registered-events"
+                    onClick={closeMenus}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      pathname.startsWith("/registered-events")
+                        ? "bg-orange-500/10 text-orange-600 font-semibold"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
+                    }`}
+                  >
+                    <Flag className="h-4 w-4 text-muted-foreground" />
+                    Giải đã đăng ký
+                  </Link>
+                </>
+                {role === Role.ORGANIZER && (
                   <>
                     <Link
-                      href="/my-registrations"
-                      onClick={closeMenus}
+                      href="/my-events"
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                        pathname.startsWith("/my-registrations")
-                          ? "bg-orange-500/10 text-orange-600 font-semibold"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
-                      }`}
+                      pathname.startsWith("/my-events")
+                        ? "bg-orange-500/10 text-orange-600 font-semibold"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
+                    }`}
                     >
-                      <Ticket className="h-4 w-4" />
-                      Vé của tôi
+                      <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
+                      Quản lý giải của tôi
                     </Link>
                     <Link
-                      href="/certificates"
-                      onClick={closeMenus}
+                      href="/wallet"
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                        pathname.startsWith("/certificates")
-                          ? "bg-orange-500/10 text-orange-600 font-semibold"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
-                      }`}
+                      pathname.startsWith("/wallet")
+                        ? "bg-orange-500/10 text-orange-600 font-semibold"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
+                    }`}
+                      onClick={closeMenus}
                     >
-                      <Award className="h-4 w-4" />
-                      Chứng nhận
+                      <Wallet className="h-4 w-4 text-muted-foreground" />
+                      Ví & giải ngân
                     </Link>
                   </>
                 )}

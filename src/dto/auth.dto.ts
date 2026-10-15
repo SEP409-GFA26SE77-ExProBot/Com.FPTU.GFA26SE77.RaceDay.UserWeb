@@ -45,13 +45,10 @@ export type RegisterFormDto = z.infer<typeof RegisterFormSchema>;
 
 export const LoginResponseSchema = z.object({
   userId: z.union([z.string(), z.number()]).optional(),
-  user_id: z.union([z.string(), z.number()]).optional(),
   username: z.string().optional(),
   fullName: z.string().optional(),
   email: z.string().optional(),
-  token: z.string().optional(),
   accessToken: z.string().optional(),
-  expiredTime: z.number().optional(),
   role: z.string().optional(),
   mustChangePassword: z.boolean().optional(),
 });
