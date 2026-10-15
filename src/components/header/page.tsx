@@ -17,16 +17,12 @@ import {
   ChevronDown,
   Calendar,
   Trophy,
-  QrCode,
-  ShieldCheck,
-  LayoutDashboard,
   Camera,
   Award,
   CreditCard,
   Ticket,
   AlertTriangle,
   PlusCircle,
-  Wallet,
 } from "lucide-react";
 
 interface NavLink {
@@ -49,24 +45,6 @@ const NAV_LINKS: NavLink[] = [
   },
   { label: "Kết quả", href: "/results", icon: Trophy },
   { label: "Tìm ảnh", href: "/photos", icon: Camera },
-  {
-    label: "Quét QR",
-    href: "/scan-qr",
-    icon: QrCode,
-    roles: [Role.COORDINATOR, Role.STAFF, Role.ADMIN],
-  },
-  {
-    label: "Quản trị giải",
-    href: "/event-admin",
-    icon: LayoutDashboard,
-    roles: [Role.ADMIN, Role.COORDINATOR],
-  },
-  {
-    label: "Quản trị nhân sự",
-    href: "/staff-admin",
-    icon: ShieldCheck,
-    roles: [Role.ADMIN, Role.COORDINATOR],
-  },
 ];
 
 let cachedAuthRaw = "";
@@ -363,50 +341,6 @@ export default function Header() {
                       </>
                     )}
 
-                    {isLoggedIn && (
-                      <>
-                        <Link
-                          href="/my-events"
-                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
-                          onClick={closeMenus}
-                        >
-                          <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
-                          Quản lý giải của tôi
-                        </Link>
-                        <Link
-                          href="/wallet"
-                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
-                          onClick={closeMenus}
-                        >
-                          <Wallet className="h-4 w-4 text-muted-foreground" />
-                          Ví & giải ngân
-                        </Link>
-                      </>
-                    )}
-
-                    {(role === Role.ADMIN || role === Role.COORDINATOR) && (
-                      <Link
-                        href="/event-admin"
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
-                        onClick={closeMenus}
-                      >
-                        <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
-                        Bảng điều khiển sự kiện
-                      </Link>
-                    )}
-
-                    {(role === Role.COORDINATOR ||
-                      role === Role.STAFF ||
-                      role === Role.ADMIN) && (
-                      <Link
-                        href="/scan-qr"
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
-                        onClick={closeMenus}
-                      >
-                        <QrCode className="h-4 w-4 text-muted-foreground" />
-                        Quét QR Check-in
-                      </Link>
-                    )}
                   </div>
 
                   <div className="pt-1 border-t border-border/60">

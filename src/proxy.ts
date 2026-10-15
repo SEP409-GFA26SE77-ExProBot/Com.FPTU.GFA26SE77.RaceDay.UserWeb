@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Role } from "./interfaces/role";
-
-function mapAppRole(raw: string): string {
-    const r = raw.replace(/^ROLE_/i, "").trim().toUpperCase();
-    if (!r) return Role.RUNNER;
-    if (r === "USER" || r === "CUSTOMER" || r === "MEMBER") return Role.RUNNER;
-    // IAM seed "Volunteer" ↔ quyền staff vận hành
-    if (r === "VOLUNTEER") return Role.VOLUNTEER;
-    return r;
-}
+import { mapAppRole } from "./lib/role";
 
 const ROLE_PERMISSIONS: Record<string, (Role | string)[] | '*'> = {
     // Bất kỳ user đã login (account mới có thể chưa có cookie role)
@@ -23,9 +15,6 @@ const ROLE_PERMISSIONS: Record<string, (Role | string)[] | '*'> = {
     '/race-day': '*',
     // Tạo giải: đã login. Chi tiết quản lý giải chỉ qua /organizer/events/{id} (xem regex bên dưới)
     '/events/create': '*',
-    '/event-admin': [Role.ADMIN, Role.COORDINATOR],
-    '/staff-admin': [Role.ADMIN, Role.COORDINATOR],
-    '/scan-qr': [Role.ORGANIZER, Role.COORDINATOR, Role.STAFF, Role.VOLUNTEER, Role.PHOTOGRAPHER, Role.ADMIN],
     '/register-event': '*',
 };
 
@@ -105,17 +94,9 @@ export function proxy(request: NextRequest) {
     } else if (/^\/events\/create\/package-return(\/|$)/.test(pathname)) {
         // Return URL sau thanh toán gói tổ chức
         allowedRoles = '*';
-    } else if (
-        /^\/organizer\/events\/[^/]+\/?$/.test(pathname) ||
-        /^\/organizer\/events\/[^/]+\/(setup-map|race-simulation|staff|wallet|payout-history|profile)(\/.*)?$/.test(
-          pathname
-        )
-    ) {
-        // Chi tiết giải + Setup map + Race simulation — vào từ Giải của tôi
-        allowedRoles = '*';
     } else if (pathname === '/organizer' || pathname.startsWith('/organizer/')) {
-        // Chặn gõ URL portal organizer (approvals, module prototype, …)
-        return NextResponse.redirect(new URL('/403', request.url));
+        // Every organizer route requires the Organizer role.
+        allowedRoles = [Role.ORGANIZER];
     }
 
     if (allowedRoles) {
@@ -129,7 +110,11 @@ export function proxy(request: NextRequest) {
         // 2.2. Đã đăng nhập nhưng Role không nằm trong danh sách cho phép
         const isAllowed =
             allowedRoles === '*' ||
-            (Boolean(role) && allowedRoles.some((allowed) => allowed.toString().toUpperCase() === role));
+            (Boolean(role) &&
+                allowedRoles.some(
+                    (allowed) =>
+                        allowed.toString().toUpperCase() === role.toUpperCase()
+                ));
 
         if (!isAllowed) {
             // Đá sang trang báo lỗi 403 Forbidden hoặc về trang chủ của role đó

@@ -10,6 +10,7 @@ export function mapAppRole(raw: string | null | undefined): string {
     .trim()
     .toUpperCase();
   if (r === "USER" || r === "CUSTOMER" || r === "MEMBER") return Role.RUNNER;
+  if (r === "ORGANIZER") return Role.ORGANIZER;
   return r;
 }
 
