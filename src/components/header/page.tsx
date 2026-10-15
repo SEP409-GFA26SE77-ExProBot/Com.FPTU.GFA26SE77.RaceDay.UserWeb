@@ -23,7 +23,10 @@ import {
   Ticket,
   AlertTriangle,
   PlusCircle,
+  LayoutDashboard,
+  Wallet,
 } from "lucide-react";
+import { extractRoleFromToken } from "@/lib/jwt";
 
 interface NavLink {
   label: string;
@@ -62,7 +65,7 @@ function getAuthSnapshot() {
   const avatarUrl = Cookies.get("avatar_url") || "";
   // USER (IAM) / trống → RUNNER để hiện Vé, Chứng nhận, menu runner
   const role = accessToken
-    ? mapAppRole(rawRole || Role.RUNNER)
+    ? mapAppRole(rawRole || extractRoleFromToken(accessToken) || Role.RUNNER)
     : "";
   // Đồng bộ cookie nếu còn lưu USER cũ
   if (accessToken && rawRole && mapAppRole(rawRole) !== rawRole.toUpperCase()) {
@@ -137,7 +140,7 @@ export default function Header() {
   const { isLoggedIn, username, role, avatarUrl } = useSyncExternalStore(
     subscribeAuth,
     getAuthSnapshot,
-    () => SERVER_AUTH_SNAPSHOT
+    () => SERVER_AUTH_SNAPSHOT,
   );
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -259,7 +262,9 @@ export default function Header() {
               {userMenuOpen && (
                 <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-xl border border-border bg-card p-1.5 shadow-xl ring-1 ring-black/5 animate-in fade-in-0 zoom-in-95">
                   <div className="px-3 py-2 border-b border-border/60">
-                    <p className="text-xs text-muted-foreground">Đã đăng nhập với</p>
+                    <p className="text-xs text-muted-foreground">
+                      Đã đăng nhập với
+                    </p>
                     <p className="text-sm font-semibold text-foreground truncate">
                       {username}
                     </p>
@@ -275,7 +280,7 @@ export default function Header() {
                       Hồ sơ của tôi
                     </Link>
 
-                    {role === Role.RUNNER && (
+                    {isLoggedIn && (
                       <>
                         <Link
                           href="/my-registrations"
@@ -320,6 +325,26 @@ export default function Header() {
                       </>
                     )}
 
+                    {isLoggedIn && role === Role.ORGANIZER && (
+                      <>
+                        <Link
+                          href="/my-events"
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+                          onClick={closeMenus}
+                        >
+                          <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
+                          Quản lý giải của tôi
+                        </Link>
+                        <Link
+                          href="/wallet"
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+                          onClick={closeMenus}
+                        >
+                          <Wallet className="h-4 w-4 text-muted-foreground" />
+                          Ví & giải ngân
+                        </Link>
+                      </>
+                    )}
                   </div>
 
                   <div className="pt-1 border-t border-border/60">
@@ -385,7 +410,7 @@ export default function Header() {
 
       {/* Mobile Drawer Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-border/60 bg-background/95 backdrop-blur-xl px-4 pt-3 pb-6 space-y-4 animate-in slide-in-from-top-4 duration-200">
+        <div className="md:hidden max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t border-border/60 bg-background/95 px-4 pt-3 pb-6 backdrop-blur-xl space-y-4 animate-in slide-in-from-top-4 duration-200">
           {isLoggedIn && (
             <div className="flex items-center justify-between rounded-xl bg-muted/60 p-3">
               <div className="flex items-center gap-3">
@@ -448,31 +473,92 @@ export default function Header() {
                   <User className="h-4 w-4" />
                   Hồ sơ của tôi
                 </Link>
-                {role === Role.RUNNER && (
+                <>
+                  <Link
+                    href="/my-registrations"
+                    onClick={closeMenus}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      pathname.startsWith("/my-registrations")
+                        ? "bg-orange-500/10 text-orange-600 font-semibold"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
+                    }`}
+                  >
+                    <Ticket className="h-4 w-4" />
+                    Vé của tôi
+                  </Link>
+                  <Link
+                    href="/payments"
+                    onClick={closeMenus}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      pathname.startsWith("/payments")
+                        ? "bg-orange-500/10 text-orange-600 font-semibold"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
+                    }`}
+                  >
+                    <CreditCard className="h-4 w-4 text-muted-foreground" />
+                    Thanh toán
+                  </Link>
+                  <Link
+                    href="/certificates"
+                    onClick={closeMenus}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      pathname.startsWith("/certificates")
+                        ? "bg-orange-500/10 text-orange-600 font-semibold"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
+                    }`}
+                  >
+                    <Award className="h-4 w-4" />
+                    Chứng nhận
+                  </Link>
+                  <Link
+                    href="/disputes"
+                    onClick={closeMenus}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      pathname.startsWith("/disputes")
+                        ? "bg-orange-500/10 text-orange-600 font-semibold"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
+                    }`}
+                  >
+                    <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                    Khiếu nại
+                  </Link>
+                  <Link
+                    href="/registered-events"
+                    onClick={closeMenus}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      pathname.startsWith("/registered-events")
+                        ? "bg-orange-500/10 text-orange-600 font-semibold"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
+                    }`}
+                  >
+                    <Flag className="h-4 w-4 text-muted-foreground" />
+                    Giải đã đăng ký
+                  </Link>
+                </>
+                {role === Role.ORGANIZER && (
                   <>
                     <Link
-                      href="/my-registrations"
-                      onClick={closeMenus}
+                      href="/my-events"
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                        pathname.startsWith("/my-registrations")
-                          ? "bg-orange-500/10 text-orange-600 font-semibold"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
-                      }`}
+                      pathname.startsWith("/my-events")
+                        ? "bg-orange-500/10 text-orange-600 font-semibold"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
+                    }`}
                     >
-                      <Ticket className="h-4 w-4" />
-                      Vé của tôi
+                      <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
+                      Quản lý giải của tôi
                     </Link>
                     <Link
-                      href="/certificates"
-                      onClick={closeMenus}
+                      href="/wallet"
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                        pathname.startsWith("/certificates")
-                          ? "bg-orange-500/10 text-orange-600 font-semibold"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
-                      }`}
+                      pathname.startsWith("/wallet")
+                        ? "bg-orange-500/10 text-orange-600 font-semibold"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
+                    }`}
+                      onClick={closeMenus}
                     >
-                      <Award className="h-4 w-4" />
-                      Chứng nhận
+                      <Wallet className="h-4 w-4 text-muted-foreground" />
+                      Ví & giải ngân
                     </Link>
                   </>
                 )}
