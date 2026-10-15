@@ -144,19 +144,19 @@ export default function RegistrationReviewModal({
                 <Fact label="Email" value={r.email || "—"} />
                 <Fact label="SĐT" value={r.phone || "—"} />
                 <Fact label="Ngày sinh" value={r.dateOfBirth || "—"} />
-                <Fact label="Giới tính" value={r.gender || "—"} />
-                <Fact label="CCCD/CMND" value={r.idNumber || "—"} />
                 <Fact
-                  label="Chiều cao / cân nặng"
+                  label="Giới tính"
                   value={
-                    r.heightCm || r.weightKg
-                      ? `${r.heightCm ? `${r.heightCm} cm` : "—"} / ${
-                          r.weightKg ? `${r.weightKg} kg` : "—"
-                        }`
-                      : "—"
+                    r.gender === "Male"
+                      ? "Nam"
+                      : r.gender === "Female"
+                        ? "Nữ"
+                        : r.gender || "—"
                   }
                 />
+                <Fact label="CCCD/CMND" value={r.idNumber || "—"} />
                 <Fact label="Nhóm máu" value={r.bloodType || "—"} />
+                <Fact label="Tên trên BIB" value={r.bibName?.trim() || "—"} />
               </div>
 
               <div className="space-y-2 rounded-xl border border-border/50 bg-card p-3">
@@ -164,6 +164,7 @@ export default function RegistrationReviewModal({
                   Liên hệ khẩn cấp
                 </p>
                 <DetailRow label="Người liên hệ" value={r.emergencyName} />
+                <DetailRow label="Mối quan hệ" value={r.emergencyRelation} />
                 <DetailRow label="SĐT" value={r.emergencyPhone} />
               </div>
 
@@ -206,6 +207,16 @@ export default function RegistrationReviewModal({
                     </span>
                   )}
                 </div>
+                <DetailRow
+                  label="Điều khoản trách nhiệm"
+                  value={
+                    r.liabilityAccepted === true
+                      ? "Đã chấp nhận"
+                      : r.liabilityAccepted === false
+                        ? "Chưa chấp nhận"
+                        : undefined
+                  }
+                />
               </div>
             </section>
 

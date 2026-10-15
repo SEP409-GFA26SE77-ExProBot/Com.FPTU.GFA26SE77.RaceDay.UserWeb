@@ -30,6 +30,7 @@ export const LoginResponseSchema = z.object({
   accessToken: z.string().optional(),
   expiredTime: z.number().optional(),
   role: z.string().optional(),
+  mustChangePassword: z.boolean().optional(),
 });
 
 export type LoginResponse = z.infer<typeof LoginResponseSchema>;
@@ -75,7 +76,7 @@ export const ChangePasswordSchema = z.object({
 
 export type ChangePasswordDto = z.infer<typeof ChangePasswordSchema>;
 
-/** GET api/v1/iam/me */
+/** GET / PUT api/v1/iam/me */
 export interface MyProfileDto {
   id: string;
   email: string;
@@ -87,4 +88,39 @@ export interface MyProfileDto {
   gender: number | string;
   status?: number | string;
   emailVerified?: boolean;
+  /** URL ảnh đại diện (R2 / uploads/avatars) */
+  avatarUrl?: string | null;
+}
+
+/** Body PUT api/v1/iam/me */
+export interface UpdateMyProfileDto {
+  fullName: string;
+  phone?: string | null;
+  dateOfBirth?: string | null;
+  /** 0 Unknown | 1 Male | 2 Female */
+  gender?: number;
+  avatarUrl?: string | null;
+}
+
+export function genderToApiNumber(gender: unknown): number {
+  if (typeof gender === "number" && Number.isFinite(gender)) return gender;
+  const s = String(gender ?? "").trim().toLowerCase();
+  if (s === "1" || s === "male" || s === "nam") return 1;
+  if (s === "2" || s === "female" || s === "nữ" || s === "nu") return 2;
+  return 0;
+}
+
+/** Map gender API → giá trị form đăng ký (Male | Female | Other). */
+export function genderToFormValue(gender: unknown): string {
+  const n = genderToApiNumber(gender);
+  if (n === 1) return "Male";
+  if (n === 2) return "Female";
+  if (n === 0) return "";
+  return "Other";
+}
+
+export function profileDobToDateInput(iso?: string | null): string {
+  if (!iso) return "";
+  const m = String(iso).match(/^(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : "";
 }

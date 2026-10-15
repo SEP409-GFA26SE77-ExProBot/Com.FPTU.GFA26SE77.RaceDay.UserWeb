@@ -20,6 +20,7 @@ import {
 import { submitRaceEvent } from "@/api/organizer";
 import { listEventStaff } from "@/api/event-staff";
 import { hasEventCourse } from "@/api/race-map";
+import OrganizerEventStatusModal from "@/components/events/OrganizerEventStatusModal";
 import type { RaceEventDto, TicketPricingDto } from "@/dto/event.dto";
 import { getApiErrorMessage } from "@/lib/error";
 import { getOrganizerStatusLabel, getStatusColor } from "@/lib/format";
@@ -28,7 +29,6 @@ import {
   canSubmitForApproval,
   PROFILE_DOC_TYPES,
   statusKey,
-  utcToLocalInput,
 } from "../_shared";
 
 type CheckItem = {
@@ -107,6 +107,7 @@ export default function ProfileOpenRegClient() {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [acting, setActing] = useState(false);
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
 
   const notify = (msg: string) => {
     setToast(msg);
@@ -223,7 +224,7 @@ export default function ProfileOpenRegClient() {
   const canSubmit = event ? canSubmitForApproval(event.status) : false;
   const isPending =
     sk === "pending" || sk === "pending-approval";
-
+  const isRejected = sk === "rejected";
   const handleSubmitApproval = async () => {
     if (!canSubmit || acting) return;
     if (!requiredReady) {
@@ -301,11 +302,22 @@ export default function ProfileOpenRegClient() {
             Hồ sơ giải
           </p>
           <h1 className="mt-1 text-2xl font-extrabold">Xét mở chính thức</h1>
-          <span
-            className={`mt-2 inline-flex rounded-md border px-2.5 py-1 text-[11px] font-extrabold ${getStatusColor(event.status)}`}
-          >
-            {getOrganizerStatusLabel(event.status)}
-          </span>
+          {isRejected ? (
+            <button
+              type="button"
+              onClick={() => setStatusModalOpen(true)}
+              className={`mt-2 inline-flex rounded-md border px-2.5 py-1 text-[11px] font-extrabold transition hover:ring-2 hover:ring-red-300 ${getStatusColor(event.status)}`}
+              title="Xem lý do từ chối & hồ sơ xét duyệt"
+            >
+              {getOrganizerStatusLabel(event.status)}
+            </button>
+          ) : (
+            <span
+              className={`mt-2 inline-flex rounded-md border px-2.5 py-1 text-[11px] font-extrabold ${getStatusColor(event.status)}`}
+            >
+              {getOrganizerStatusLabel(event.status)}
+            </span>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           {canSubmit && (
@@ -365,6 +377,28 @@ export default function ProfileOpenRegClient() {
         </div>
       </div>
 
+      {isRejected && (
+        <button
+          type="button"
+          onClick={() => setStatusModalOpen(true)}
+          className="flex w-full items-start gap-3 rounded-xl border border-red-500/25 bg-red-500/5 p-4 text-left transition hover:border-red-400 hover:bg-red-500/10"
+        >
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-red-700">
+              Hồ sơ bị từ chối — xem xét duyệt
+            </p>
+            <p className="mt-1 text-sm text-red-600/95">
+              {event.rejectionReason?.trim() ||
+                "Admin đã từ chối hồ sơ. Bấm để xem chi tiết xét duyệt và lý do."}
+            </p>
+            <p className="mt-2 text-xs font-semibold text-orange-600 underline underline-offset-2">
+              Mở mục xét duyệt →
+            </p>
+          </div>
+        </button>
+      )}
+
       {toast && (
         <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
           <CheckCircle2 className="h-4 w-4" />
@@ -382,20 +416,15 @@ export default function ProfileOpenRegClient() {
         <h2 className="text-sm font-bold">Lịch đăng ký</h2>
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 text-sm">
           <div className="rounded-xl bg-muted/40 px-4 py-3">
-            <p className="text-xs text-muted-foreground">Mở ĐK (lịch)</p>
+            <p className="text-xs text-muted-foreground">Giờ mở đăng ký</p>
             <p className="mt-1 font-semibold">
               {event.registrationOpensAtUtc
                 ? new Date(event.registrationOpensAtUtc).toLocaleString("vi-VN")
                 : "— Chưa đặt"}
             </p>
-            {event.registrationOpensAtUtc && (
-              <p className="mt-0.5 text-[11px] text-muted-foreground">
-                Local: {utcToLocalInput(event.registrationOpensAtUtc)}
-              </p>
-            )}
           </div>
           <div className="rounded-xl bg-muted/40 px-4 py-3">
-            <p className="text-xs text-muted-foreground">Đóng ĐK (lịch)</p>
+            <p className="text-xs text-muted-foreground">Giờ đóng đăng ký</p>
             <p className="mt-1 font-semibold">
               {event.registrationClosesAtUtc
                 ? new Date(event.registrationClosesAtUtc).toLocaleString("vi-VN")
@@ -404,24 +433,24 @@ export default function ProfileOpenRegClient() {
           </div>
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
-          Khi giải đã <strong>Approved</strong>, job hệ thống tự mở ĐK lúc{" "}
-          <code>registrationOpensAtUtc</code> và tự đóng lúc{" "}
-          <code>registrationClosesAtUtc</code>. Nút bên trên mở/đóng thủ công.
+          Sau khi admin duyệt giải, hệ thống sẽ tự mở / đóng đăng ký đúng lịch đã
+          đặt. Bạn vẫn có thể mở hoặc đóng thủ công bằng nút bên trên.
         </p>
         {canSubmit && (
           <p className="mt-2 text-xs font-medium text-amber-700">
-            Checklist xong → bấm <strong>Gửi admin duyệt giải</strong>. Sau khi
-            admin Approved mới mở được ĐK.
+            Hoàn tất checklist → bấm <strong>Gửi admin duyệt giải</strong>. Chỉ
+            sau khi admin duyệt mới mở được đăng ký.
           </p>
         )}
         {isPending && (
           <p className="mt-2 text-xs font-medium text-amber-700">
-            Hồ sơ đã gửi — chờ admin duyệt. Không cần gửi lại trừ khi bị từ chối.
+            Hồ sơ đã gửi — đang chờ admin duyệt. Không cần gửi lại trừ khi bị từ
+            chối.
           </p>
         )}
         {sk === "approved" && (
           <p className="mt-2 text-xs font-medium text-emerald-700">
-            Admin đã duyệt — có thể mở ĐK thủ công hoặc chờ lịch tự mở.
+            Admin đã duyệt — có thể mở đăng ký thủ công hoặc chờ lịch tự mở.
           </p>
         )}
       </section>
@@ -432,22 +461,31 @@ export default function ProfileOpenRegClient() {
           {checks.map((c) => (
             <li
               key={c.id}
-              className="flex items-center justify-between gap-3 rounded-xl border border-border/50 px-3 py-2.5"
+              className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 ${
+                c.ok
+                  ? "border-border/50"
+                  : "border-amber-300/80 bg-amber-50/60"
+              }`}
             >
               <div className="flex items-center gap-2 text-sm">
                 {c.ok ? (
                   <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
                 ) : (
-                  <Circle className="h-4 w-4 shrink-0 text-slate-300" />
+                  <Circle className="h-4 w-4 shrink-0 text-amber-500" />
                 )}
-                <span className={c.ok ? "text-foreground" : "text-muted-foreground"}>
+                <span className={c.ok ? "text-foreground" : "font-medium text-amber-900"}>
                   {c.label}
+                  {c.id === "window" && !c.ok ? (
+                    <span className="ml-1 font-normal text-muted-foreground">
+                      (khuyến nghị)
+                    </span>
+                  ) : null}
                 </span>
               </div>
               {c.href && !c.ok && (
                 <Link
                   href={c.href}
-                  className="text-xs font-bold text-orange-600 hover:underline"
+                  className="shrink-0 text-xs font-bold text-orange-600 hover:underline"
                 >
                   Bổ sung
                 </Link>
@@ -455,18 +493,29 @@ export default function ProfileOpenRegClient() {
             </li>
           ))}
         </ul>
-        {!requiredReady && canSubmit && (
-          <p className="mt-3 text-xs text-amber-700">
-            Hoàn thành các mục bắt buộc (trừ khuyến nghị lịch ĐK) trước khi gửi
-            admin duyệt.
-          </p>
-        )}
-        {!requiredReady && canOpenRegistration(event.status) && (
-          <p className="mt-3 text-xs text-amber-700">
-            Hoàn thành các mục bắt buộc trước khi mở ĐK thủ công.
+        {isRejected && (
+          <p className="mt-3 text-xs text-red-700">
+            Hồ sơ bị từ chối: sửa theo lý do admin, đủ checklist, rồi bấm{" "}
+            <span className="font-bold">Gửi admin duyệt giải</span> lại.{" "}
+            <button
+              type="button"
+              onClick={() => setStatusModalOpen(true)}
+              className="font-bold text-orange-600 underline underline-offset-2"
+            >
+              Xem lại xét duyệt
+            </button>
           </p>
         )}
       </section>
+
+      {statusModalOpen ? (
+        <OrganizerEventStatusModal
+          eventId={eventId}
+          listStatus={event.status}
+          open
+          onClose={() => setStatusModalOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -17,12 +17,17 @@ export interface ApiRegistration {
   bloodType?: string | null;
   emergencyName?: string | null;
   emergencyPhone?: string | null;
+  /** Ba/Mẹ | Chồng/Vợ | Anh/Chị/Em | Người thân | Bạn bè */
+  emergencyRelation?: string | null;
   shirtType?: string | null;
   shirtSize?: string | null;
   shirtColor?: string | null;
+  /** Tên in trên BIB (khác số BIB) */
+  bibName?: string | null;
   medicalCodes?: string[] | unknown | null;
   healthCertFileName?: string | null;
   healthCertUrl?: string | null;
+  liabilityAccepted?: boolean | null;
   bibNumber?: string | null;
   rejectionReason?: string | null;
   /** Người duyệt / từ chối (nếu BE trả) */
@@ -121,12 +126,14 @@ export interface CreateRaceEventRequest {
   submitForApproval: boolean;
 }
 
+/** Lựa chọn vật phẩm bổ sung (bib/áo/chip…) — lưu local / hồ sơ */
 export interface ProfileAdditionDto {
   selectedItems?: string[];
   notes?: string;
   [key: string]: unknown;
 }
 
+/** Vật phẩm tiếp tế theo thùng */
 export interface EventSupplyItemDto {
   id: string;
   name: string;

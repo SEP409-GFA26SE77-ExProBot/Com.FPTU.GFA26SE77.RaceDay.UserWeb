@@ -21,12 +21,25 @@ export const MSG = {
   phone: "Số điện thoại không hợp lệ.",
   dateOfBirth: "Ngày sinh không hợp lệ.",
   idNumber: "Số CCCD/CMND phải gồm 9 hoặc 12 chữ số.",
+  idNumberRequired: "Vui lòng nhập số CCCD / hộ chiếu.",
   bloodType: "Nhóm máu không hợp lệ (VD: O, A, B, AB hoặc O+/A-/…).",
+  bloodTypeRequired: "Vui lòng chọn nhóm máu.",
   gender: "Giới tính không hợp lệ (Male/Female/Other hoặc Nam/Nữ).",
   height: `Chiều cao phải từ ${MIN_HEIGHT_CM}–${MAX_HEIGHT_CM} cm.`,
   weight: `Cân nặng phải từ ${MIN_WEIGHT_KG}–${MAX_WEIGHT_KG} kg.`,
   liability: "Cần chấp nhận điều khoản trách nhiệm.",
+  paymentTerms: "Cần chấp nhận điều khoản thanh toán.",
+  emergencyRelation: "Vui lòng chọn mối quan hệ.",
+  emergencyPhoneSame:
+    "SĐT liên hệ khẩn cấp không được trùng số điện thoại của người tham gia.",
 } as const;
+
+/** So khớp SĐT VN kể cả dạng 0… / +84… */
+export function phonesMatch(a: string, b: string): boolean {
+  const na = normalizePhone(a).replace(/^\+84/, "0");
+  const nb = normalizePhone(b).replace(/^\+84/, "0");
+  return Boolean(na) && na === nb;
+}
 
 export function normalizePhone(phone: string): string {
   return phone.trim().replace(/[\s.\-()]/g, "");
@@ -74,6 +87,11 @@ export function isValidDateOfBirth(isoDate: string, today = new Date()): boolean
 export function isValidOptionalIdNumber(idNumber: string): boolean {
   const t = idNumber.trim();
   return !t || VN_ID.test(t);
+}
+
+export function isValidRequiredIdNumber(idNumber: string): boolean {
+  const t = idNumber.trim();
+  return Boolean(t) && VN_ID.test(t);
 }
 
 export function isValidOptionalBloodType(bloodType: string): boolean {

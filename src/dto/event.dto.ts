@@ -138,8 +138,12 @@ export interface RaceEventListItemDto {
   registrationOpensAtUtc?: string | null;
   totalRunners?: number;
   activeRunners?: number;
-  /** List API đôi khi trả mảng string thay vì full distances */
+  /** Chip labels (tên cự ly) — trước đây từng là type mặt đường "road" */
   distanceTypes?: string[];
+  /** Km thực tế từ list API — dùng filter bucket */
+  distanceKms?: number[];
+  /** Giá thấp nhất hiện tại (phase/base) — list API; dùng filter giá */
+  minPrice?: number | null;
   organizerName?: string;
   distances?: EventDistanceDto[];
   organizer?: OrganizerInfoDto;
@@ -158,9 +162,13 @@ export interface CreateRegistrationDto {
   bloodType?: string;
   emergencyName: string;
   emergencyPhone: string;
+  /** Ba/Mẹ | Chồng/Vợ | Anh/Chị/Em | Người thân | Bạn bè */
+  emergencyRelation?: string;
   shirtType?: string;
   shirtSize?: string;
   shirtColor?: string;
+  /** Tên in trên BIB */
+  bibName?: string;
   medicalCodes?: string[];
   healthCertFileName?: string;
   healthCertUrl?: string;
@@ -184,9 +192,11 @@ export interface RegistrationDto {
   bloodType?: string;
   emergencyName?: string;
   emergencyPhone?: string;
+  emergencyRelation?: string;
   shirtType?: string;
   shirtSize?: string;
   shirtColor?: string;
+  bibName?: string;
   medicalCodes?: string[];
   healthCertFileName?: string;
   healthCertUrl?: string;
@@ -201,6 +211,9 @@ export interface RegistrationDto {
   updatedAt?: string;
   createdAtUtc?: string;
   updatedAtUtc?: string;
+  /** UTC khi staff quét QR check-in (confirmed) */
+  checkedInAtUtc?: string | null;
+  checkedInByUserId?: string | null;
   // Populated by BE join
   eventName?: string;
   distanceName?: string;

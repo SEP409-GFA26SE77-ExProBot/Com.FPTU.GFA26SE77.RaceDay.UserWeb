@@ -208,7 +208,14 @@ export default function MyRegistrationsPage() {
                 ))
               : pager.pageItems.map((reg) => {
                   const event = eventMap[String(reg.eventId)];
-                  const price = reg.distancePrice ?? 0;
+                  const price =
+                    (typeof reg.price === "number" && Number.isFinite(reg.price)
+                      ? reg.price
+                      : null) ??
+                    (typeof reg.distancePrice === "number" &&
+                    Number.isFinite(reg.distancePrice)
+                      ? reg.distancePrice
+                      : 0);
                   const statusLine = reg.bibNumber
                     ? `BIB ${reg.bibNumber} · ${getRegistrationStatusLabel(reg.status)}`
                     : getRegistrationStatusLabel(reg.status);

@@ -19,24 +19,34 @@ import PageLoading from "@/components/ui/PageLoading";
 import Pagination from "@/components/ui/Pagination";
 import { usePagedList } from "@/hooks/usePagedList";
 import { getApiErrorMessage } from "@/lib/error";
+import {
+  DISTANCE_BUCKETS,
+  eventDistanceKms,
+  matchesDistanceBucket,
+  type DistanceBucketKey,
+} from "@/lib/distance-buckets";
+import {
+  isEventEnded,
+  isEventStarted,
+  isPublicRegistrationLive,
+} from "@/lib/event-lifecycle";
+import {
+  eventMatchesProvince,
+  matchVnProvince,
+  VN_PROVINCES,
+} from "@/lib/vn-provinces";
 
 const PAGE_SIZE = 6;
 
-/** Chỉ trạng thái giải (góc nhìn VĐV khám phá) */
+/**
+ * Trang public khám phá: không có “đã kết thúc”.
+ * “Đang diễn ra” giữ lại vì RaceDay có race-day / live (giống finder có live race).
+ */
 const STATUS_FILTERS = [
   { key: "all", label: "Tất cả" },
   { key: "registration-open", label: "Đang mở" },
   { key: "upcoming", label: "Sắp mở" },
-  { key: "ended", label: "Đã đóng / kết thúc" },
-] as const;
-
-const TYPE_FILTERS = [
-  { key: "trail", label: "Trail" },
-  { key: "ultra", label: "Ultra" },
-  { key: "núi", label: "Núi" },
-  { key: "đường-phố", label: "Đường phố" },
-  { key: "chạy-đêm", label: "Chạy đêm" },
-  { key: "biển", label: "Biển / Đảo" },
+  { key: "in-progress", label: "Đang diễn ra" },
 ] as const;
 
 const PRICE_FILTERS = [
@@ -47,67 +57,63 @@ const PRICE_FILTERS = [
 ] as const;
 
 type StatusKey = (typeof STATUS_FILTERS)[number]["key"];
-type TypeKey = (typeof TYPE_FILTERS)[number]["key"] | "all";
 type PriceKey = (typeof PRICE_FILTERS)[number]["key"];
 
 function normalizeEventStatus(status: string): string {
   return (status || "").toLowerCase().replace(/_/g, "-");
 }
 
-function matchesEventStatus(statusRaw: string, filter: StatusKey): boolean {
-  if (filter === "all") return true;
-  const status = normalizeEventStatus(statusRaw);
-  if (filter === "registration-open") return status === "registration-open";
-  if (filter === "upcoming") {
-    // Sắp mở: đã duyệt / chưa tới cửa sổ ĐK (không gồm pending hồ sơ)
-    return (
-      status === "upcoming" ||
-      status === "approved" ||
-      status === "published"
-    );
+/** Giải còn hiện trên trang khám phá (bỏ completed / quá ngày / hủy). */
+function isDiscoverablePublicEvent(event: RaceEventListItemDto): boolean {
+  const sk = normalizeEventStatus(event.status);
+  if (
+    sk === "completed" ||
+    sk === "cancelled" ||
+    sk === "rejected" ||
+    sk === "draft" ||
+    sk === "pending" ||
+    sk === "pending-approval"
+  ) {
+    return false;
   }
-  // ended: đóng ĐK / kết thúc / hết slot / hủy
+  if (isEventEnded(event)) return false;
+  return true;
+}
+
+function matchesEventStatus(
+  event: RaceEventListItemDto,
+  filter: StatusKey
+): boolean {
+  if (filter === "all") return true;
+  if (filter === "registration-open") return isPublicRegistrationLive(event);
+  if (filter === "in-progress") {
+    const sk = normalizeEventStatus(event.status);
+    return isEventStarted(event) || sk === "in-progress";
+  }
+  // upcoming: chưa mở ĐK live, chưa tới race day
+  if (isPublicRegistrationLive(event) || isEventStarted(event)) return false;
+  const sk = normalizeEventStatus(event.status);
   return (
-    status === "closed" ||
-    status === "completed" ||
-    status === "sold-out" ||
-    status === "cancelled" ||
-    status === "rejected"
+    sk === "upcoming" ||
+    sk === "approved" ||
+    sk === "published" ||
+    sk === "registration-open" ||
+    sk === "closed"
   );
 }
 
-function eventCity(event: RaceEventListItemDto): string {
-  const parts = (event.location || "").split(",").map((s) => s.trim());
-  return parts[parts.length - 1] || event.location || "Khác";
-}
-
 function minEventPrice(event: RaceEventListItemDto): number | null {
-  const distances = event.distances || [];
-  if (!distances.length) return null;
-  return Math.min(...distances.map((d) => d.price));
-}
-
-function matchesType(event: RaceEventListItemDto, typeFilter: TypeKey): boolean {
-  if (typeFilter === "all") return true;
-  const hay = `${event.name} ${event.tagline || ""} ${event.location || ""}`.toLowerCase();
-  switch (typeFilter) {
-    case "trail":
-      return /trail|địa hình/.test(hay);
-    case "ultra":
-      return /ultra|70k|100k/.test(hay);
-    case "núi":
-      return /núi|mountain|sapa|sa pa|hoàng liên/.test(hay);
-    case "đường-phố":
-      return /city|đường phố|night run|lakeside|hanoi|hcmc|hồ chí minh|nguyễn huệ/.test(
-        hay
-      );
-    case "chạy-đêm":
-      return /đêm|night|night run/.test(hay);
-    case "biển":
-      return /biển|đảo|ocean|nha trang|ven biển|island/.test(hay);
-    default:
-      return true;
+  if (typeof event.minPrice === "number" && Number.isFinite(event.minPrice)) {
+    return event.minPrice;
   }
+  const distances = event.distances || [];
+  if (distances.length) {
+    const prices = distances
+      .map((d) => Number(d.price))
+      .filter((p) => Number.isFinite(p) && p >= 0);
+    if (prices.length) return Math.min(...prices);
+  }
+  return null;
 }
 
 function FilterChip({
@@ -143,8 +149,8 @@ function EventsClientInner() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusKey>("all");
-  const [typeFilter, setTypeFilter] = useState<TypeKey>("all");
-  const [cityFilter, setCityFilter] = useState<string>("all");
+  const [distanceFilter, setDistanceFilter] = useState<DistanceBucketKey>("all");
+  const [provinceFilter, setProvinceFilter] = useState<string>("all");
   const [priceFilter, setPriceFilter] = useState<PriceKey>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -174,70 +180,96 @@ function EventsClientInner() {
   useEffect(() => {
     if (!tagFromUrl) return;
     const isStatus = STATUS_FILTERS.some((f) => f.key === tagFromUrl);
+    const isDistance = DISTANCE_BUCKETS.some((f) => f.key === tagFromUrl);
     if (isStatus) setStatusFilter(tagFromUrl as StatusKey);
-    else if (tagFromUrl === "registered") {
-      /* legacy query — bỏ filter ĐK trên trang khám phá */
-    } else setTypeFilter(tagFromUrl as TypeKey);
+    else if (isDistance) setDistanceFilter(tagFromUrl as DistanceBucketKey);
+    else if (tagFromUrl === "registered" || tagFromUrl === "ended") {
+      /* legacy — trang public không filter ĐK / đã kết thúc */
+    }
     setFiltersOpen(true);
   }, [tagFromUrl]);
 
-  const cityOptions = useMemo(
-    () =>
-      Array.from(new Set(catalog.map(eventCity))).sort((a, b) =>
-        a.localeCompare(b, "vi")
-      ),
+  /** Catalog public: bỏ giải đã kết thúc / hủy */
+  const discoverable = useMemo(
+    () => catalog.filter(isDiscoverablePublicEvent),
     [catalog]
   );
+
+  /** 34 tỉnh/thành (sau sáp nhập) + số giải đang khám phá được */
+  const provinceOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const event of discoverable) {
+      const p = matchVnProvince(event.location || "");
+      if (!p) continue;
+      counts.set(p.key, (counts.get(p.key) || 0) + 1);
+    }
+    return VN_PROVINCES.map((p) => ({
+      ...p,
+      count: counts.get(p.key) || 0,
+    })).sort((a, b) => a.label.localeCompare(b.label, "vi"));
+  }, [discoverable]);
 
   const filtered = useMemo(() => {
     const priceBand =
       PRICE_FILTERS.find((p) => p.key === priceFilter) ?? PRICE_FILTERS[0];
-    const list = catalog.filter((event) => {
+    const list = discoverable.filter((event) => {
       const q = searchQuery.toLowerCase();
       const matchesSearch =
         !q ||
         event.name.toLowerCase().includes(q) ||
-        (event.location || "").toLowerCase().includes(q) ||
-        eventCity(event).toLowerCase().includes(q);
+        (event.location || "").toLowerCase().includes(q);
 
-      const matchesStatus = matchesEventStatus(event.status, statusFilter);
-      const matchesTypeOk = matchesType(event, typeFilter);
-      const matchesCity =
-        cityFilter === "all" || eventCity(event) === cityFilter;
+      const matchesStatus = matchesEventStatus(event, statusFilter);
+      const matchesDistance = matchesDistanceBucket(
+        eventDistanceKms(event),
+        distanceFilter
+      );
+      const matchesProvince = eventMatchesProvince(
+        event.location || "",
+        provinceFilter
+      );
 
       const price = minEventPrice(event);
+      // Không có giá → không khớp band cụ thể (tránh mọi filter đều pass).
       const matchesPrice =
-        priceFilter === "all" ||
-        price == null ||
-        (price >= priceBand.min && price <= priceBand.max);
+        priceFilter === "all"
+          ? true
+          : price != null && price >= priceBand.min && price <= priceBand.max;
 
       return (
         matchesSearch &&
         matchesStatus &&
-        matchesTypeOk &&
-        matchesCity &&
+        matchesDistance &&
+        matchesProvince &&
         matchesPrice
       );
     });
 
     return [...list].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-  }, [catalog, searchQuery, statusFilter, typeFilter, cityFilter, priceFilter]);
+  }, [
+    discoverable,
+    searchQuery,
+    statusFilter,
+    distanceFilter,
+    provinceFilter,
+    priceFilter,
+  ]);
 
-  const resetKey = `${searchQuery}|${statusFilter}|${typeFilter}|${cityFilter}|${priceFilter}`;
+  const resetKey = `${searchQuery}|${statusFilter}|${distanceFilter}|${provinceFilter}|${priceFilter}`;
   const pager = usePagedList(filtered, PAGE_SIZE, resetKey);
 
   const activeFilterCount = [
     statusFilter !== "all",
-    typeFilter !== "all",
-    cityFilter !== "all",
+    distanceFilter !== "all",
+    provinceFilter !== "all",
     priceFilter !== "all",
   ].filter(Boolean).length;
 
   const clearFilters = () => {
     setSearchQuery("");
     setStatusFilter("all");
-    setTypeFilter("all");
-    setCityFilter("all");
+    setDistanceFilter("all");
+    setProvinceFilter("all");
     setPriceFilter("all");
   };
 
@@ -259,7 +291,7 @@ function EventsClientInner() {
         </h1>
         <p className="mt-1.5 text-muted-foreground max-w-3xl text-sm sm:text-base">
           Tìm theo tên / địa điểm, lọc theo trạng thái giải (đang mở, sắp mở,
-          đã đóng), loại hình, thành phố và mức giá.
+          đã đóng), cự ly (theo km), thành phố và mức giá.
         </p>
 
         <div className="mt-4 flex items-center gap-3">
@@ -371,20 +403,20 @@ function EventsClientInner() {
 
             <div className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-4">
               <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground sm:w-24 sm:pt-2 shrink-0">
-                Loại hình
+                Cự ly
               </span>
               <div className="flex flex-wrap gap-2">
                 <FilterChip
-                  active={typeFilter === "all"}
-                  onClick={() => setTypeFilter("all")}
+                  active={distanceFilter === "all"}
+                  onClick={() => setDistanceFilter("all")}
                 >
-                  Mọi loại
+                  Mọi cự ly
                 </FilterChip>
-                {TYPE_FILTERS.map((f) => (
+                {DISTANCE_BUCKETS.map((f) => (
                   <FilterChip
                     key={f.key}
-                    active={typeFilter === f.key}
-                    onClick={() => setTypeFilter(f.key)}
+                    active={distanceFilter === f.key}
+                    onClick={() => setDistanceFilter(f.key)}
                   >
                     {f.label}
                   </FilterChip>
@@ -394,22 +426,22 @@ function EventsClientInner() {
 
             <div className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-4">
               <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground sm:w-24 sm:pt-2 shrink-0">
-                Địa điểm
+                Tỉnh / thành
               </span>
-              <div className="flex flex-wrap gap-2 max-h-28 overflow-y-auto">
+              <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
                 <FilterChip
-                  active={cityFilter === "all"}
-                  onClick={() => setCityFilter("all")}
+                  active={provinceFilter === "all"}
+                  onClick={() => setProvinceFilter("all")}
                 >
                   Mọi nơi
                 </FilterChip>
-                {cityOptions.map((city) => (
+                {provinceOptions.map((p) => (
                   <FilterChip
-                    key={city}
-                    active={cityFilter === city}
-                    onClick={() => setCityFilter(city)}
+                    key={p.key}
+                    active={provinceFilter === p.key}
+                    onClick={() => setProvinceFilter(p.key)}
                   >
-                    {city}
+                    {p.count > 0 ? `${p.label} (${p.count})` : p.label}
                   </FilterChip>
                 ))}
               </div>
@@ -436,7 +468,7 @@ function EventsClientInner() {
       )}
 
       <p className="mb-4 text-xs text-muted-foreground">
-        Hiển thị {filtered.length} / {catalog.length} giải
+        Hiển thị {filtered.length} / {discoverable.length} giải
       </p>
 
       <div

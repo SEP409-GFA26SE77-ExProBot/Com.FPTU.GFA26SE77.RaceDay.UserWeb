@@ -17,9 +17,9 @@ import {
   User,
   Users,
 } from "lucide-react";
-import { getMyProfile } from "@/api/auth";
+import { getMyProfile, persistAvatarCookie } from "@/api/auth";
 import { getPackageCatalog, createPackagePurchase } from "@/api/event-packages";
-import { createPackageCheckout, syncPayment, mockPay } from "@/api/payments";
+import { createPackageCheckout, syncPayment } from "@/api/payments";
 import type { MyProfileDto } from "@/dto/auth.dto";
 import type {
   PackageCatalogDto,
@@ -29,6 +29,7 @@ import type {
 import type { CheckoutResponseDto } from "@/dto/payment.dto";
 import { formatPrice } from "@/lib/format";
 import { getApiErrorMessage } from "@/lib/error";
+import { mediaDisplayUrl } from "@/lib/media-url";
 import { VietQrCheckout } from "@/components/payment/VietQrCheckout";
 import { PayOsEmbedded } from "@/components/payment/PayOsEmbedded";
 
@@ -77,8 +78,6 @@ export default function EventPackageCheckout() {
   const [step, setStep] = useState<Step>("form");
   const [checkout, setCheckout] = useState<CheckoutResponseDto | null>(null);
   const [purchaseId, setPurchaseId] = useState<string | null>(null);
-  const [mockPaying, setMockPaying] = useState(false);
-  const [mockError, setMockError] = useState<string | null>(null);
 
   // Load catalog + profile
   useEffect(() => {
@@ -92,6 +91,7 @@ export default function EventPackageCheckout() {
         if (cancelled) return;
         setCatalog(data);
         setProfile(me);
+        if (me?.avatarUrl) persistAvatarCookie(me.avatarUrl);
         if (data.durations.length > 0) setSelectedDuration(data.durations[0]);
         if (data.capacities.length > 0) setSelectedCapacity(data.capacities[0]);
       } catch (e) {
@@ -116,14 +116,23 @@ export default function EventPackageCheckout() {
     setPromoValid(!!matchedPromo);
   }, [promoCode, catalog, matchedPromo]);
 
-  const handleApplyPromo = () => {
+  const handleApplyPromo = async () => {
     const code = promoDraft.trim();
     setPromoCode(code);
     if (!code) {
       setPromoValid(null);
       return;
     }
-    const hit = catalog?.promoCodes.find(
+    // Refresh catalog — mã mới (admin/seed) nhận ngay, không cần F5 trang.
+    let promos = catalog?.promoCodes ?? [];
+    try {
+      const fresh = await getPackageCatalog();
+      setCatalog(fresh);
+      promos = fresh.promoCodes ?? [];
+    } catch {
+      /* giữ catalog cũ nếu refresh fail */
+    }
+    const hit = promos.find(
       (c) => c.code.toLowerCase() === code.toLowerCase()
     );
     setPromoValid(!!hit);
@@ -231,28 +240,6 @@ export default function EventPackageCheckout() {
     }, 800);
   }, [purchaseId, activePaymentId, router]);
 
-  const handleMockPay = useCallback(async () => {
-    if (!activePaymentId) {
-      setMockError("Không tìm thấy mã thanh toán (paymentId).");
-      return;
-    }
-    setMockPaying(true);
-    setMockError(null);
-    try {
-      await mockPay(activePaymentId);
-      setStep("success");
-      setTimeout(() => {
-        router.push(
-          `/events/create/package-return?purchaseId=${purchaseId}&paymentId=${activePaymentId}`
-        );
-      }, 800);
-    } catch (e) {
-      setMockError(getApiErrorMessage(e, "Giả lập thanh toán thất bại."));
-    } finally {
-      setMockPaying(false);
-    }
-  }, [activePaymentId, purchaseId, router]);
-
   // ── Loading ──
   if (loading) {
     return (
@@ -346,37 +333,6 @@ export default function EventPackageCheckout() {
               <p className="text-[11px] leading-relaxed text-muted-foreground">
                 PayOS xác nhận xong sẽ tự chuyển trang. Giải nháp được tạo sau khi thanh toán thành công.
               </p>
-
-              {/* Mock pay button for dev / testing */}
-              <div className="rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/5 p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider">
-                    Thử nghiệm / Test
-                  </span>
-                  <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                    MOCK MODE
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  disabled={mockPaying || !activePaymentId}
-                  onClick={() => void handleMockPay()}
-                  className="w-full flex items-center justify-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 text-xs font-bold shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {mockPaying ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                  )}
-                  {mockPaying ? "Đang giả lập thanh toán…" : "Giả lập thanh toán (Mock Pay)"}
-                </button>
-                {mockError && (
-                  <p className="text-[11px] text-red-500 font-medium">{mockError}</p>
-                )}
-                <p className="text-[10px] leading-tight text-muted-foreground">
-                  Bấm để gọi API <code className="font-mono text-emerald-700 dark:text-emerald-400">mockPay()</code> xác nhận đơn đã thanh toán.
-                </p>
-              </div>
             </aside>
           </div>
         </div>
@@ -412,9 +368,20 @@ export default function EventPackageCheckout() {
         <div className="space-y-4">
           <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
             <div className="mb-3 flex items-center gap-2.5">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500/10 text-orange-600">
-                <User className="h-4 w-4" />
-              </span>
+              {profile?.avatarUrl ? (
+                <span className="relative inline-flex h-9 w-9 shrink-0 overflow-hidden rounded-full border border-orange-500/30 bg-muted shadow-xs">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={mediaDisplayUrl(profile.avatarUrl)}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                </span>
+              ) : (
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500/10 text-orange-600">
+                  <User className="h-4 w-4" />
+                </span>
+              )}
               <h2 className="text-sm font-bold text-foreground">Thông tin cá nhân</h2>
             </div>
             <dl className="space-y-2.5 text-sm">
@@ -452,7 +419,7 @@ export default function EventPackageCheckout() {
               </div>
             </dl>
             <Link
-              href="/profile"
+              href="/profile/edit"
               className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-orange-500/30 bg-orange-500/10 px-3 py-1.5 text-xs font-semibold text-orange-700 transition-colors hover:bg-orange-500/15"
             >
               <Pencil className="h-3 w-3" />

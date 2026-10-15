@@ -22,6 +22,7 @@ import { syncPayment } from "@/api/payments";
 import { RaceEventDto, RegistrationDto } from "@/dto/event.dto";
 import { formatPrice, formatDate } from "@/lib/format";
 import { PAGE_SHELL_FORM } from "@/lib/page-shell";
+import { buildCheckInQrValue } from "@/lib/registration-qr";
 
 function ConfirmationContent() {
   const params = useParams();
@@ -142,16 +143,14 @@ function ConfirmationContent() {
     img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
   };
 
-  // QR Payload: use official BE qrPayload, or build verifiable QR payload
-  const qrPayload =
-    registration?.qrPayload ||
-    JSON.stringify({
-      registrationId: registration?.id,
-      eventId: eventId,
-      fullName: registration?.fullName,
-      bib: registration?.bibNumber || "PENDING",
-      status: registration?.status || "paid",
-    });
+  // Khớp BE BuildQrJson — không stringify object API thành "[object Object]"
+  const qrPayload = buildCheckInQrValue({
+    userId: registration?.userId,
+    bibNumber: registration?.bibNumber,
+    eventId: registration?.eventId || eventId,
+    distanceKm: registration?.distanceKm,
+    qrPayload: registration?.qrPayload,
+  });
 
   const isConfirmed = registration?.status === "confirmed";
   const isPendingApproval = registration?.status === "pending_approval" || !isConfirmed;
@@ -332,28 +331,38 @@ function ConfirmationContent() {
             </div>
           </div>
 
-          {/* QR Code */}
-          <div className="flex flex-col items-center space-y-4">
-            <p className="text-sm font-semibold text-foreground">
-              Mã QR xác nhận Check-in
-            </p>
-            <div
-              ref={qrRef}
-              className="rounded-2xl border-2 border-border bg-white p-5 shadow-inner"
-            >
-              <QRCodeSVG
-                value={qrPayload}
-                size={200}
-                level="H"
-                bgColor="#ffffff"
-                fgColor="#1a1a1a"
-                includeMargin={false}
-              />
+          {/* QR chỉ khi BTC đã duyệt + có BIB (đúng format check-in) */}
+          {isConfirmed && registration?.bibNumber ? (
+            <div className="flex flex-col items-center space-y-4">
+              <p className="text-sm font-semibold text-foreground">
+                Mã QR check-in
+              </p>
+              <div
+                ref={qrRef}
+                className="rounded-2xl border-2 border-border bg-white p-5 shadow-inner"
+              >
+                <QRCodeSVG
+                  value={qrPayload}
+                  size={220}
+                  level="M"
+                  bgColor="#ffffff"
+                  fgColor="#1a1a1a"
+                  includeMargin
+                />
+              </div>
+              <p className="text-2xl font-extrabold tracking-tight text-orange-600">
+                BIB {registration.bibNumber}
+              </p>
+              <p className="text-[11px] text-muted-foreground text-center max-w-sm">
+                Xuất trình QR hoặc đọc số BIB tại quầy. Có thể mở lại vé trong
+                «Đăng ký của tôi».
+              </p>
             </div>
-            <p className="text-[11px] text-muted-foreground text-center max-w-sm">
-              Xuất trình mã QR này tại quầy nhận Race Kit vào ngày sự kiện.
-            </p>
-          </div>
+          ) : (
+            <div className="rounded-xl border border-amber-200/80 bg-amber-50 px-4 py-3 text-center text-sm text-amber-950">
+              QR check-in sẽ hiện sau khi Ban tổ chức duyệt và cấp số BIB.
+            </div>
+          )}
 
           {/* Action buttons */}
           <div className="flex flex-col sm:flex-row gap-3">

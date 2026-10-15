@@ -20,16 +20,24 @@ import {
   ShieldOff,
 } from "lucide-react";
 import { RaceEventDto, EventDistanceDto } from "@/dto/event.dto";
-import { getEventById, createRegistration, uploadHealthCert } from "@/api/events";
+import { getMyProfile } from "@/api/auth";
+import {
+  genderToFormValue,
+  profileDobToDateInput,
+} from "@/dto/auth.dto";
+import {
+  getEventById,
+  getRegistrationById,
+  createRegistration,
+  uploadHealthCert,
+} from "@/api/events";
 import { formatPrice, formatDate } from "@/lib/format";
 import {
   getPublicEventStatusLabel,
   isPublicRegistrationLive,
 } from "@/lib/event-lifecycle";
 import { resolveDistanceTicketPrice } from "@/lib/ticket-pricing";
-import TicketPriceDisplay, {
-  formatPhaseWindow,
-} from "@/components/events/TicketPriceDisplay";
+import TicketPriceDisplay from "@/components/events/TicketPriceDisplay";
 import { getApiErrorMessage } from "@/lib/error";
 import {
   isValidDateOfBirth,
@@ -37,13 +45,14 @@ import {
   isValidOptionalBloodType,
   isValidOptionalGender,
   isValidOptionalHeightCm,
-  isValidOptionalIdNumber,
   isValidOptionalVietnamPhone,
   isValidOptionalWeightKg,
+  isValidRequiredIdNumber,
   isValidVietnamPhone,
+  phonesMatch,
   MSG,
 } from "@/lib/input-rules";
-import { PAGE_SHELL_FORM } from "@/lib/page-shell";
+import { PAGE_SHELL } from "@/lib/page-shell";
 
 const formDraftKey = (eventId: string) => `registration_form_draft_${eventId}`;
 
@@ -60,6 +69,16 @@ const MEDICAL_OPTIONS = [
   { code: "none", label: "Không mắc bệnh lý đặc biệt" },
 ] as const;
 
+const EMERGENCY_RELATIONS = [
+  "Ba/Mẹ",
+  "Chồng/Vợ",
+  "Anh/Chị/Em",
+  "Người thân",
+  "Bạn bè",
+] as const;
+
+const BLOOD_OPTIONS = ["O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-", "O", "A", "B", "AB"] as const;
+
 interface FormData {
   fullName: string;
   email: string;
@@ -73,14 +92,28 @@ interface FormData {
   shirtType: string;
   shirtSize: string;
   shirtColor: string;
+  bibName: string;
   emergencyName: string;
   emergencyPhone: string;
+  emergencyRelation: string;
   selectedDistanceId: string | null;
   medicalCodes: string[];
   liabilityAccepted: boolean;
+  paymentTermsAccepted: boolean;
 }
 
-type ErrorMap = Partial<Record<keyof FormData | "healthCert" | "medicalCodes", string>>;
+type ErrorMap = Partial<
+  Record<keyof FormData | "healthCert" | "medicalCodes", string>
+>;
+
+type RegStep = 1 | 2 | 3 | 4;
+
+const REG_STEPS: { id: RegStep; label: string }[] = [
+  { id: 1, label: "Chọn cự ly" },
+  { id: 2, label: "Thông tin cá nhân" },
+  { id: 3, label: "Thông tin y tế" },
+  { id: 4, label: "Thanh toán" },
+];
 
 function RegisterPageContent() {
   const params = useParams();
@@ -96,6 +129,7 @@ function RegisterPageContent() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [pendingPayRegId, setPendingPayRegId] = useState<string | null>(null);
   const [resumeHint, setResumeHint] = useState<string | null>(null);
+  const [step, setStep] = useState<RegStep>(1);
 
   const loggedIn = Boolean(Cookies.get("access_token"));
 
@@ -112,11 +146,14 @@ function RegisterPageContent() {
     shirtType: "",
     shirtSize: "",
     shirtColor: "",
+    bibName: "",
     emergencyName: "",
     emergencyPhone: "",
+    emergencyRelation: "",
     selectedDistanceId: null,
     medicalCodes: [],
     liabilityAccepted: false,
+    paymentTermsAccepted: false,
   });
 
   const [healthCert, setHealthCert] = useState<File | null>(null);
@@ -145,31 +182,102 @@ function RegisterPageContent() {
   }, [eventId]);
 
   // Quay lại từ trang thanh toán (không hủy đơn) → khôi phục form + tiếp tục thanh toán
+  // Chỉ hiện «Tiếp tục thanh toán» khi đơn vẫn pending_payment (tránh confirmed → lỗi checkout)
   useEffect(() => {
     if (!eventId) return;
+    let cancelled = false;
     try {
       const raw = sessionStorage.getItem(formDraftKey(eventId));
       if (raw) {
         const draft = JSON.parse(raw) as FormData;
         setFormData((prev) => ({ ...prev, ...draft }));
+        // Chỉ nhảy bước khi resume từ thanh toán — «Đăng ký ngay» luôn bắt đầu ở chọn cự ly
+        if (resume && draft.selectedDistanceId) setStep(2);
       }
-      const lastReg = sessionStorage.getItem("last_registration_id");
-      const regMeta = sessionStorage.getItem("registration_data");
-      if (lastReg && regMeta) {
-        const meta = JSON.parse(regMeta);
-        if (String(meta.eventId) === eventId || meta.registrationId === lastReg) {
+    } catch {
+      /* ignore */
+    }
+
+    (async () => {
+      try {
+        const lastReg = sessionStorage.getItem("last_registration_id");
+        const regMeta = sessionStorage.getItem("registration_data");
+        if (!lastReg || !regMeta) return;
+        const meta = JSON.parse(regMeta) as {
+          eventId?: string;
+          registrationId?: string;
+        };
+        const sameEvent =
+          String(meta.eventId) === eventId || meta.registrationId === lastReg;
+        if (!sameEvent) return;
+
+        const reg = await getRegistrationById(lastReg).catch(() => null);
+        if (cancelled) return;
+
+        if (reg?.status === "pending_payment") {
           setPendingPayRegId(lastReg);
           if (resume) {
             setResumeHint(
               "Đơn đang chờ thanh toán. Bấm «Tiếp tục thanh toán» để mở lại QR — phiếu khám cần đính kèm lại nếu gửi đơn mới."
             );
           }
+          return;
         }
+
+        // Đã thanh toán / duyệt / hủy — dọn cache để không hiện nút thanh toán sai
+        sessionStorage.removeItem("last_registration_id");
+        sessionStorage.removeItem("registration_data");
+        setPendingPayRegId(null);
+        setResumeHint(null);
+        if (resume && reg?.status === "confirmed") {
+          setResumeHint(
+            "Đơn này đã thanh toán / xác nhận. Không cần thanh toán lại — xem Vé của tôi nếu cần."
+          );
+        } else if (resume && reg?.status === "pending_approval") {
+          setResumeHint(
+            "Đơn đã thanh toán, đang chờ BTC duyệt. Xem trạng thái tại Vé / đăng ký."
+          );
+        }
+      } catch {
+        /* ignore */
       }
-    } catch {
-      /* ignore */
-    }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [eventId, resume]);
+
+  // Prefill từ hồ sơ IAM (GET /me) — không đè draft đã có
+  useEffect(() => {
+    if (!loggedIn) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const me = await getMyProfile();
+        if (cancelled) return;
+        setFormData((prev) => {
+          const hasDraft =
+            Boolean(prev.fullName.trim()) || Boolean(prev.email.trim());
+          if (hasDraft) return prev;
+          return {
+            ...prev,
+            fullName: me.fullName || prev.fullName,
+            email: me.email || prev.email,
+            phone: me.phone || prev.phone,
+            gender: genderToFormValue(me.gender) || prev.gender,
+            dateOfBirth:
+              profileDobToDateInput(me.dateOfBirth) || prev.dateOfBirth,
+          };
+        });
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loggedIn]);
 
   if (pageLoading) {
     return (
@@ -200,7 +308,7 @@ function RegisterPageContent() {
   if (!loggedIn) {
     const from = encodeURIComponent(`/events/${eventId}/register`);
     return (
-      <div className={`${PAGE_SHELL_FORM} py-16 text-center space-y-4`}>
+      <div className={`${PAGE_SHELL} max-w-3xl py-16 text-center space-y-4`}>
         <LogIn className="mx-auto h-10 w-10 text-orange-500" />
         <h1 className="text-2xl font-extrabold">Đăng nhập để đăng ký</h1>
         <p className="text-sm text-muted-foreground max-w-md mx-auto">
@@ -221,7 +329,7 @@ function RegisterPageContent() {
     const isSoldOut = event.status === "sold-out";
     const label = getPublicEventStatusLabel(event);
     return (
-      <div className={`${PAGE_SHELL_FORM} py-16 text-center space-y-4`}>
+      <div className={`${PAGE_SHELL} max-w-3xl py-16 text-center space-y-4`}>
         <ShieldOff className="mx-auto h-10 w-10 text-muted-foreground" />
         <h1 className="text-2xl font-extrabold">
           {isSoldOut ? "Hết slot đăng ký" : "Giải chưa mở đăng ký"}
@@ -250,80 +358,140 @@ function RegisterPageContent() {
     ? resolveDistanceTicketPrice(event?.ticketPricing, selectedDistance)
     : null;
 
-  const validate = (): boolean => {
+  const medicalNoneOnly =
+    formData.medicalCodes.length === 1 &&
+    formData.medicalCodes[0] === "none";
+
+  const validateStep = (s: RegStep): boolean => {
     const newErrors: ErrorMap = {};
 
-    // Khớp CreateRegistrationCommandValidator + InputRules (BE)
-    if (!formData.fullName.trim()) newErrors.fullName = "Vui lòng nhập họ tên";
-    else if (formData.fullName.trim().length > 100)
-      newErrors.fullName = "Họ tên tối đa 100 ký tự.";
-
-    if (!formData.email.trim()) newErrors.email = "Vui lòng nhập email";
-    else if (!isValidEmail(formData.email))
-      newErrors.email = "Email không hợp lệ.";
-
-    if (!formData.phone.trim()) newErrors.phone = "Vui lòng nhập số điện thoại";
-    else if (!isValidVietnamPhone(formData.phone)) newErrors.phone = MSG.phone;
-
-    if (!formData.gender) newErrors.gender = "Vui lòng chọn giới tính";
-    else if (!isValidOptionalGender(formData.gender))
-      newErrors.gender = MSG.gender;
-
-    if (!formData.dateOfBirth)
-      newErrors.dateOfBirth = "Vui lòng nhập ngày sinh";
-    else if (!isValidDateOfBirth(formData.dateOfBirth))
-      newErrors.dateOfBirth = MSG.dateOfBirth;
-
-    if (!isValidOptionalIdNumber(formData.idNumber))
-      newErrors.idNumber = MSG.idNumber;
-
-    if (!isValidOptionalHeightCm(formData.heightCm))
-      newErrors.heightCm = MSG.height;
-    if (!isValidOptionalWeightKg(formData.weightKg))
-      newErrors.weightKg = MSG.weight;
-    if (!isValidOptionalBloodType(formData.bloodType))
-      newErrors.bloodType = MSG.bloodType;
-
-    if (!formData.emergencyName.trim())
-      newErrors.emergencyName = "Vui lòng nhập người liên hệ khẩn cấp";
-    else if (formData.emergencyName.trim().length > 100)
-      newErrors.emergencyName = "Tên liên hệ khẩn cấp tối đa 100 ký tự.";
-
-    if (!formData.emergencyPhone.trim())
-      newErrors.emergencyPhone = "Vui lòng nhập SĐT khẩn cấp";
-    else if (!isValidOptionalVietnamPhone(formData.emergencyPhone))
-      newErrors.emergencyPhone = MSG.phone;
-
-    if (!formData.selectedDistanceId)
-      newErrors.selectedDistanceId = "Vui lòng chọn cự ly";
-    if (!formData.shirtSize) newErrors.shirtSize = "Vui lòng chọn size áo";
-
-    if (formData.medicalCodes.length === 0)
-      newErrors.medicalCodes =
-        "Chọn ít nhất một mục bệnh lý (hoặc \u201CKhông mắc…\u201D).";
-    else if (
-      formData.medicalCodes.includes("none") &&
-      formData.medicalCodes.length > 1
-    )
-      newErrors.medicalCodes =
-        "Không thể chọn \u201CKhông mắc bệnh lý đặc biệt\u201D cùng các bệnh khác.";
-
-    if (!healthCert) newErrors.healthCert = "Vui lòng đính kèm phiếu khám sức khỏe.";
-    else {
-      const okType =
-        ["application/pdf", "image/jpeg", "image/png", "image/jpg"].includes(
-          healthCert.type
-        ) || /\.(pdf|jpe?g|png)$/i.test(healthCert.name);
-      if (!okType) newErrors.healthCert = "Chỉ chấp nhận PDF, JPG, PNG.";
-      if (healthCert.size > 5 * 1024 * 1024)
-        newErrors.healthCert = "File tối đa 5MB.";
+    if (s === 1) {
+      if (!formData.selectedDistanceId)
+        newErrors.selectedDistanceId = "Vui lòng chọn cự ly";
     }
 
-    if (!formData.liabilityAccepted)
-      newErrors.liabilityAccepted = MSG.liability;
+    if (s === 2) {
+      if (!formData.fullName.trim()) newErrors.fullName = "Vui lòng nhập họ tên";
+      else if (formData.fullName.trim().length > 100)
+        newErrors.fullName = "Họ tên tối đa 100 ký tự.";
+
+      if (!formData.email.trim()) newErrors.email = "Vui lòng nhập email";
+      else if (!isValidEmail(formData.email))
+        newErrors.email = "Email không hợp lệ.";
+
+      if (!formData.phone.trim())
+        newErrors.phone = "Vui lòng nhập số điện thoại";
+      else if (!isValidVietnamPhone(formData.phone))
+        newErrors.phone = MSG.phone;
+
+      if (!formData.gender) newErrors.gender = "Vui lòng chọn giới tính";
+      else if (!isValidOptionalGender(formData.gender))
+        newErrors.gender = MSG.gender;
+
+      if (!formData.dateOfBirth)
+        newErrors.dateOfBirth = "Vui lòng nhập ngày sinh";
+      else if (!isValidDateOfBirth(formData.dateOfBirth))
+        newErrors.dateOfBirth = MSG.dateOfBirth;
+
+      if (!formData.idNumber.trim())
+        newErrors.idNumber = MSG.idNumberRequired;
+      else if (!isValidRequiredIdNumber(formData.idNumber))
+        newErrors.idNumber = MSG.idNumber;
+
+      if (formData.bibName.trim().length > 40)
+        newErrors.bibName = "Tên trên BIB tối đa 40 ký tự.";
+    }
+
+    if (s === 3) {
+      if (!isValidOptionalHeightCm(formData.heightCm))
+        newErrors.heightCm = MSG.height;
+      if (!isValidOptionalWeightKg(formData.weightKg))
+        newErrors.weightKg = MSG.weight;
+
+      if (!formData.bloodType.trim())
+        newErrors.bloodType = MSG.bloodTypeRequired;
+      else if (!isValidOptionalBloodType(formData.bloodType))
+        newErrors.bloodType = MSG.bloodType;
+
+      if (!formData.emergencyName.trim())
+        newErrors.emergencyName = "Vui lòng nhập người liên hệ khẩn cấp";
+      else if (formData.emergencyName.trim().length > 100)
+        newErrors.emergencyName = "Tên liên hệ khẩn cấp tối đa 100 ký tự.";
+
+      if (!formData.emergencyPhone.trim())
+        newErrors.emergencyPhone = "Vui lòng nhập SĐT khẩn cấp";
+      else if (!isValidOptionalVietnamPhone(formData.emergencyPhone))
+        newErrors.emergencyPhone = MSG.phone;
+      else if (phonesMatch(formData.emergencyPhone, formData.phone))
+        newErrors.emergencyPhone = MSG.emergencyPhoneSame;
+
+      if (!formData.emergencyRelation.trim())
+        newErrors.emergencyRelation = MSG.emergencyRelation;
+
+      if (formData.medicalCodes.length === 0)
+        newErrors.medicalCodes =
+          "Chọn ít nhất một mục bệnh lý (hoặc \u201CKhông mắc…\u201D).";
+      else if (
+        formData.medicalCodes.includes("none") &&
+        formData.medicalCodes.length > 1
+      )
+        newErrors.medicalCodes =
+          "Không thể chọn \u201CKhông mắc bệnh lý đặc biệt\u201D cùng các bệnh khác.";
+
+      // Phiếu khám bắt buộc trừ khi chỉ tick «Không mắc bệnh lý đặc biệt»
+      if (!medicalNoneOnly) {
+        if (!healthCert)
+          newErrors.healthCert = "Vui lòng đính kèm phiếu khám sức khỏe.";
+        else {
+          const okType =
+            [
+              "application/pdf",
+              "image/jpeg",
+              "image/png",
+              "image/jpg",
+            ].includes(healthCert.type) ||
+            /\.(pdf|jpe?g|png)$/i.test(healthCert.name);
+          if (!okType) newErrors.healthCert = "Chỉ chấp nhận PDF, JPG, PNG.";
+          if (healthCert.size > 5 * 1024 * 1024)
+            newErrors.healthCert = "File tối đa 5MB.";
+        }
+      } else if (healthCert) {
+        const okType =
+          ["application/pdf", "image/jpeg", "image/png", "image/jpg"].includes(
+            healthCert.type
+          ) || /\.(pdf|jpe?g|png)$/i.test(healthCert.name);
+        if (!okType) newErrors.healthCert = "Chỉ chấp nhận PDF, JPG, PNG.";
+        if (healthCert.size > 5 * 1024 * 1024)
+          newErrors.healthCert = "File tối đa 5MB.";
+      }
+
+      if (!formData.liabilityAccepted)
+        newErrors.liabilityAccepted = MSG.liability;
+    }
+
+    if (s === 4) {
+      if (!formData.paymentTermsAccepted)
+        newErrors.paymentTermsAccepted = MSG.paymentTerms;
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  const goNext = () => {
+    if (!validateStep(step)) return;
+    try {
+      sessionStorage.setItem(formDraftKey(eventId), JSON.stringify(formData));
+    } catch {
+      /* ignore */
+    }
+    if (step < 4) setStep((step + 1) as RegStep);
+  };
+
+  const goBack = () => {
+    setErrors({});
+    setSubmitError(null);
+    if (step > 1) setStep((step - 1) as RegStep);
   };
 
   const toggleMedical = (code: string) => {
@@ -349,13 +517,40 @@ function RegisterPageContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validate() || !formData.selectedDistanceId || !healthCert) return;
+    if (step !== 4) {
+      goNext();
+      return;
+    }
+    if (!validateStep(1)) {
+      setStep(1);
+      return;
+    }
+    if (!validateStep(2)) {
+      setStep(2);
+      return;
+    }
+    if (!validateStep(3)) {
+      setStep(3);
+      return;
+    }
+    if (!validateStep(4) || !formData.selectedDistanceId) return;
+    if (!medicalNoneOnly && !healthCert) {
+      setStep(3);
+      return;
+    }
 
     setSubmitting(true);
     setSubmitError(null);
 
     try {
-      const uploaded = await uploadHealthCert(healthCert);
+      let healthCertFileName: string | undefined;
+      let healthCertUrl: string | undefined;
+      if (healthCert) {
+        const uploaded = await uploadHealthCert(healthCert);
+        healthCertFileName = uploaded.fileName || healthCert.name;
+        healthCertUrl = uploaded.fileUrl;
+      }
+
       const registration = await createRegistration(eventId, {
         distanceId: formData.selectedDistanceId,
         fullName: formData.fullName.trim(),
@@ -363,18 +558,20 @@ function RegisterPageContent() {
         phone: formData.phone.trim(),
         dateOfBirth: formData.dateOfBirth,
         gender: formData.gender,
-        idNumber: formData.idNumber.trim() || undefined,
+        idNumber: formData.idNumber.trim(),
         heightCm: formData.heightCm ? Number(formData.heightCm) : undefined,
         weightKg: formData.weightKg ? Number(formData.weightKg) : undefined,
         bloodType: formData.bloodType || undefined,
         emergencyName: formData.emergencyName.trim(),
         emergencyPhone: formData.emergencyPhone.trim(),
+        emergencyRelation: formData.emergencyRelation || undefined,
         shirtType: formData.shirtType || undefined,
         shirtSize: formData.shirtSize || undefined,
         shirtColor: formData.shirtColor || undefined,
+        bibName: formData.bibName.trim() || undefined,
         medicalCodes: formData.medicalCodes,
-        healthCertFileName: uploaded.fileName || healthCert.name,
-        healthCertUrl: uploaded.fileUrl,
+        healthCertFileName,
+        healthCertUrl,
         liabilityAccepted: true,
       });
 
@@ -424,7 +621,7 @@ function RegisterPageContent() {
     } bg-background py-2.5 px-4 text-sm outline-none transition-all focus:ring-2 placeholder:text-muted-foreground`;
 
   return (
-    <div className={`${PAGE_SHELL_FORM} py-8`}>
+    <div className={`${PAGE_SHELL} py-8`}>
       {/* Breadcrumb */}
       <div className="mb-6">
         <Link
@@ -437,18 +634,64 @@ function RegisterPageContent() {
       </div>
 
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
           Đăng ký tham gia giải
         </h1>
         <p className="mt-1 text-muted-foreground">{event.name}</p>
       </div>
 
+      {/* Stepper nhẹ */}
+      <nav className="mb-8 flex flex-wrap items-center gap-2 sm:gap-0">
+        {REG_STEPS.map((s, i) => {
+          const active = step === s.id;
+          const done = step > s.id;
+          return (
+            <div key={s.id} className="flex items-center gap-2 sm:gap-3">
+              {i > 0 ? (
+                <div
+                  className={`mx-1 hidden h-px w-8 sm:block ${
+                    done ? "bg-orange-400" : "bg-border"
+                  }`}
+                />
+              ) : null}
+              <button
+                type="button"
+                onClick={() => {
+                  if (s.id < step) setStep(s.id);
+                }}
+                className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold transition ${
+                  active
+                    ? "bg-orange-500 text-white"
+                    : done
+                      ? "bg-orange-500/15 text-orange-700"
+                      : "bg-muted text-muted-foreground"
+                }`}
+              >
+                <span
+                  className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${
+                    active
+                      ? "bg-white/25"
+                      : done
+                        ? "bg-orange-500 text-white"
+                        : "bg-background"
+                  }`}
+                >
+                  {s.id}
+                </span>
+                {s.label}
+              </button>
+            </div>
+          );
+        })}
+      </nav>
+
       <form onSubmit={handleSubmit}>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
           {/* Form fields */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="min-w-0 space-y-6">
             {/* Distance selection */}
+            {step === 1 ? (
             <section className="rounded-2xl border border-border bg-card p-6 space-y-4">
               <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-500 text-white text-xs font-bold">
@@ -523,8 +766,11 @@ function RegisterPageContent() {
                 })}
               </div>
             </section>
+            ) : null}
 
             {/* Personal info */}
+            {step === 2 ? (
+            <>
             <section className="rounded-2xl border border-border bg-card p-6 space-y-4">
               <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-500 text-white text-xs font-bold">
@@ -631,9 +877,9 @@ function RegisterPageContent() {
                 </div>
 
                 {/* ID Number */}
-                <div>
+                <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-foreground mb-1.5">
-                    Số CCCD / Hộ chiếu
+                    Số CCCD / Hộ chiếu *
                   </label>
                   <input
                     type="text"
@@ -643,12 +889,22 @@ function RegisterPageContent() {
                     className={inputClass("idNumber")}
                     disabled={submitting}
                   />
+                  <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">
+                    Nếu chưa đủ tuổi, có thể điền CCCD/hộ chiếu của người giám hộ
+                    hoặc người liên hệ khẩn cấp.
+                  </p>
                   {errors.idNumber && (
                     <p className="mt-1 text-xs text-red-500">{errors.idNumber}</p>
                   )}
                 </div>
+              </div>
+            </section>
 
-                {/* T-shirt Size */}
+            <section className="rounded-2xl border border-border bg-card p-6 space-y-4">
+              <h2 className="text-lg font-bold text-foreground">
+                Thông tin bổ sung
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-foreground mb-1.5">
                     <Shirt className="inline h-3.5 w-3.5 mr-1 text-orange-500" />
@@ -660,7 +916,7 @@ function RegisterPageContent() {
                     className={inputClass("shirtSize")}
                     disabled={submitting}
                   >
-                    <option value="">Chọn size</option>
+                    <option value="">Để trống / Chọn size</option>
                     <option value="XS">XS</option>
                     <option value="S">S</option>
                     <option value="M">M</option>
@@ -669,20 +925,65 @@ function RegisterPageContent() {
                     <option value="XXL">XXL</option>
                   </select>
                 </div>
+                <div>
+                  <label className="block text-xs font-semibold text-foreground mb-1.5">
+                    Tên trên BIB
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Tên in trên số BIB"
+                    value={formData.bibName}
+                    onChange={(e) => updateField("bibName", e.target.value)}
+                    className={inputClass("bibName")}
+                    disabled={submitting}
+                    maxLength={40}
+                  />
+                  {errors.bibName ? (
+                    <p className="mt-1 text-xs text-red-500">{errors.bibName}</p>
+                  ) : null}
+                </div>
               </div>
             </section>
+            </>
+            ) : null}
 
             {/* Medical + health cert */}
+            {step === 3 ? (
+            <>
             <section className="rounded-2xl border border-border bg-card p-6 space-y-4">
               <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-500 text-white text-xs font-bold">
                   3
                 </span>
-                Hồ sơ y tế
+                Thông tin y tế
               </h2>
               <p className="text-xs text-muted-foreground">
-                Chọn tình trạng bệnh lý (có thể nhiều mục) và đính kèm phiếu khám sức khỏe.
+                Chọn tình trạng bệnh lý (có thể nhiều mục). Phiếu khám bắt buộc
+                nếu có bệnh lý; không bắt buộc khi chọn «Không mắc bệnh lý đặc biệt».
               </p>
+
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1.5">
+                  Nhóm máu *
+                </label>
+                <select
+                  value={formData.bloodType}
+                  onChange={(e) => updateField("bloodType", e.target.value)}
+                  className={inputClass("bloodType")}
+                  disabled={submitting}
+                >
+                  <option value="">Chọn nhóm máu</option>
+                  {BLOOD_OPTIONS.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+                {errors.bloodType ? (
+                  <p className="mt-1 text-xs text-red-500">{errors.bloodType}</p>
+                ) : null}
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {MEDICAL_OPTIONS.map((opt) => (
                   <label
@@ -710,7 +1011,8 @@ function RegisterPageContent() {
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1.5">
                   <FileUp className="inline h-3.5 w-3.5 mr-1 text-orange-500" />
-                  Phiếu khám sức khỏe (PDF/JPG/PNG, ≤5MB) *
+                  Phiếu khám sức khỏe (PDF/JPG/PNG, ≤5MB)
+                  {medicalNoneOnly ? " — không bắt buộc" : " *"}
                 </label>
                 <input
                   type="file"
@@ -742,9 +1044,6 @@ function RegisterPageContent() {
             {/* Emergency Contact */}
             <section className="rounded-2xl border border-border bg-card p-6 space-y-4">
               <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-500 text-white text-xs font-bold">
-                  4
-                </span>
                 Liên hệ khẩn cấp
               </h2>
 
@@ -788,15 +1087,38 @@ function RegisterPageContent() {
                     </p>
                   )}
                 </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-foreground mb-1.5">
+                    Mối quan hệ với người tham gia *
+                  </label>
+                  <select
+                    value={formData.emergencyRelation}
+                    onChange={(e) =>
+                      updateField("emergencyRelation", e.target.value)
+                    }
+                    className={inputClass("emergencyRelation")}
+                    disabled={submitting}
+                  >
+                    <option value="">- Chọn quan hệ -</option>
+                    {EMERGENCY_RELATIONS.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.emergencyRelation ? (
+                    <p className="mt-1 text-xs text-red-500">
+                      {errors.emergencyRelation}
+                    </p>
+                  ) : null}
+                </div>
               </div>
             </section>
 
             {/* Liability */}
             <section className="rounded-2xl border border-border bg-card p-6 space-y-4">
               <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-500 text-white text-xs font-bold">
-                  5
-                </span>
                 Điều khoản trách nhiệm
               </h2>
               <label className="flex items-start gap-3 cursor-pointer">
@@ -816,10 +1138,249 @@ function RegisterPageContent() {
                 <p className="text-xs text-red-500">{errors.liabilityAccepted}</p>
               )}
             </section>
+            </>
+            ) : null}
+
+            {step === 4 ? (
+              <div className="space-y-4">
+                <section className="rounded-2xl border border-border bg-card p-6 space-y-3">
+                  <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-500 text-white text-xs font-bold">
+                      4
+                    </span>
+                    Xác nhận & thanh toán
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Kiểm tra thông tin trước khi mở cổng thanh toán PayOS (QR).
+                  </p>
+                </section>
+
+                <section className="rounded-2xl border border-border bg-card p-6 space-y-3">
+                  <h3 className="text-sm font-bold">Thông tin mua hàng</h3>
+                  <dl className="grid gap-2 text-sm sm:grid-cols-2">
+                    <div>
+                      <dt className="text-[10px] uppercase text-muted-foreground">
+                        Sự kiện
+                      </dt>
+                      <dd className="font-medium">{event.name}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-[10px] uppercase text-muted-foreground">
+                        Hạng mục
+                      </dt>
+                      <dd className="font-medium">
+                        {selectedDistance?.name ||
+                          selectedDistance?.type ||
+                          "—"}
+                        {selectedDistance
+                          ? ` · ${selectedDistance.distanceKm} km`
+                          : ""}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-[10px] uppercase text-muted-foreground">
+                        Size áo
+                      </dt>
+                      <dd className="font-medium">
+                        {formData.shirtSize || "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-[10px] uppercase text-muted-foreground">
+                        Tên trên BIB
+                      </dt>
+                      <dd className="font-medium">
+                        {formData.bibName.trim() || "—"}
+                      </dd>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <dt className="text-[10px] uppercase text-muted-foreground">
+                        Tổng thanh toán
+                      </dt>
+                      <dd className="mt-0.5">
+                        {selectedTicket ? (
+                          <TicketPriceDisplay
+                            ticket={selectedTicket}
+                            size="md"
+                            align="left"
+                          />
+                        ) : selectedDistance ? (
+                          <span className="text-lg font-extrabold text-orange-600">
+                            {formatPrice(selectedDistance.price)}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </dd>
+                    </div>
+                  </dl>
+                </section>
+
+                <section className="rounded-2xl border border-border bg-card p-6 space-y-3">
+                  <h3 className="text-sm font-bold">Thông tin cá nhân</h3>
+                  <dl className="grid gap-2 text-sm sm:grid-cols-2">
+                    <div>
+                      <dt className="text-[10px] uppercase text-muted-foreground">
+                        Họ tên
+                      </dt>
+                      <dd className="font-medium">{formData.fullName}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-[10px] uppercase text-muted-foreground">
+                        Email
+                      </dt>
+                      <dd className="font-medium break-all">{formData.email}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-[10px] uppercase text-muted-foreground">
+                        Số điện thoại
+                      </dt>
+                      <dd className="font-medium">{formData.phone}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-[10px] uppercase text-muted-foreground">
+                        Giới tính · Ngày sinh
+                      </dt>
+                      <dd className="font-medium">
+                        {formData.gender === "Male"
+                          ? "Nam"
+                          : formData.gender === "Female"
+                            ? "Nữ"
+                            : formData.gender || "—"}
+                        {" · "}
+                        {formData.dateOfBirth || "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-[10px] uppercase text-muted-foreground">
+                        CCCD / Hộ chiếu
+                      </dt>
+                      <dd className="font-medium">{formData.idNumber}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-[10px] uppercase text-muted-foreground">
+                        Size áo · Tên BIB
+                      </dt>
+                      <dd className="font-medium">
+                        {formData.shirtSize || "—"}
+                        {" · "}
+                        {formData.bibName.trim() || "—"}
+                      </dd>
+                    </div>
+                  </dl>
+                </section>
+
+                <section className="rounded-2xl border border-border bg-card p-6 space-y-3">
+                  <h3 className="text-sm font-bold">Thông tin y tế & liên hệ</h3>
+                  <dl className="grid gap-2 text-sm sm:grid-cols-2">
+                    <div>
+                      <dt className="text-[10px] uppercase text-muted-foreground">
+                        Nhóm máu
+                      </dt>
+                      <dd className="font-medium">
+                        {formData.bloodType || "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-[10px] uppercase text-muted-foreground">
+                        Bệnh lý
+                      </dt>
+                      <dd className="font-medium">
+                        {formData.medicalCodes.includes("none")
+                          ? "Không mắc bệnh lý đặc biệt"
+                          : formData.medicalCodes
+                              .map(
+                                (c) =>
+                                  MEDICAL_OPTIONS.find((o) => o.code === c)
+                                    ?.label || c
+                              )
+                              .join(", ") || "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-[10px] uppercase text-muted-foreground">
+                        Phiếu khám
+                      </dt>
+                      <dd className="font-medium">
+                        {healthCert
+                          ? healthCert.name
+                          : medicalNoneOnly
+                            ? "Không đính kèm (không mắc bệnh lý)"
+                            : "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-[10px] uppercase text-muted-foreground">
+                        Liên hệ khẩn cấp
+                      </dt>
+                      <dd className="font-medium">
+                        {formData.emergencyName}
+                        {formData.emergencyRelation
+                          ? ` (${formData.emergencyRelation})`
+                          : ""}
+                        <br />
+                        {formData.emergencyPhone}
+                      </dd>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <dt className="text-[10px] uppercase text-muted-foreground">
+                        Điều khoản trách nhiệm
+                      </dt>
+                      <dd className="font-medium">
+                        {formData.liabilityAccepted
+                          ? "Đã chấp nhận"
+                          : "Chưa chấp nhận"}
+                      </dd>
+                    </div>
+                  </dl>
+                </section>
+
+                <section className="rounded-2xl border border-border bg-card p-6 space-y-3">
+                  <h3 className="text-sm font-bold">Phương thức thanh toán</h3>
+                  <label className="flex items-center gap-3 rounded-xl border border-orange-500/40 bg-orange-500/5 px-3 py-3 text-sm font-medium">
+                    <input
+                      type="radio"
+                      name="payMethod"
+                      checked
+                      readOnly
+                      className="h-4 w-4 text-orange-500"
+                    />
+                    Quét mã QR ngân hàng (PayOS)
+                  </label>
+                  <p className="text-[11px] text-muted-foreground">
+                    RaceDay thanh toán qua PayOS VietQR. Sau khi bấm Thanh toán,
+                    hệ thống tạo đơn và mở mã QR.
+                  </p>
+                </section>
+
+                <section className="rounded-2xl border border-border bg-card p-6 space-y-3">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.paymentTermsAccepted}
+                      onChange={(e) =>
+                        updateField("paymentTermsAccepted", e.target.checked)
+                      }
+                      className="mt-1 h-4 w-4 rounded border-border text-orange-500 focus:ring-orange-500"
+                      disabled={submitting}
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      Tôi đã đọc, hiểu và chấp nhận quy định sự kiện cùng điều
+                      khoản thanh toán của RaceDay. *
+                    </span>
+                  </label>
+                  {errors.paymentTermsAccepted ? (
+                    <p className="text-xs text-red-500">
+                      {errors.paymentTermsAccepted}
+                    </p>
+                  ) : null}
+                </section>
+              </div>
+            ) : null}
           </div>
 
           {/* Sidebar summary */}
-          <div className="lg:col-span-1">
+          <div className="min-w-0">
             <div className="sticky top-24 space-y-4">
               <div className="rounded-2xl border border-border bg-card p-6 shadow-lg space-y-4">
                 <h3 className="font-bold text-foreground text-base">
@@ -871,12 +1432,6 @@ function RegisterPageContent() {
                           </span>
                         )}
                       </div>
-                      {selectedTicket?.phase &&
-                      formatPhaseWindow(selectedTicket.phase) ? (
-                        <p className="text-right text-[11px] text-muted-foreground">
-                          Áp dụng {formatPhaseWindow(selectedTicket.phase)}
-                        </p>
-                      ) : null}
                     </>
                   )}
                 </div>
@@ -907,23 +1462,48 @@ function RegisterPageContent() {
                     <ChevronRight className="h-4 w-4" />
                   </button>
                 ) : (
-                  <button
-                    type="submit"
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-red-600 py-3 text-sm font-bold text-white shadow-lg shadow-orange-500/25 transition-all hover:shadow-orange-500/40 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                    disabled={!selectedDistance || submitting}
-                  >
-                    {submitting ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Đang tạo đơn & mở QR…
-                      </>
-                    ) : (
-                      <>
-                        Thanh toán ngay
+                  <div className="space-y-2">
+                    {step > 1 ? (
+                      <button
+                        type="button"
+                        onClick={goBack}
+                        disabled={submitting}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-border py-2.5 text-sm font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50"
+                      >
+                        <ArrowLeft className="h-4 w-4" />
+                        Quay lại
+                      </button>
+                    ) : null}
+                    {step < 4 ? (
+                      <button
+                        type="button"
+                        onClick={goNext}
+                        disabled={step === 1 && !selectedDistance}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-red-600 py-3 text-sm font-bold text-white shadow-lg shadow-orange-500/25 transition-all hover:shadow-orange-500/40 disabled:opacity-50"
+                      >
+                        Tiếp tục
                         <ChevronRight className="h-4 w-4" />
-                      </>
+                      </button>
+                    ) : (
+                      <button
+                        type="submit"
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-red-600 py-3 text-sm font-bold text-white shadow-lg shadow-orange-500/25 transition-all hover:shadow-orange-500/40 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                        disabled={!selectedDistance || submitting}
+                      >
+                        {submitting ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Đang tạo đơn & mở QR…
+                          </>
+                        ) : (
+                          <>
+                            Thanh toán
+                            <ChevronRight className="h-4 w-4" />
+                          </>
+                        )}
+                      </button>
                     )}
-                  </button>
+                  </div>
                 )}
 
                 {resumeHint && (

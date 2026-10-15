@@ -10,7 +10,7 @@ const STORAGE_PUBLIC = (
 ).replace(/\/$/, "");
 
 const STORAGE_FOLDER =
-  /^\/(?:uploads\/)?(event-docs|event-banners|health-certs)\/(.+)$/i;
+  /^\/(?:uploads\/)?(event-docs|event-banners|health-certs|avatars)\/(.+)$/i;
 
 export function absoluteFileUrl(fileUrl: string): string {
   if (!fileUrl) return "";
@@ -51,18 +51,13 @@ export function resolveStoredFileUrl(fileUrl: string): string {
   return abs;
 }
 
-/** Preview / mở file trên User FE (proxy khi còn trên API local). */
+/**
+ * Preview / mở file trên User FE.
+ * Dùng URL tuyệt đối BE/R2 — không proxy qua Next `/api/media`
+ * (static file đã serve từ API `UseStaticFiles` / CDN).
+ */
 export function mediaDisplayUrl(fileUrl: string): string {
   if (!fileUrl) return "";
   if (fileUrl.startsWith("blob:")) return fileUrl;
-  const resolved = resolveStoredFileUrl(fileUrl);
-  try {
-    const host = new URL(resolved).hostname;
-    if (host === "localhost" || host === "127.0.0.1") {
-      return `/api/media?u=${encodeURIComponent(resolved)}`;
-    }
-  } catch {
-    /* keep */
-  }
-  return resolved;
+  return resolveStoredFileUrl(fileUrl);
 }

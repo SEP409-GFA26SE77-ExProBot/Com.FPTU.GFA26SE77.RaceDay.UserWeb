@@ -28,10 +28,16 @@ function withResolvedDocuments(event: RaceEventDto): RaceEventDto {
 }
 
 function withResolvedReg(reg: RegistrationDto): RegistrationDto {
-  if (!reg?.healthCertUrl) return reg;
-  return {
+  const raw = reg as RegistrationDto & { distanceLabel?: string | null };
+  const distanceName = reg.distanceName || raw.distanceLabel || undefined;
+  const next: RegistrationDto = {
     ...reg,
-    healthCertUrl: resolveStoredFileUrl(reg.healthCertUrl),
+    ...(distanceName ? { distanceName } : {}),
+  };
+  if (!next.healthCertUrl) return next;
+  return {
+    ...next,
+    healthCertUrl: resolveStoredFileUrl(next.healthCertUrl),
   };
 }
 
@@ -128,4 +134,21 @@ export async function getRegistrationById(
 /** Cancel a pending_payment registration */
 export async function cancelRegistration(registrationId: string): Promise<void> {
   return api.post(`${EVENT_API}/registrations/${registrationId}/cancel`);
+}
+
+/**
+ * Rejected + đã paid → sửa hồ sơ & nộp lại pending_approval (không thanh toán lại).
+ * Body giống CreateRegistrationDto (không cần distanceId).
+ */
+export async function resubmitRejectedRegistration(
+  registrationId: string,
+  data: Omit<CreateRegistrationDto, "distanceId" | "dateOfBirth"> & {
+    dateOfBirth?: string;
+  }
+): Promise<RegistrationDto> {
+  const reg = (await api.put(
+    `${EVENT_API}/registrations/${registrationId}/resubmit`,
+    data
+  )) as RegistrationDto;
+  return withResolvedReg(reg);
 }

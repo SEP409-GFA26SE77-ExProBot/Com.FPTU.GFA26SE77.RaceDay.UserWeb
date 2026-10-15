@@ -11,7 +11,13 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { getEventById, getRegistrationById, cancelRegistration } from "@/api/events";
-import { createCheckout, syncPayment, mockCancel } from "@/api/payments";
+import {
+  createCheckout,
+  getPaymentStatus,
+  syncPayment,
+  mockCancel,
+  mockPay,
+} from "@/api/payments";
 import { RaceEventDto, RegistrationDto } from "@/dto/event.dto";
 import type { CheckoutResponseDto } from "@/dto/payment.dto";
 import { formatPrice } from "@/lib/format";
@@ -25,6 +31,9 @@ type PaymentState = "booting" | "checkout" | "success" | "error";
 function toAbsoluteCheckoutUrl(url: string): string {
   if (url.startsWith("http://") || url.startsWith("https://")) return url;
   if (typeof window === "undefined") return url;
+  // Mock checkoutUrl thường trỏ API :5080 — không gắn origin FE :3000
+  const apiBase = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
+  if (apiBase && url.startsWith("/")) return `${apiBase}${url}`;
   const base = window.location.origin;
   return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
 }
@@ -45,6 +54,8 @@ function PaymentContent() {
   const [paymentState, setPaymentState] = useState<PaymentState>("booting");
   const [checkout, setCheckout] = useState<CheckoutResponseDto | null>(null);
   const [returnUrl, setReturnUrl] = useState("");
+  const [payOsMock, setPayOsMock] = useState(false);
+  const [mockPaying, setMockPaying] = useState(false);
 
   const startedCheckoutRef = useRef(false);
   const cancellingRef = useRef(false);
@@ -98,6 +109,22 @@ function PaymentContent() {
     [router, eventId, registration?.id, regId]
   );
 
+  const confirmMockPaid = useCallback(async () => {
+    const payId = checkout?.paymentId;
+    if (!payId || mockPaying) return;
+    setMockPaying(true);
+    setError(null);
+    try {
+      await mockPay(payId);
+      setPaymentState("success");
+      window.setTimeout(() => goPending(payId), 500);
+    } catch (e) {
+      setError(getApiErrorMessage(e, "Giả lập thanh toán thất bại."));
+    } finally {
+      setMockPaying(false);
+    }
+  }, [checkout?.paymentId, mockPaying, goPending]);
+
   // PayOS redirect cancelUrl (?abandon=1) → hủy đơn → form sạch
   useEffect(() => {
     if (!abandon) return;
@@ -114,6 +141,17 @@ function PaymentContent() {
       startedCheckoutRef.current = false;
 
       try {
+        try {
+          const st = await getPaymentStatus();
+          if (isMounted) {
+            setPayOsMock(
+              String(st.payOsMode || "").toLowerCase() === "mock"
+            );
+          }
+        } catch {
+          /* ignore */
+        }
+
         const eventData = await getEventById(eventId);
         if (!isMounted) return;
         setEvent(eventData);
@@ -151,6 +189,27 @@ function PaymentContent() {
         const effectiveId = reg?.id || regId;
         if (!effectiveId) {
           setError("Không tìm thấy mã đăng ký. Vui lòng đăng ký lại.");
+          setPaymentState("error");
+          return;
+        }
+
+        const status = (reg?.status || "").toLowerCase();
+        if (status && status !== "pending_payment") {
+          try {
+            sessionStorage.removeItem("last_registration_id");
+            sessionStorage.removeItem("registration_data");
+          } catch {
+            /* ignore */
+          }
+          if (status === "confirmed" || status === "pending_approval") {
+            router.replace(
+              `/events/${eventId}/pending?regId=${effectiveId}`
+            );
+            return;
+          }
+          setError(
+            `Đơn không còn chờ thanh toán (hiện tại: ${reg?.status}). Vui lòng đăng ký lại hoặc xem Vé của tôi.`
+          );
           setPaymentState("error");
           return;
         }
@@ -410,8 +469,27 @@ function PaymentContent() {
             </div>
 
             <p className="text-[11px] text-muted-foreground leading-relaxed">
-              PayOS xác nhận xong sẽ tự chuyển trang. «Quay lại form» giữ thông tin + đơn chờ thanh toán; «Hủy thanh toán» xóa đơn và form trống.
+              {payOsMock
+                ? "Đang dùng PayOS mock (dev): QR không trừ tiền thật — bấm nút giả lập bên dưới để coi như đã thanh toán."
+                : "PayOS xác nhận xong sẽ tự chuyển trang. «Quay lại form» giữ thông tin + đơn chờ thanh toán; «Hủy thanh toán» xóa đơn và form trống."}
             </p>
+
+            {payOsMock && checkout?.paymentId ? (
+              <button
+                type="button"
+                onClick={() => void confirmMockPaid()}
+                disabled={mockPaying}
+                className="w-full rounded-xl bg-gradient-to-r from-orange-500 to-red-600 py-2.5 text-sm font-bold text-white shadow-sm disabled:opacity-50"
+              >
+                {mockPaying ? (
+                  <span className="inline-flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Đang giả lập…
+                  </span>
+                ) : (
+                  "Giả lập thanh toán thành công"
+                )}
+              </button>
+            ) : null}
 
             <button
               type="button"

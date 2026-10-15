@@ -94,23 +94,46 @@ export function getMyEventsCardStatusLabel(
   return "Chưa duyệt";
 }
 
+/** Badge trên ảnh banner/card list — nền đặc + chữ sáng (không dùng /15 translucent). */
+export function getPublicEventStatusBadgeClass(label: string): string {
+  switch (label) {
+    case "Đang mở":
+      return "bg-emerald-600 text-white";
+    case "Sắp mở":
+    case "Chờ mở":
+      return "bg-amber-500 text-zinc-950";
+    case "Đang diễn ra":
+      return "bg-rose-600 text-white";
+    case "Hết slot":
+    case "Đã hủy":
+    case "Từ chối":
+      return "bg-red-600 text-white";
+    case "Đã đóng":
+    case "Đã kết thúc":
+      return "bg-zinc-800 text-white";
+    default:
+      return "bg-zinc-950 text-white";
+  }
+}
+
+/** Badge trên banner — nền đặc + chữ sáng (giống EventCard public). */
 export function getMyEventsCardStatusColor(label: string): string {
   switch (label) {
     case "Đã duyệt":
-      return "bg-emerald-500/15 text-emerald-700 border-emerald-500/25";
+      return "bg-emerald-600 text-white";
     case "Chờ duyệt":
     case "Chưa duyệt":
-      return "bg-amber-500/15 text-amber-700 border-amber-500/25";
+      return "bg-amber-500 text-zinc-950";
     case "Đã bắt đầu":
-      return "bg-orange-500/15 text-orange-700 border-orange-500/25";
+      return "bg-orange-600 text-white";
     case "Đã kết thúc":
     case "Hết hạn gói":
-      return "bg-gray-500/15 text-gray-600 border-gray-500/25";
+      return "bg-zinc-800 text-white";
     case "Đã từ chối":
     case "Đã hủy":
-      return "bg-red-500/15 text-red-700 border-red-500/25";
+      return "bg-red-600 text-white";
     default:
-      return "bg-gray-500/15 text-gray-600 border-gray-500/25";
+      return "bg-zinc-950 text-white";
   }
 }
 
