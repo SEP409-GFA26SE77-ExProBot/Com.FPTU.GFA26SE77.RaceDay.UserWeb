@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { login } from "@/api/auth";
 import { Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
-import { getApiErrorMessage } from "@/lib/error";
+import { getApiErrorMessage, getZodFieldErrors } from "@/lib/error";
+import { LoginSchema } from "@/dto/auth.dto";
 
 function LoginForm() {
   const router = useRouter();
@@ -19,26 +20,33 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [mustChangePasswordHint, setMustChangePasswordHint] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
     setError(null);
+    setFieldErrors((prev) => {
+      if (!prev[name]) return prev;
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.username.trim() || !form.password.trim()) {
-      setError("Vui lòng điền đầy đủ tên đăng nhập và mật khẩu.");
+    const parsed = LoginSchema.safeParse(form);
+    if (!parsed.success) {
+      setFieldErrors(getZodFieldErrors(parsed.error));
       return;
     }
     setLoading(true);
     setError(null);
+    setFieldErrors({});
     try {
-      const res = await login({
-        username: form.username.trim(),
-        password: form.password,
-      });
+      const res = await login(parsed.data);
       if (res.mustChangePassword) {
         setMustChangePasswordHint(true);
         return;
@@ -97,9 +105,16 @@ function LoginForm() {
             placeholder="Nhập tên đăng nhập"
             value={form.username}
             onChange={handleChange}
-            className="auth-input"
+            className={`auth-input${fieldErrors.username ? " auth-input--error" : ""}`}
             disabled={loading}
+            aria-invalid={Boolean(fieldErrors.username)}
+            aria-describedby={fieldErrors.username ? "login-username-error" : undefined}
           />
+          {fieldErrors.username ? (
+            <p id="login-username-error" className="auth-field-error">
+              {fieldErrors.username}
+            </p>
+          ) : null}
         </div>
 
         {/* Password */}
@@ -118,8 +133,12 @@ function LoginForm() {
               placeholder="Nhập mật khẩu của bạn"
               value={form.password}
               onChange={handleChange}
-              className="auth-input auth-input--with-icon"
+              className={`auth-input auth-input--with-icon${
+                fieldErrors.password ? " auth-input--error" : ""
+              }`}
               disabled={loading}
+              aria-invalid={Boolean(fieldErrors.password)}
+              aria-describedby={fieldErrors.password ? "login-password-error" : undefined}
             />
             <button
               type="button"
@@ -131,6 +150,11 @@ function LoginForm() {
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </div>
+          {fieldErrors.password ? (
+            <p id="login-password-error" className="auth-field-error">
+              {fieldErrors.password}
+            </p>
+          ) : null}
           <Link href="/forgot-password" className="auth-forgot">
             Quên mật khẩu?
           </Link>

@@ -1,3 +1,5 @@
+import * as z from "zod";
+
 export function getApiErrorMessage(err: unknown, fallback: string = "Đã xảy ra lỗi. Vui lòng thử lại."): string {
   if (!err) return fallback;
 
@@ -59,4 +61,19 @@ export function getApiErrorMessage(err: unknown, fallback: string = "Đã xảy 
   }
 
   return fallback;
+}
+
+export function getZodErrorMessage(error: z.ZodError): string {
+  return error.issues[0]?.message ?? "Dữ liệu không hợp lệ.";
+}
+
+export function getZodFieldErrors(error: z.ZodError): Record<string, string> {
+  const fieldErrors: Record<string, string> = {};
+  for (const issue of error.issues) {
+    const key = issue.path[0];
+    if (typeof key === "string" && !fieldErrors[key]) {
+      fieldErrors[key] = issue.message;
+    }
+  }
+  return fieldErrors;
 }

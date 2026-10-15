@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { register } from "@/api/auth";
 import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
-import { getApiErrorMessage } from "@/lib/error";
+import { getApiErrorMessage, getZodFieldErrors } from "@/lib/error";
+import { RegisterFormSchema } from "@/dto/auth.dto";
 
 interface RegisterForm {
   username: string;
@@ -43,48 +44,42 @@ export default function RegisterPage() {
   const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [success, setSuccess] = useState(false);
 
   const strength = passwordStrength(form.password);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
     setError(null);
-  };
-
-  const validate = () => {
-    if (!form.fullName.trim()) return "Vui lòng nhập họ và tên.";
-    if (!form.username.trim() || form.username.trim().length < 3)
-      return "Tên đăng nhập phải có ít nhất 3 ký tự.";
-    if (!/^[a-zA-Z0-9._-]+$/.test(form.username.trim()))
-      return "Tên đăng nhập chỉ gồm chữ cái, số, dấu chấm, gạch dưới hoặc gạch ngang.";
-    if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()))
-      return "Vui lòng nhập địa chỉ email hợp lệ.";
-    if (form.password.length < 8) return "Mật khẩu phải có ít nhất 8 ký tự.";
-    if (form.password !== form.confirmPassword) return "Mật khẩu xác nhận không khớp.";
-    return null;
+    setFieldErrors((prev) => {
+      if (!prev[name]) return prev;
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const validationError = validate();
-    if (validationError) {
-      setError(validationError);
+    const parsed = RegisterFormSchema.safeParse(form);
+    if (!parsed.success) {
+      setFieldErrors(getZodFieldErrors(parsed.error));
       return;
     }
     setLoading(true);
     setError(null);
+    setFieldErrors({});
     try {
-      await register({
-        username: form.username.trim(),
-        email: form.email.trim(),
-        password: form.password,
-        fullName: form.fullName.trim(),
-        phone: form.phone.trim() || undefined,
-      });
+      const { confirmPassword: _confirmPassword, ...payload } = parsed.data;
+      await register(payload);
       setSuccess(true);
       setTimeout(
-        () => router.push(`/verify-email?email=${encodeURIComponent(form.email.trim())}`),
+        () =>
+          router.push(
+            `/verify-email?email=${encodeURIComponent(parsed.data.email)}`
+          ),
         1500
       );
     } catch (err) {
@@ -145,9 +140,16 @@ export default function RegisterPage() {
               placeholder="Nguyễn Văn A"
               value={form.fullName}
               onChange={handleChange}
-              className="auth-input"
+              className={`auth-input${fieldErrors.fullName ? " auth-input--error" : ""}`}
               disabled={loading}
+              aria-invalid={Boolean(fieldErrors.fullName)}
+              aria-describedby={fieldErrors.fullName ? "reg-fullname-error" : undefined}
             />
+            {fieldErrors.fullName ? (
+              <p id="reg-fullname-error" className="auth-field-error">
+                {fieldErrors.fullName}
+              </p>
+            ) : null}
           </div>
 
           {/* Username */}
@@ -160,12 +162,19 @@ export default function RegisterPage() {
               name="username"
               type="text"
               autoComplete="username"
-              placeholder="nguyenvana"
+              placeholder="Tên đăng nhập"
               value={form.username}
               onChange={handleChange}
-              className="auth-input"
+              className={`auth-input${fieldErrors.username ? " auth-input--error" : ""}`}
               disabled={loading}
+              aria-invalid={Boolean(fieldErrors.username)}
+              aria-describedby={fieldErrors.username ? "reg-username-error" : undefined}
             />
+            {fieldErrors.username ? (
+              <p id="reg-username-error" className="auth-field-error">
+                {fieldErrors.username}
+              </p>
+            ) : null}
           </div>
 
           {/* Email */}
@@ -178,12 +187,19 @@ export default function RegisterPage() {
               name="email"
               type="email"
               autoComplete="email"
-              placeholder="vana@example.com"
+              placeholder="mail@example.com"
               value={form.email}
               onChange={handleChange}
-              className="auth-input"
+              className={`auth-input${fieldErrors.email ? " auth-input--error" : ""}`}
               disabled={loading}
+              aria-invalid={Boolean(fieldErrors.email)}
+              aria-describedby={fieldErrors.email ? "reg-email-error" : undefined}
             />
+            {fieldErrors.email ? (
+              <p id="reg-email-error" className="auth-field-error">
+                {fieldErrors.email}
+              </p>
+            ) : null}
           </div>
 
           {/* Phone */}
@@ -196,12 +212,19 @@ export default function RegisterPage() {
               name="phone"
               type="tel"
               autoComplete="tel"
-              placeholder="+84 xxx xxx xxx"
+              placeholder="+84xxxxxxxxx"
               value={form.phone}
               onChange={handleChange}
-              className="auth-input"
+              className={`auth-input${fieldErrors.phone ? " auth-input--error" : ""}`}
               disabled={loading}
+              aria-invalid={Boolean(fieldErrors.phone)}
+              aria-describedby={fieldErrors.phone ? "reg-phone-error" : undefined}
             />
+            {fieldErrors.phone ? (
+              <p id="reg-phone-error" className="auth-field-error">
+                {fieldErrors.phone}
+              </p>
+            ) : null}
           </div>
 
           {/* Password */}
@@ -218,8 +241,12 @@ export default function RegisterPage() {
                 placeholder="Tối thiểu 8 ký tự"
                 value={form.password}
                 onChange={handleChange}
-                className="auth-input auth-input--with-icon"
+                className={`auth-input auth-input--with-icon${
+                  fieldErrors.password ? " auth-input--error" : ""
+                }`}
                 disabled={loading}
+                aria-invalid={Boolean(fieldErrors.password)}
+                aria-describedby={fieldErrors.password ? "reg-password-error" : undefined}
               />
               <button
                 type="button"
@@ -231,6 +258,11 @@ export default function RegisterPage() {
                 {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
+            {fieldErrors.password ? (
+              <p id="reg-password-error" className="auth-field-error">
+                {fieldErrors.password}
+              </p>
+            ) : null}
             {/* Strength meter */}
             {form.password && (
               <div className="auth-strength">
@@ -238,11 +270,10 @@ export default function RegisterPage() {
                   {[1, 2, 3, 4].map((n) => (
                     <div
                       key={n}
-                      className={`auth-strength-bar ${
-                        strength.level >= n
-                          ? `auth-strength-bar--${strength.level}`
-                          : ""
-                      }`}
+                      className={`auth-strength-bar ${strength.level >= n
+                        ? `auth-strength-bar--${strength.level}`
+                        : ""
+                        }`}
                     />
                   ))}
                 </div>
@@ -268,15 +299,19 @@ export default function RegisterPage() {
                 value={form.confirmPassword}
                 onChange={handleChange}
                 className={`auth-input auth-input--with-icon ${
-                  form.confirmPassword &&
-                  form.password !== form.confirmPassword
+                  fieldErrors.confirmPassword ||
+                  (form.confirmPassword && form.password !== form.confirmPassword)
                     ? "auth-input--error"
                     : form.confirmPassword &&
-                      form.password === form.confirmPassword
-                    ? "auth-input--success"
-                    : ""
+                        form.password === form.confirmPassword
+                      ? "auth-input--success"
+                      : ""
                 }`}
                 disabled={loading}
+                aria-invalid={Boolean(fieldErrors.confirmPassword)}
+                aria-describedby={
+                  fieldErrors.confirmPassword ? "reg-confirm-password-error" : undefined
+                }
               />
               <button
                 type="button"
@@ -290,6 +325,11 @@ export default function RegisterPage() {
                 {showConfirmPw ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
+            {fieldErrors.confirmPassword ? (
+              <p id="reg-confirm-password-error" className="auth-field-error">
+                {fieldErrors.confirmPassword}
+              </p>
+            ) : null}
           </div>
         </div>
 
