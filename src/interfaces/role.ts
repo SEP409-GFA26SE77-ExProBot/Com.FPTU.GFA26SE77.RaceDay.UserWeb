@@ -1,6 +1,6 @@
 export enum Role {
-    RUNNER = 'User',
-    ORGANIZER = 'Organizer'
+    RUNNER = 'USER',
+    ORGANIZER = 'ORGANIZER',
 }
 
 export const ALL_ROLES: Role[] = Object.values(Role);

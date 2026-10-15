@@ -50,53 +50,32 @@ const NAV_LINKS: NavLink[] = [
 let cachedAuthRaw = "";
 let cachedAuthState = {
   isLoggedIn: false,
-  username: null as string | null,
+  username: null as string | null | undefined,
   role: null as string | null,
   avatarUrl: null as string | null,
 };
 
-function roleFromJwt(token: string): string | null {
-  try {
-    const parts = token.split(".");
-    if (parts.length < 2) return null;
-    const payload = JSON.parse(
-      atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"))
-    );
-    const raw =
-      payload.role ||
-      payload["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] ||
-      payload.roles?.[0] ||
-      (Array.isArray(payload.role) ? payload.role[0] : undefined);
-    if (typeof raw === "string" && raw.trim()) {
-      return raw.replace(/^ROLE_/i, "").trim().toUpperCase();
-    }
-  } catch {
-    /* ignore */
-  }
-  return null;
-}
-
 function getAuthSnapshot() {
-  const token = Cookies.get("access_token") || "";
-  const username = Cookies.get("username") || "Racer";
+  const accessToken = Cookies.get("accessToken") || "";
+  const username = Cookies.get("username");
   const rawRole = Cookies.get("role") || "";
   const avatarUrl = Cookies.get("avatar_url") || "";
   // USER (IAM) / trống → RUNNER để hiện Vé, Chứng nhận, menu runner
-  const role = token
-    ? mapAppRole(rawRole || roleFromJwt(token) || Role.RUNNER)
+  const role = accessToken
+    ? mapAppRole(rawRole || Role.RUNNER)
     : "";
   // Đồng bộ cookie nếu còn lưu USER cũ
-  if (token && rawRole && mapAppRole(rawRole) !== rawRole.toUpperCase()) {
+  if (accessToken && rawRole && mapAppRole(rawRole) !== rawRole.toUpperCase()) {
     Cookies.set("role", role, { sameSite: "lax", path: "/" });
   }
-  const raw = `${token}:${username}:${role}:${avatarUrl}`;
+  const raw = `${accessToken}:${username}:${role}:${avatarUrl}`;
   if (raw !== cachedAuthRaw) {
     cachedAuthRaw = raw;
     cachedAuthState = {
-      isLoggedIn: Boolean(token),
-      username: token ? username : null,
-      role: token && role ? role : null,
-      avatarUrl: token && avatarUrl ? avatarUrl : null,
+      isLoggedIn: Boolean(accessToken),
+      username: accessToken ? username : null,
+      role: accessToken && role ? role : null,
+      avatarUrl: accessToken && avatarUrl ? avatarUrl : null,
     };
   }
   return cachedAuthState;
@@ -127,7 +106,7 @@ function UserAvatarMark({
   sizeClass = "h-7 w-7",
   textClass = "text-xs",
 }: {
-  username: string | null;
+  username: string | null | undefined;
   avatarUrl: string | null;
   sizeClass?: string;
   textClass?: string;
