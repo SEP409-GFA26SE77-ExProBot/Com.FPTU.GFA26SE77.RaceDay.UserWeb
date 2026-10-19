@@ -1,4 +1,6 @@
 "use client";
+import { useOrganizerToastState } from "@/lib/use-organizer-toast-state";
+import { useOrganizerErrorState } from "@/lib/use-organizer-error-state";
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -30,8 +32,8 @@ export default function OrganizerEventWallet({ eventId }: { eventId: string }) {
   const [ledger, setLedger] = useState<EventFinanceSummaryDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [error, setError] = useOrganizerErrorState();
+  const [toast, setToast] = useOrganizerToastState<string | null>(null);
   const [bank, setBank] = useState<BankAccountDto>({
     bankName: "",
     accountNumber: "",

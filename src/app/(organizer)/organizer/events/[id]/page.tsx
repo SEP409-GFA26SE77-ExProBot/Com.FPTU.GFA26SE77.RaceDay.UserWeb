@@ -1,4 +1,6 @@
 "use client";
+import { useOrganizerToastState } from "@/lib/use-organizer-toast-state";
+import { useOrganizerErrorState } from "@/lib/use-organizer-error-state";
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -88,8 +90,8 @@ function MyEventDetailContent() {
   const [regs, setRegs] = useState<ApiRegistration[]>([]);
   const [loading, setLoading] = useState(true);
   const [regsLoading, setRegsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [error, setError] = useOrganizerErrorState();
+  const [toast, setToast] = useOrganizerToastState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [reason, setReason] = useState("");
@@ -108,7 +110,7 @@ function MyEventDetailContent() {
       setRegs(Array.isArray(list) ? list : []);
     } catch (e) {
       setRegs([]);
-      notify(getApiErrorMessage(e, "Không tải được danh sách đăng ký."));
+      setError(getApiErrorMessage(e, "Không tải được danh sách đăng ký."));
     } finally {
       setRegsLoading(false);
     }
@@ -162,7 +164,7 @@ function MyEventDetailContent() {
       );
       await loadRegs();
     } catch (e) {
-      notify(getApiErrorMessage(e, "Duyệt thất bại."));
+      setError(getApiErrorMessage(e, "Duyệt thất bại."));
     } finally {
       setBusyId(null);
     }
@@ -178,7 +180,7 @@ function MyEventDetailContent() {
       notify("Đã từ chối đăng ký.");
       await loadRegs();
     } catch (e) {
-      notify(getApiErrorMessage(e, "Từ chối thất bại."));
+      setError(getApiErrorMessage(e, "Từ chối thất bại."));
     } finally {
       setBusyId(null);
     }

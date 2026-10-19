@@ -1,4 +1,5 @@
 "use client";
+import { useOrganizerErrorState } from "@/lib/use-organizer-error-state";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -18,7 +19,7 @@ export default function EventFinancePanel({ eventId }: { eventId: string }) {
   const [data, setData] = useState<EventFinanceSummaryDto | null>(null);
   const [payouts, setPayouts] = useState<PayoutRequestDto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useOrganizerErrorState();
 
   useEffect(() => {
     let cancelled = false;

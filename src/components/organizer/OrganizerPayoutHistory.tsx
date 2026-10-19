@@ -1,4 +1,5 @@
 "use client";
+import { useOrganizerErrorState } from "@/lib/use-organizer-error-state";
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -35,7 +36,7 @@ export default function OrganizerPayoutHistory({
   const [eventName, setEventName] = useState("");
   const [items, setItems] = useState<PayoutRequestDto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useOrganizerErrorState();
 
   const load = useCallback(async () => {
     setError(null);

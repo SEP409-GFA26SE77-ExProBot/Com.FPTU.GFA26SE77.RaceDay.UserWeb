@@ -75,8 +75,8 @@ export default function ResultsHubPage() {
         </p>
         <h1 className="text-3xl font-extrabold tracking-tight">Kết quả giải chạy</h1>
         <p className="mt-1 text-sm text-muted-foreground max-w-2xl">
-          Danh sách giải từ API. Bảng xếp hạng / finish time chi tiết chưa có endpoint trên
-          backend — khi có sẽ hiển thị tại từng giải.
+          Chọn giải để xem bảng xếp hạng, thành tích và pace theo từng cự ly,
+          hoặc tra cứu thứ hạng của bạn.
         </p>
       </div>
 
@@ -111,7 +111,7 @@ export default function ResultsHubPage() {
                       href={`/results/${r.eventId}`}
                       className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 hover:underline"
                     >
-                      Xem trang giải <ExternalLink className="h-3 w-3" />
+                      Xem bảng xếp hạng <ExternalLink className="h-3 w-3" />
                     </Link>
                     <Link
                       href={`/my-registrations/${r.id}`}
@@ -130,11 +130,11 @@ export default function ResultsHubPage() {
       <section className="space-y-3">
         <h2 className="text-lg font-bold flex items-center gap-2">
           <Flag className="h-4 w-4 text-orange-500" />
-          Tất cả giải (API)
+          Chọn giải xem kết quả
         </h2>
         {events.length === 0 ? (
           <div className="rounded-2xl border border-dashed p-10 text-center text-sm text-muted-foreground">
-            Không có sự kiện từ máy chủ.
+            Chưa có giải để hiển thị kết quả.
           </div>
         ) : (
           <ul className="space-y-3">
@@ -158,7 +158,7 @@ export default function ResultsHubPage() {
                   href={`/results/${ev.id}`}
                   className="rounded-full bg-orange-500 px-4 py-2 text-xs font-semibold text-white"
                 >
-                  Chi tiết
+                  Xem bảng xếp hạng
                 </Link>
               </li>
             ))}

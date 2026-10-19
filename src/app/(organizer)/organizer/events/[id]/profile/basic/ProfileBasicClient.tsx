@@ -1,4 +1,6 @@
 "use client";
+import { useOrganizerToastState } from "@/lib/use-organizer-toast-state";
+import { useOrganizerErrorState } from "@/lib/use-organizer-error-state";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
@@ -41,8 +43,8 @@ export default function ProfileBasicClient() {
 
   const [event, setEvent] = useState<RaceEventDto | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [error, setError] = useOrganizerErrorState();
+  const [toast, setToast] = useOrganizerToastState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const [name, setName] = useState("");
@@ -147,7 +149,7 @@ export default function ProfileBasicClient() {
       setBannerImage(result.fileUrl);
       notify("Tải ảnh banner thành công.");
     } catch (e) {
-      notify(getApiErrorMessage(e, "Upload thất bại."));
+      setError(getApiErrorMessage(e, "Upload thất bại."));
     } finally {
       setUploading(false);
     }

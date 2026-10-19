@@ -1,4 +1,6 @@
 "use client";
+import { useOrganizerToastState } from "@/lib/use-organizer-toast-state";
+import { useOrganizerErrorState } from "@/lib/use-organizer-error-state";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -494,8 +496,8 @@ export default function EventPermitRegistration({
   const [conditions, setConditions] = useState<boolean[]>(
     safetyConditions.map(() => false)
   );
-  const [toast, setToast] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useOrganizerToastState("");
+  const [error, setError] = useOrganizerErrorState();
   const [fieldErrors, setFieldErrors] = useState<Set<FieldErrorKey>>(
     () => new Set()
   );
