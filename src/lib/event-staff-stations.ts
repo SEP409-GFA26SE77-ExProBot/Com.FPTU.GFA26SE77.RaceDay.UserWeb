@@ -12,14 +12,8 @@ const DUTY_STATIONS: Record<EventStaffRole, StaffStationDto[]> = {
   coordinator: [
     {
       id: "duty:ops",
-      label: "Trung tâm điều hành (không gán map)",
+      label: "Trung tâm điều hành",
       kind: "other",
-      source: "duty",
-    },
-    {
-      id: "duty:medical",
-      label: "Y tế (không gán map)",
-      kind: "medical",
       source: "duty",
     },
   ],
@@ -30,6 +24,12 @@ const DUTY_STATIONS: Record<EventStaffRole, StaffStationDto[]> = {
       kind: "other",
       source: "duty",
     },
+    {
+      id: "duty:static",
+      label: "Cố định",
+      kind: "photo_zone",
+      source: "duty",
+    }
   ],
   volunteer: [
     {

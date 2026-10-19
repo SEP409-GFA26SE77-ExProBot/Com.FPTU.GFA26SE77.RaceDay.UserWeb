@@ -81,7 +81,7 @@ export default function ProfileEditPage() {
   const [pwApiError, setPwApiError] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = Cookies.get("access_token");
+    const token = Cookies.get("accessToken");
     setLoggedIn(Boolean(token));
     setUsername(Cookies.get("username") || "");
     if (!token) {

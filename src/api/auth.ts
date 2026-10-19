@@ -123,10 +123,10 @@ export function persistAvatarCookie(avatarUrl?: string | null) {
 }
 
 export async function logout(): Promise<void> {
-  Cookies.remove('access_token');
+  Cookies.remove('accessToken');
   Cookies.remove('role');
   Cookies.remove('username');
-  Cookies.remove('user_id');
+  Cookies.remove('userId');
   persistAvatarCookie(null);
   window.location.href = '/';
 }

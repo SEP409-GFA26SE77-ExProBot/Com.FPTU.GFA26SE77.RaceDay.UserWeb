@@ -13,7 +13,7 @@ const api = axios.create({
 api.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
         if (typeof window !== 'undefined') {
-            const token = Cookies.get('access_token');
+            const token = Cookies.get('accessToken');
             if (token && config.headers) {
                 config.headers.Authorization = `Bearer ${token}`;
             }
@@ -41,7 +41,7 @@ api.interceptors.response.use(
                     // Validation / business rule errors are handled and displayed directly by the calling UI forms
                     break;
                 case 401:
-                    Cookies.remove('access_token');
+                    Cookies.remove('accessToken');
                     if (typeof window !== 'undefined') {
                         const currentPath = window.location.pathname;
                         if (currentPath !== '/login' && currentPath !== '/register' && currentPath !== '/verify-email') {
