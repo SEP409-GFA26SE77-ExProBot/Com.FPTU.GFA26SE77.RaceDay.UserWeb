@@ -1,4 +1,6 @@
 "use client";
+import { useOrganizerToastState } from "@/lib/use-organizer-toast-state";
+import { useOrganizerErrorState } from "@/lib/use-organizer-error-state";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -104,8 +106,8 @@ export default function ProfileOpenRegClient() {
   const [staffCount, setStaffCount] = useState(0);
   const [mapReady, setMapReady] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [error, setError] = useOrganizerErrorState();
+  const [toast, setToast] = useOrganizerToastState<string | null>(null);
   const [acting, setActing] = useState(false);
   const [statusModalOpen, setStatusModalOpen] = useState(false);
 

@@ -1,4 +1,6 @@
 "use client";
+import { useOrganizerErrorState } from "@/lib/use-organizer-error-state";
+import { useOrganizerToastState } from "@/lib/use-organizer-toast-state";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -245,7 +247,8 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
   const [stations, setStations] = useState<StaffStationDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useOrganizerErrorState();
+  const [, setToast] = useOrganizerToastState<string | null>(null);
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [fullName, setFullName] = useState("");
@@ -337,8 +340,10 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
       setInviteOpen(false);
       resetForm();
       await load();
+      setToast("Đã mời nhân sự vào giải.");
     } catch (e) {
-      setFormError(getApiErrorMessage(e, "Mời thất bại."));
+      const message = getApiErrorMessage(e, "Mời thất bại.");
+      setError(message);
     } finally {
       setBusy(false);
     }
@@ -353,6 +358,7 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
         stationLabel: nextStation ? stationLabelOf(nextStation) ?? null : null,
       });
       await load();
+      setToast("Đã cập nhật vị trí nhân sự.");
     } catch (e) {
       setError(getApiErrorMessage(e, "Gán vị trí thất bại."));
     } finally {
@@ -369,6 +375,7 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
       await revokeEventStaff(eventId, memberId);
       setRevokeTarget(null);
       await load();
+      setToast("Đã gỡ nhân sự khỏi giải.");
     } catch (e) {
       setError(getApiErrorMessage(e, "Gỡ thất bại."));
     } finally {

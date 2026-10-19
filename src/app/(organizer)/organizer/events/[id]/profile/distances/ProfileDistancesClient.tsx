@@ -1,4 +1,6 @@
 "use client";
+import { useOrganizerToastState } from "@/lib/use-organizer-toast-state";
+import { useOrganizerErrorState } from "@/lib/use-organizer-error-state";
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -119,8 +121,8 @@ export default function ProfileDistancesClient() {
   const eventId = String(params?.id || "");
   const [event, setEvent] = useState<RaceEventDto | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [error, setError] = useOrganizerErrorState();
+  const [toast, setToast] = useOrganizerToastState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [rows, setRows] = useState<DistRow[]>([]);
 
