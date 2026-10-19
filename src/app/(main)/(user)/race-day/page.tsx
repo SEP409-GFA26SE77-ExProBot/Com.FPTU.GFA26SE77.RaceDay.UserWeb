@@ -17,7 +17,7 @@ export default function RaceDayPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const loggedIn = Boolean(Cookies.get("access_token"));
+  const loggedIn = Boolean(Cookies.get("accessToken"));
 
   useEffect(() => {
     if (!loggedIn) {

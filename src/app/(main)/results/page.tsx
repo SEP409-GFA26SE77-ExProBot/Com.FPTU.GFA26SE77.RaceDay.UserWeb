@@ -22,7 +22,7 @@ export default function ResultsHubPage() {
   const [myRegs, setMyRegs] = useState<RegistrationDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const loggedIn = Boolean(Cookies.get("access_token"));
+  const loggedIn = Boolean(Cookies.get("accessToken"));
 
   useEffect(() => {
     let cancelled = false;
@@ -30,7 +30,7 @@ export default function ResultsHubPage() {
       try {
         const list = await getEvents();
         if (!cancelled) setEvents(Array.isArray(list) ? list : []);
-        if (Cookies.get("access_token")) {
+        if (Cookies.get("accessToken")) {
           try {
             const regs = await getMyRegistrations();
             if (!cancelled) setMyRegs(Array.isArray(regs) ? regs : []);

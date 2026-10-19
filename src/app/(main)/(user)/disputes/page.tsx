@@ -7,7 +7,7 @@ import { PAGE_SHELL } from "@/lib/page-shell";
 
 /** BE chưa có dispute API — không dùng mock */
 export default function DisputesPage() {
-  const loggedIn = Boolean(Cookies.get("access_token"));
+  const loggedIn = Boolean(Cookies.get("accessToken"));
 
   if (!loggedIn) {
     return (

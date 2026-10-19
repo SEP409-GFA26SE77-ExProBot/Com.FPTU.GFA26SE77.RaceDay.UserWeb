@@ -67,7 +67,7 @@ export async function getEventCoursePublic(
   try {
     const headers: HeadersInit = { Accept: "application/json" };
     if (typeof window !== "undefined") {
-      const token = Cookies.get("access_token");
+      const token = Cookies.get("accessToken");
       if (token) headers.Authorization = `Bearer ${token}`;
     }
     const res = await fetch(url, { headers, credentials: "omit" });

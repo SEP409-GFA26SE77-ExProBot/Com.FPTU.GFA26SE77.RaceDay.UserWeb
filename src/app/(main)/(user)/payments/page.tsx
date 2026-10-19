@@ -73,7 +73,7 @@ export default function PaymentsHistoryPage() {
   );
 
   useEffect(() => {
-    const token = Cookies.get("access_token");
+    const token = Cookies.get("accessToken");
     setLoggedIn(Boolean(token));
     if (!token) {
       setBoot(false);

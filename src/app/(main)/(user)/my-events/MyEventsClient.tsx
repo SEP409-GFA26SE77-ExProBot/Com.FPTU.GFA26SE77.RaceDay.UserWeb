@@ -180,7 +180,7 @@ export default function MyEventsClient() {
   } | null>(null);
 
   useEffect(() => {
-    const token = Cookies.get("access_token");
+    const token = Cookies.get("accessToken") || Cookies.get("access_token");
     setLoggedIn(Boolean(token));
     if (!token) {
       setReady(true);

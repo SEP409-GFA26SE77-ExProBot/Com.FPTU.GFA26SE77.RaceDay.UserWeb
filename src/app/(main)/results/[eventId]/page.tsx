@@ -33,7 +33,7 @@ export default function EventResultsPage() {
       try {
         const ev = await getEventById(eventId);
         if (!cancelled) setEvent(ev);
-        if (Cookies.get("access_token")) {
+        if (Cookies.get("accessToken")) {
           try {
             const regs = await getMyRegistrations();
             if (!cancelled) {

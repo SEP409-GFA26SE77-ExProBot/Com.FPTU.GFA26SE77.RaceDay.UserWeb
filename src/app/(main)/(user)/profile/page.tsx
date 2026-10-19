@@ -38,7 +38,7 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = Cookies.get("access_token");
+    const token = Cookies.get("accessToken");
     const name = Cookies.get("username") || null;
     setUsername(token ? name : null);
 

@@ -88,7 +88,7 @@ export default function EventDetailPage() {
   }, [eventId]);
 
   useEffect(() => {
-    const token = Cookies.get("access_token");
+    const token = Cookies.get("accessToken");
     if (!token || !eventId) {
       setMyReg(null);
       return;

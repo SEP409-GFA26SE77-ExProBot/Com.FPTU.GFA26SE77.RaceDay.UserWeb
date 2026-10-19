@@ -55,7 +55,7 @@ export default function Home() {
 
   useEffect(() => {
     let cancelled = false;
-    if (!Cookies.get("access_token")) {
+    if (!Cookies.get("accessToken")) {
       setMyRegByEventId(new Map());
       return;
     }

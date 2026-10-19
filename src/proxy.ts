@@ -21,7 +21,9 @@ const ROLE_PERMISSIONS: Record<string, (Role | string)[] | '*'> = {
 
 export function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
-    const token = request.cookies.get('accessToken')?.value;
+    const token =
+        request.cookies.get('accessToken')?.value ||
+        request.cookies.get('access_token')?.value;
     const rawRole = request.cookies.get('role')?.value;
     const tokenRole = extractRoleFromToken(token);
     // USER (IAM) / trống → RUNNER

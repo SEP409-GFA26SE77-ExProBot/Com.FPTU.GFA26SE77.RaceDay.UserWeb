@@ -30,11 +30,15 @@ import type {
 import { getApiErrorMessage } from "@/lib/error";
 import { PAGE_SHELL } from "@/lib/page-shell";
 
-const ROLE_TABS: { id: EventStaffRole; label: string; hint: string }[] = [
+const ROLE_TABS: {
+  id: EventStaffRole;
+  label: string;
+  hint: string;
+}[] = [
   {
     id: "coordinator",
     label: "Coordinator",
-    hint: "Gán checkpoint từ bản đồ (start / CP / finish) hoặc nhiệm vụ không gắn map (điều hành, y tế).",
+    hint: "Gán checkpoint từ bản đồ (start / CP / finish) hoặc nhiệm vụ không gắn map (Trung tâm điều hành).",
   },
   {
     id: "photographer",
@@ -47,6 +51,12 @@ const ROLE_TABS: { id: EventStaffRole; label: string; hint: string }[] = [
     hint: "Gán điểm tiếp tế (aid) đã setup trên map, hoặc quầy check-in / kit không gắn map.",
   },
 ];
+
+const INVITE_ROLE_LABELS: Record<EventStaffRole, string> = {
+  coordinator: "Điều phối viên",
+  photographer: "Nhiếp ảnh gia",
+  volunteer: "Tình nguyện viên",
+};
 
 function StationPicker({
   role,
@@ -174,7 +184,7 @@ function StationPicker({
             {filteredDuty.length > 0 ? (
               <>
                 <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                  Nhiệm vụ (không gán map)
+                  Nhiệm vụ
                 </p>
                 {filteredDuty.map((s) => (
                   <button
@@ -386,7 +396,7 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
           <button
             type="button"
             onClick={() => void load()}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-bold hover:bg-muted"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-bold transition-colors duration-150 hover:bg-muted-foreground/10 active:scale-95"
           >
             <RefreshCw className="h-3.5 w-3.5" /> Làm mới
           </button>
@@ -396,7 +406,7 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
               resetForm();
               setInviteOpen(true);
             }}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-red-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-red-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-colors duration-150 hover:from-orange-400 hover:to-red-500 active:scale-95"
           >
             <Plus className="h-3.5 w-3.5" /> Mời / thêm
           </button>
@@ -415,7 +425,7 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            {t.label}
+            {INVITE_ROLE_LABELS[t.id]}
           </button>
         ))}
       </div>
@@ -448,7 +458,7 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
           </div>
         ) : members.length === 0 ? (
           <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-            Chưa có {roleMeta.label.toLowerCase()} cho giải này. Bấm{" "}
+            Chưa có {INVITE_ROLE_LABELS[role].toLowerCase()} cho giải này. Bấm{" "}
             <span className="font-semibold text-foreground">Mời / thêm</span> để
             cấp tài khoản.
           </div>
@@ -512,7 +522,7 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest text-orange-500">
-                  {roleMeta.label}
+                  {INVITE_ROLE_LABELS[role]}
                 </p>
                 <h2
                   id="invite-staff-title"
