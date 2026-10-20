@@ -45,6 +45,19 @@ export async function getPackagePurchase(
   }
 }
 
+/** POST /organizer/packages/purchases/{id}/cancel — hủy đơn chờ thanh toán */
+export async function cancelPackagePurchase(
+  id: string
+): Promise<PackagePurchaseDto> {
+  try {
+    return (await api.post(
+      `${EVENT_API}/organizer/packages/purchases/${id}/cancel`
+    )) as PackagePurchaseDto;
+  } catch (e) {
+    throw new Error(getApiErrorMessage(e, "Hủy đơn mua gói thất bại."));
+  }
+}
+
 /** PUT /organizer/{eventId}/profile — update draft event fields */
 export async function updateEventProfile(
   eventId: string,
@@ -56,6 +69,34 @@ export async function updateEventProfile(
     return result;
   } catch (e) {
     throw new Error(getApiErrorMessage(e, "Cập nhật hồ sơ giải thất bại."));
+  }
+}
+
+/** GET /organizer/{eventId}/distances — cự ly + ticketPricing (organizer setup) */
+export async function getOrganizerDistances(
+  eventId: string
+): Promise<{
+  eventId: string;
+  status: string;
+  distances: Array<{
+    id: string;
+    name: string;
+    distanceKm: number;
+    capacity: number;
+    registeredCount: number;
+    basePrice: number;
+    /** @deprecated */
+    price?: number;
+    currency: string;
+    startAt?: string | null;
+    endAt?: string | null;
+  }>;
+  ticketPricing?: unknown;
+}> {
+  try {
+    return await api.get(`${EVENT_API}/organizer/${eventId}/distances`);
+  } catch (e) {
+    throw new Error(getApiErrorMessage(e, "Không tải được cự ly."));
   }
 }
 

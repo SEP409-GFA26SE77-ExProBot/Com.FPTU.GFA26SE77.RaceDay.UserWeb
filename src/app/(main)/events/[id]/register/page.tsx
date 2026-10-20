@@ -1206,7 +1206,9 @@ function RegisterPageContent() {
                           />
                         ) : selectedDistance ? (
                           <span className="text-lg font-extrabold text-orange-600">
-                            {formatPrice(selectedDistance.price)}
+                            {formatPrice(
+                              selectedDistance.basePrice ?? selectedDistance.price
+                            )}
                           </span>
                         ) : (
                           "—"
@@ -1428,7 +1430,9 @@ function RegisterPageContent() {
                           />
                         ) : (
                           <span className="text-xl font-extrabold text-orange-600">
-                            {formatPrice(selectedDistance.price)}
+                            {formatPrice(
+                              selectedDistance.basePrice ?? selectedDistance.price
+                            )}
                           </span>
                         )}
                       </div>

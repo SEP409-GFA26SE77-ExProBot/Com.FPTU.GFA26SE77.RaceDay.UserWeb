@@ -115,7 +115,7 @@ export default function EventCard({
       ? event.minPrice
       : null;
   const fromDistances = distances.length
-    ? Math.min(...distances.map((d) => Number(d.price) || 0))
+    ? Math.min(...distances.map((d) => Number(d.basePrice ?? d.price) || 0))
     : 0;
   const lowestPrice = fromList != null ? fromList : fromDistances;
 

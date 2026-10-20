@@ -7,13 +7,11 @@ import {
   AlertCircle,
   ArrowLeft,
   Calendar,
-  CheckCircle2,
   FileText,
   ImageIcon,
   Loader2,
   Save,
-  Users,
-} from "lucide-react";
+  Users } from "lucide-react";
 import Link from "next/link";
 import { getEventById } from "@/api/events";
 import { uploadOrganizerFile } from "@/api/organizer";
@@ -21,7 +19,7 @@ import { updateEventProfile } from "@/api/event-packages";
 import OrganizerLocationFields from "@/components/organizer/OrganizerLocationFields";
 import type { RaceEventDto } from "@/dto/event.dto";
 import { getApiErrorMessage } from "@/lib/error";
-import { getOrganizerStatusLabel, getStatusColor } from "@/lib/format";
+import { toastError, toastSuccess } from "@/lib/toast";
 import { mediaDisplayUrl } from "@/lib/media-url";
 import { composeLocation, splitLocation } from "@/lib/vn-provinces";
 
@@ -44,7 +42,6 @@ export default function EventProfileClient() {
   const [event, setEvent] = useState<RaceEventDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Form fields
@@ -62,11 +59,6 @@ export default function EventProfileClient() {
 
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-
-  const notify = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3500);
-  };
 
   // Load event
   useEffect(() => {
@@ -107,9 +99,9 @@ export default function EventProfileClient() {
     try {
       const result = await uploadOrganizerFile(file, "banner");
       setBannerImage(result.fileUrl);
-      notify("Tải ảnh banner thành công.");
+      toastSuccess("Tải ảnh banner thành công.");
     } catch (e) {
-      notify(getApiErrorMessage(e, "Upload thất bại."));
+      toastError(e, "Upload thất bại.");
     } finally {
       setUploading(false);
     }
@@ -119,11 +111,11 @@ export default function EventProfileClient() {
   const handleSave = useCallback(async () => {
     if (saving || !event) return;
     if (!provinceKey) {
-      setError("Vui lòng chọn tỉnh / thành phố.");
+      toastError("Vui lòng chọn tỉnh / thành phố.");
       return;
     }
     setSaving(true);
-    setError(null);
+
     try {
       const org = event.organizer;
       const hasBank =
@@ -167,18 +159,14 @@ export default function EventProfileClient() {
                     accountHolder: accountHolder.trim() || undefined,
                     accountNumber: accountNumber.trim() || undefined,
                     bankName: bankName.trim() || undefined,
-                    branch: branch.trim() || undefined,
-                  },
-                },
-              };
+                    branch: branch.trim() || undefined } } };
             })()
-          : {}),
-      });
+          : {}) });
       const refreshed = await getEventById(eventId);
       setEvent(refreshed);
-      notify("Đã lưu hồ sơ giải.");
+      toastSuccess("Đã lưu hồ sơ giải.");
     } catch (e) {
-      setError(getApiErrorMessage(e, "Lưu thất bại."));
+      toastError(e, "Lưu thất bại.");
     } finally {
       setSaving(false);
     }
@@ -236,13 +224,8 @@ export default function EventProfileClient() {
             Chi tiết giải
           </p>
           <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-foreground">
-            {event.name || "Giải chưa đặt tên"}
+            Hồ sơ giải
           </h1>
-          <span
-            className={`mt-2 inline-flex rounded-md border px-2.5 py-1 text-[11px] font-extrabold ${getStatusColor(event.status)}`}
-          >
-            {getOrganizerStatusLabel(event.status)}
-          </span>
           {editable && (
             <p className="mt-2 text-xs text-muted-foreground">
               Gửi admin duyệt tại{" "}
@@ -279,13 +262,6 @@ export default function EventProfileClient() {
             <p className="text-sm font-bold text-red-700">Lý do từ chối</p>
             <p className="mt-1 text-sm text-red-600">{event.rejectionReason}</p>
           </div>
-        </div>
-      )}
-
-      {toast && (
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900">
-          <CheckCircle2 className="h-4 w-4 shrink-0" />
-          {toast}
         </div>
       )}
 
@@ -461,8 +437,7 @@ function Field({
   required,
   disabled,
   icon: Icon,
-  children,
-}: {
+  children }: {
   label: string;
   required?: boolean;
   disabled?: boolean;

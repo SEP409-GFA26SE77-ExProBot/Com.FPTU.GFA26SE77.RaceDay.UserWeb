@@ -3,9 +3,9 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Loader2, AlertCircle, CheckCircle2, ArrowLeft } from "lucide-react";
+import { Loader2, CheckCircle2, ArrowLeft } from "lucide-react";
 import { resetPassword } from "@/api/auth";
-import { getApiErrorMessage } from "@/lib/error";
+import { toastError } from "@/lib/toast";
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -15,26 +15,24 @@ function ResetPasswordForm() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
     if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError("Vui lòng nhập email hợp lệ.");
+      toastError("Vui lòng nhập email hợp lệ.");
       return;
     }
     if (!/^\d{6}$/.test(otp.trim())) {
-      setError("OTP phải gồm 6 chữ số.");
+      toastError("OTP phải gồm 6 chữ số.");
       return;
     }
     if (password.length < 8) {
-      setError("Mật khẩu mới phải có ít nhất 8 ký tự.");
+      toastError("Mật khẩu mới phải có ít nhất 8 ký tự.");
       return;
     }
     if (password !== confirm) {
-      setError("Mật khẩu xác nhận không khớp.");
+      toastError("Mật khẩu xác nhận không khớp.");
       return;
     }
     setLoading(true);
@@ -47,7 +45,7 @@ function ResetPasswordForm() {
       setDone(true);
       setTimeout(() => router.push("/login"), 1600);
     } catch (err) {
-      setError(getApiErrorMessage(err, "Đặt lại mật khẩu thất bại."));
+      toastError(err, "Đặt lại mật khẩu thất bại.");
     } finally {
       setLoading(false);
     }
@@ -68,12 +66,6 @@ function ResetPasswordForm() {
             <p className="auth-subtitle">Nhập OTP và mật khẩu mới</p>
           </div>
           <form onSubmit={handleSubmit} className="auth-form" noValidate>
-            {error && (
-              <div className="auth-error" role="alert">
-                <AlertCircle size={16} />
-                <span>{error}</span>
-              </div>
-            )}
             <div className="auth-field">
               <label className="auth-label" htmlFor="reset-email">
                 Email

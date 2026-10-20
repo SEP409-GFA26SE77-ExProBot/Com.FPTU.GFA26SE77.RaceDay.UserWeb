@@ -2,21 +2,19 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Loader2, Mail, CheckCircle2, ArrowLeft, AlertCircle } from "lucide-react";
+import { Loader2, Mail, CheckCircle2, ArrowLeft } from "lucide-react";
 import { forgotPassword } from "@/api/auth";
-import { getApiErrorMessage } from "@/lib/error";
+import { toastError } from "@/lib/toast";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
     if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError("Vui lòng nhập email hợp lệ.");
+      toastError("Vui lòng nhập email hợp lệ.");
       return;
     }
     setLoading(true);
@@ -24,7 +22,7 @@ export default function ForgotPasswordPage() {
       await forgotPassword({ email: email.trim() });
       setSent(true);
     } catch (err) {
-      setError(getApiErrorMessage(err, "Không gửi được yêu cầu."));
+      toastError(err, "Không gửi được yêu cầu.");
     } finally {
       setLoading(false);
     }
@@ -60,12 +58,6 @@ export default function ForgotPasswordPage() {
             <p className="auth-subtitle">Nhập email để nhận OTP đặt lại mật khẩu</p>
           </div>
           <form onSubmit={handleSubmit} className="auth-form" noValidate>
-            {error && (
-              <div className="auth-error" role="alert">
-                <AlertCircle size={16} />
-                <span>{error}</span>
-              </div>
-            )}
             <div className="auth-field">
               <label htmlFor="forgot-email" className="auth-label">
                 Email

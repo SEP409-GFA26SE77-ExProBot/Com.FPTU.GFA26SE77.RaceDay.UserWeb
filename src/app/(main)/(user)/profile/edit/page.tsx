@@ -6,7 +6,6 @@ import Cookies from "js-cookie";
 import {
   ArrowLeft,
   Camera,
-  CheckCircle2,
   KeyRound,
   Loader2,
   LogIn,
@@ -33,6 +32,7 @@ import {
 } from "@/lib/input-rules";
 import { mediaDisplayUrl } from "@/lib/media-url";
 import { PAGE_SHELL } from "@/lib/page-shell";
+import { toastError, toastSuccess } from "@/lib/toast";
 import PageLoading from "@/components/ui/PageLoading";
 
 type ProfileForm = {
@@ -62,8 +62,6 @@ export default function ProfileEditPage() {
     {}
   );
   const [savingProfile, setSavingProfile] = useState(false);
-  const [profileSaved, setProfileSaved] = useState(false);
-  const [profileApiError, setProfileApiError] = useState<string | null>(null);
   /** File staged — chỉ upload khi bấm Lưu hồ sơ */
   const [pendingAvatar, setPendingAvatar] = useState<File | null>(null);
   const [pendingAvatarPreview, setPendingAvatarPreview] = useState<
@@ -77,8 +75,6 @@ export default function ProfileEditPage() {
   });
   const [pwErrors, setPwErrors] = useState<Record<string, string>>({});
   const [savingPw, setSavingPw] = useState(false);
-  const [pwSaved, setPwSaved] = useState(false);
-  const [pwApiError, setPwApiError] = useState<string | null>(null);
 
   useEffect(() => {
     const token = Cookies.get("access_token");
@@ -151,8 +147,6 @@ export default function ProfileEditPage() {
     ev.preventDefault();
     if (!validateProfile()) return;
     setSavingProfile(true);
-    setProfileApiError(null);
-    setProfileSaved(false);
     try {
       let next = profile;
       if (pendingAvatar) {
@@ -168,11 +162,9 @@ export default function ProfileEditPage() {
       });
       setProfile(updated);
       persistAvatarCookie(updated.avatarUrl);
-      setProfileSaved(true);
+      toastSuccess("Đã lưu hồ sơ cá nhân.");
     } catch (err) {
-      setProfileApiError(
-        getApiErrorMessage(err, "Cập nhật hồ sơ thất bại.")
-      );
+      toastError(err, "Cập nhật hồ sơ thất bại.");
     } finally {
       setSavingProfile(false);
     }
@@ -181,14 +173,13 @@ export default function ProfileEditPage() {
   const handleAvatarPick = (file: File | null) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      setProfileApiError("Chỉ chọn file ảnh.");
+      toastError("Chỉ chọn file ảnh.");
       return;
     }
     if (file.size > 2 * 1024 * 1024) {
-      setProfileApiError("Ảnh tối đa 2MB.");
+      toastError("Ảnh tối đa 2MB.");
       return;
     }
-    setProfileApiError(null);
     setPendingAvatarPreview((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return URL.createObjectURL(file);
@@ -211,17 +202,15 @@ export default function ProfileEditPage() {
     ev.preventDefault();
     if (!validatePw()) return;
     setSavingPw(true);
-    setPwApiError(null);
-    setPwSaved(false);
     try {
       await changePassword({
         currentPassword: pw.currentPassword,
         newPassword: pw.newPassword,
       });
-      setPwSaved(true);
       setPw({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      toastSuccess("Đã đổi mật khẩu.");
     } catch (err) {
-      setPwApiError(getApiErrorMessage(err, "Đổi mật khẩu thất bại."));
+      toastError(err, "Đổi mật khẩu thất bại.");
     } finally {
       setSavingPw(false);
     }
@@ -357,18 +346,6 @@ export default function ProfileEditPage() {
               Thông tin cá nhân
             </h2>
 
-            {profileApiError ? (
-              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                {profileApiError}
-              </div>
-            ) : null}
-            {profileSaved ? (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 shrink-0" />
-                Đã lưu hồ sơ cá nhân.
-              </div>
-            ) : null}
-
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <label className="block text-xs font-semibold mb-1.5">
@@ -481,18 +458,6 @@ export default function ProfileEditPage() {
               <KeyRound className="h-4 w-4 text-orange-500" />
               Đổi mật khẩu
             </h2>
-
-            {pwApiError ? (
-              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                {pwApiError}
-              </div>
-            ) : null}
-            {pwSaved ? (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 shrink-0" />
-                Đã đổi mật khẩu.
-              </div>
-            ) : null}
 
             <div className="grid gap-4 sm:grid-cols-2">
               {(

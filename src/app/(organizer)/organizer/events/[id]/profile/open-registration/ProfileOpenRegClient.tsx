@@ -23,6 +23,7 @@ import { hasEventCourse } from "@/api/race-map";
 import OrganizerEventStatusModal from "@/components/events/OrganizerEventStatusModal";
 import type { RaceEventDto, TicketPricingDto } from "@/dto/event.dto";
 import { getApiErrorMessage } from "@/lib/error";
+import { toastError, toastSuccess } from "@/lib/toast";
 import { getOrganizerStatusLabel, getStatusColor } from "@/lib/format";
 import {
   canOpenRegistration,
@@ -40,7 +41,8 @@ type CheckItem = {
 
 function hasPricing(event: RaceEventDto): boolean {
   const raw = event.ticketPricing as TicketPricingDto | undefined;
-  if (raw?.phases?.some((p) =>
+  const legacyRoot = raw?.types?.length ? raw.types : raw?.phases;
+  if (legacyRoot?.some((p) =>
     Object.values(p.pricesByDistanceName || {}).some((v) => Number(v) > 0)
   )) {
     return true;
@@ -48,10 +50,13 @@ function hasPricing(event: RaceEventDto): boolean {
   if (raw?.byDistanceName) {
     for (const row of Object.values(raw.byDistanceName)) {
       if (Number(row?.basePrice) > 0) return true;
-      if (row?.phases?.some((p) => Number(p.price) > 0)) return true;
+      const list = row?.types?.length ? row.types : row?.phases;
+      if (list?.some((p) => Number(p.price) > 0)) return true;
     }
   }
-  return (event.distances || []).some((d) => Number(d.price) > 0);
+  return (event.distances || []).some(
+    (d) => Number(d.basePrice ?? d.price) > 0
+  );
 }
 
 /** Có dữ liệu cung đường thật (không tính tọa độ start placeholder). */
@@ -105,14 +110,8 @@ export default function ProfileOpenRegClient() {
   const [mapReady, setMapReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const [acting, setActing] = useState(false);
   const [statusModalOpen, setStatusModalOpen] = useState(false);
-
-  const notify = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3500);
-  };
 
   const load = useCallback(async () => {
     const data = await getEventById(eventId);
@@ -228,17 +227,17 @@ export default function ProfileOpenRegClient() {
   const handleSubmitApproval = async () => {
     if (!canSubmit || acting) return;
     if (!requiredReady) {
-      setError("Hoàn thành checklist bắt buộc trước khi gửi admin duyệt.");
+      toastError("Hoàn thành checklist bắt buộc trước khi gửi admin duyệt.");
       return;
     }
     setActing(true);
-    setError(null);
+
     try {
       await submitRaceEvent(eventId);
       await load();
-      notify("Đã gửi hồ sơ cho admin duyệt.");
+      toastSuccess("Đã gửi hồ sơ cho admin duyệt.");
     } catch (e) {
-      setError(getApiErrorMessage(e, "Gửi duyệt thất bại."));
+      toastError(e, "Gửi duyệt thất bại.");
     } finally {
       setActing(false);
     }
@@ -247,13 +246,13 @@ export default function ProfileOpenRegClient() {
   const handleOpen = async () => {
     if (!canOpen || acting) return;
     setActing(true);
-    setError(null);
+
     try {
       await openEventRegistration(eventId);
       await load();
-      notify("Đã mở đăng ký.");
+      toastSuccess("Đã mở đăng ký.");
     } catch (e) {
-      setError(getApiErrorMessage(e, "Mở ĐK thất bại."));
+      toastError(e, "Mở ĐK thất bại.");
     } finally {
       setActing(false);
     }
@@ -262,13 +261,13 @@ export default function ProfileOpenRegClient() {
   const handleClose = async () => {
     if (!isOpen || acting) return;
     setActing(true);
-    setError(null);
+
     try {
       await closeEventRegistration(eventId);
       await load();
-      notify("Đã đóng đăng ký.");
+      toastSuccess("Đã đóng đăng ký.");
     } catch (e) {
-      setError(getApiErrorMessage(e, "Đóng ĐK thất bại."));
+      toastError(e, "Đóng ĐK thất bại.");
     } finally {
       setActing(false);
     }
@@ -397,13 +396,6 @@ export default function ProfileOpenRegClient() {
             </p>
           </div>
         </button>
-      )}
-
-      {toast && (
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          <CheckCircle2 className="h-4 w-4" />
-          {toast}
-        </div>
       )}
       {error && (
         <div className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-sm text-red-600">

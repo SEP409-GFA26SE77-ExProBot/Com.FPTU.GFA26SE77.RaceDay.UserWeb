@@ -89,7 +89,7 @@ function deriveTags(event: RaceEventDto): string[] {
     else if (d.distanceKm <= 21.2) tags.add("Half Marathon");
     else if (d.distanceKm <= 42.3) tags.add("Marathon");
     else tags.add("Ultra");
-    if ((d.elevationGainM ?? 0) > 500 || isTrailEvent(event)) tags.add("Trail");
+    if (isTrailEvent(event)) tags.add("Trail");
   }
   return Array.from(tags);
 }

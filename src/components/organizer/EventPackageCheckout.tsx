@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlertCircle,
   Building2,
@@ -18,8 +18,20 @@ import {
   Users,
 } from "lucide-react";
 import { getMyProfile, persistAvatarCookie } from "@/api/auth";
-import { getPackageCatalog, createPackagePurchase } from "@/api/event-packages";
-import { createPackageCheckout, syncPayment } from "@/api/payments";
+import {
+  getPackageCatalog,
+  createPackagePurchase,
+  getPackagePurchase,
+  cancelPackagePurchase,
+} from "@/api/event-packages";
+import {
+  createPackageCheckout,
+  syncPayment,
+  cancelPendingPayment,
+  mockCancel,
+  getPaymentStatus,
+  mockPay,
+} from "@/api/payments";
 import type { MyProfileDto } from "@/dto/auth.dto";
 import type {
   PackageCatalogDto,
@@ -55,12 +67,16 @@ function displayOrDash(value?: string | null): string {
 
 export default function EventPackageCheckout() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const resumePurchaseId = searchParams.get("purchaseId") || "";
+  const resumeStarted = useRef(false);
 
   const [catalog, setCatalog] = useState<PackageCatalogDto | null>(null);
   const [profile, setProfile] = useState<MyProfileDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [resuming, setResuming] = useState(Boolean(resumePurchaseId));
 
   // Form fields
   const [orgName, setOrgName] = useState("");
@@ -78,15 +94,20 @@ export default function EventPackageCheckout() {
   const [step, setStep] = useState<Step>("form");
   const [checkout, setCheckout] = useState<CheckoutResponseDto | null>(null);
   const [purchaseId, setPurchaseId] = useState<string | null>(null);
+  const [payOsMock, setPayOsMock] = useState(false);
+  const [mockPaying, setMockPaying] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const cancellingRef = useRef(false);
 
   // Load catalog + profile
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [data, me] = await Promise.all([
+        const [data, me, paySt] = await Promise.all([
           getPackageCatalog(),
           getMyProfile().catch(() => null),
+          getPaymentStatus().catch(() => null),
         ]);
         if (cancelled) return;
         setCatalog(data);
@@ -94,6 +115,9 @@ export default function EventPackageCheckout() {
         if (me?.avatarUrl) persistAvatarCookie(me.avatarUrl);
         if (data.durations.length > 0) setSelectedDuration(data.durations[0]);
         if (data.capacities.length > 0) setSelectedCapacity(data.capacities[0]);
+        if (paySt?.payOsMode) {
+          setPayOsMock(String(paySt.payOsMode).toLowerCase() === "mock");
+        }
       } catch (e) {
         if (!cancelled) setError(getApiErrorMessage(e, "Không tải được bảng giá."));
       } finally {
@@ -102,6 +126,82 @@ export default function EventPackageCheckout() {
     })();
     return () => { cancelled = true; };
   }, []);
+
+  // Resume từ Lịch sử thanh toán (?purchaseId=) — tái dùng checkout PayOS đang pending
+  useEffect(() => {
+    if (loading || !resumePurchaseId || resumeStarted.current) return;
+    resumeStarted.current = true;
+    let cancelled = false;
+
+    (async () => {
+      setResuming(true);
+      setError(null);
+      try {
+        const purchase = await getPackagePurchase(resumePurchaseId);
+        if (cancelled) return;
+
+        const st = (purchase.status || "").toLowerCase();
+        if (purchase.createdEventId && st === "paid") {
+          router.replace(
+            `/organizer/events/${purchase.createdEventId}/profile`,
+          );
+          return;
+        }
+        if (st !== "pending_payment") {
+          setError(
+            "Đơn mua gói không còn chờ thanh toán. Vui lòng tạo gói mới hoặc kiểm tra Giải của tôi.",
+          );
+          setResuming(false);
+          return;
+        }
+
+        setPurchaseId(purchase.id);
+        setOrgName(purchase.orgName || "");
+        setOrgIntro(purchase.orgIntro || "");
+        setOrgAddress(purchase.orgAddress || "");
+        setInvoiceInfo(purchase.invoiceInfo || "");
+        if (purchase.promoCode) {
+          setPromoCode(purchase.promoCode);
+          setPromoDraft(purchase.promoCode);
+          setPromoValid(true);
+        }
+
+        const origin =
+          typeof window !== "undefined" ? window.location.origin : "";
+        const checkoutRes = await createPackageCheckout({
+          packagePurchaseId: purchase.id,
+          returnUrl: `${origin}/events/create/package-return?purchaseId=${purchase.id}`,
+          cancelUrl: `${origin}/payments`,
+        });
+
+        if (!checkoutRes.checkoutUrl && !checkoutRes.qrCode) {
+          throw new Error("Không nhận được liên kết thanh toán.");
+        }
+
+        if (cancelled) return;
+        setCheckout({
+          ...checkoutRes,
+          checkoutUrl: checkoutRes.checkoutUrl
+            ? toAbsoluteUrl(checkoutRes.checkoutUrl)
+            : "",
+          amount: checkoutRes.amount ?? purchase.totalAmount,
+        });
+        setStep("paying");
+      } catch (e) {
+        if (!cancelled) {
+          setError(
+            getApiErrorMessage(e, "Không mở lại được trang thanh toán."),
+          );
+        }
+      } finally {
+        if (!cancelled) setResuming(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, resumePurchaseId, router]);
 
   const matchedPromo = catalog?.promoCodes.find(
     (c) => c.code.toLowerCase() === promoCode.trim().toLowerCase()
@@ -240,12 +340,77 @@ export default function EventPackageCheckout() {
     }, 800);
   }, [purchaseId, activePaymentId, router]);
 
-  // ── Loading ──
-  if (loading) {
+  /** Thoát tạm: giữ đơn pending → Lịch sử thanh toán có «Tiếp tục» */
+  const keepPendingAndLeave = useCallback(() => {
+    router.push("/payments");
+  }, [router]);
+
+  /** Hủy thanh toán: hủy payment + purchase → form tạo gói sạch */
+  const cancelAndWipe = useCallback(async () => {
+    if (cancellingRef.current) return;
+    cancellingRef.current = true;
+    setCancelling(true);
+    const payId = checkout?.paymentId;
+    const pid = purchaseId;
+    try {
+      if (payId) {
+        try {
+          await cancelPendingPayment(payId);
+        } catch {
+          try {
+            await mockCancel(payId);
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+      if (pid) {
+        try {
+          await cancelPackagePurchase(pid);
+        } catch {
+          /* đã hủy / không còn pending */
+        }
+      }
+    } finally {
+      setCheckout(null);
+      setPurchaseId(null);
+      setStep("form");
+      setCancelling(false);
+      cancellingRef.current = false;
+      router.replace("/events/create");
+    }
+  }, [checkout?.paymentId, purchaseId, router]);
+
+  const confirmMockPaid = useCallback(async () => {
+    const payId = checkout?.paymentId;
+    if (!payId || mockPaying || !purchaseId) return;
+    setMockPaying(true);
+    setError(null);
+    try {
+      await mockPay(payId);
+      setStep("success");
+      window.setTimeout(() => {
+        router.push(
+          `/events/create/package-return?purchaseId=${purchaseId}&paymentId=${payId}`,
+        );
+      }, 500);
+    } catch (e) {
+      setError(getApiErrorMessage(e, "Giả lập thanh toán thất bại."));
+    } finally {
+      setMockPaying(false);
+    }
+  }, [checkout?.paymentId, mockPaying, purchaseId, router]);
+
+  // ── Loading / resume pending checkout ──
+  if (loading || (resuming && step !== "paying")) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
-        <p className="mt-3 text-sm text-muted-foreground">Đang tải bảng giá gói…</p>
+        <p className="mt-3 text-sm text-muted-foreground">
+          {resuming
+            ? "Đang mở lại trang thanh toán…"
+            : "Đang tải bảng giá gói…"}
+        </p>
       </div>
     );
   }
@@ -297,8 +462,8 @@ export default function EventPackageCheckout() {
                   checkoutUrl={checkout.checkoutUrl}
                   returnUrl={returnUrl}
                   onSuccess={handleEmbedSuccess}
-                  onCancel={() => router.push("/events/create")}
-                  onExit={() => setStep("form")}
+                  onCancel={() => void cancelAndWipe()}
+                  onExit={keepPendingAndLeave}
                   className="h-[min(480px,62vh)] w-full bg-white"
                 />
               )}
@@ -331,8 +496,51 @@ export default function EventPackageCheckout() {
                 <span className="text-xl font-extrabold text-orange-600">{formatPrice(amountToPay)}</span>
               </div>
               <p className="text-[11px] leading-relaxed text-muted-foreground">
-                PayOS xác nhận xong sẽ tự chuyển trang. Giải nháp được tạo sau khi thanh toán thành công.
+                {payOsMock
+                  ? "Đang dùng PayOS mock (dev): QR không trừ tiền thật — bấm nút giả lập bên dưới."
+                  : "PayOS xác nhận xong sẽ tự chuyển trang. «Thoát tạm» giữ đơn chờ thanh toán; «Hủy thanh toán» hủy đơn và về form trống."}
               </p>
+
+              {payOsMock && checkout.paymentId ? (
+                <button
+                  type="button"
+                  onClick={() => void confirmMockPaid()}
+                  disabled={mockPaying || cancelling}
+                  className="w-full rounded-xl bg-gradient-to-r from-orange-500 to-red-600 py-2.5 text-sm font-bold text-white shadow-sm disabled:opacity-50"
+                >
+                  {mockPaying ? (
+                    <span className="inline-flex items-center justify-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Đang giả lập…
+                    </span>
+                  ) : (
+                    "Giả lập thanh toán thành công"
+                  )}
+                </button>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={keepPendingAndLeave}
+                disabled={cancelling}
+                className="w-full rounded-xl border border-border py-2.5 text-sm font-semibold text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+              >
+                Thoát tạm — tiếp tục sau
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void cancelAndWipe()}
+                disabled={cancelling}
+                className="w-full rounded-xl border border-border py-2.5 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50"
+              >
+                {cancelling ? (
+                  <span className="inline-flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Đang hủy…
+                  </span>
+                ) : (
+                  "Hủy thanh toán"
+                )}
+              </button>
             </aside>
           </div>
         </div>

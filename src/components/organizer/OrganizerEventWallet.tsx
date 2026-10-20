@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Building2,
+  FileText,
   History,
   Loader2,
   RefreshCw,
@@ -23,6 +24,7 @@ import type {
 } from "@/dto/finance.dto";
 import { formatPrice } from "@/lib/format";
 import { getApiErrorMessage } from "@/lib/error";
+import { toastError, toastSuccess } from "@/lib/toast";
 import { PAGE_SHELL } from "@/lib/page-shell";
 
 export default function OrganizerEventWallet({ eventId }: { eventId: string }) {
@@ -31,7 +33,6 @@ export default function OrganizerEventWallet({ eventId }: { eventId: string }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const [bank, setBank] = useState<BankAccountDto>({
     bankName: "",
     accountNumber: "",
@@ -43,7 +44,7 @@ export default function OrganizerEventWallet({ eventId }: { eventId: string }) {
   const [note, setNote] = useState("");
 
   const load = useCallback(async () => {
-    setError(null);
+
     try {
       const [w, ev] = await Promise.all([
         getOrganizerWallet(),
@@ -73,13 +74,13 @@ export default function OrganizerEventWallet({ eventId }: { eventId: string }) {
 
   const saveBank = async () => {
     setBusy(true);
-    setError(null);
+
     try {
       const w = await saveOrganizerBankAccount(bank);
       setWallet(w);
-      setToast("Đã lưu tài khoản nhận giải ngân.");
+      toastSuccess("Đã lưu tài khoản nhận giải ngân.");
     } catch (e) {
-      setError(getApiErrorMessage(e, "Lưu TK thất bại."));
+      toastError(e, "Lưu TK thất bại.");
     } finally {
       setBusy(false);
     }
@@ -88,7 +89,7 @@ export default function OrganizerEventWallet({ eventId }: { eventId: string }) {
   const submitPayout = async () => {
     const value = Number(amount.replace(/\D/g, ""));
     setBusy(true);
-    setError(null);
+
     try {
       await createPayoutRequest({
         eventId,
@@ -97,10 +98,10 @@ export default function OrganizerEventWallet({ eventId }: { eventId: string }) {
       });
       setAmount("");
       setNote("");
-      setToast("Đã gửi yêu cầu rút từ túi giải này — chờ Admin duyệt.");
+      toastSuccess("Đã gửi yêu cầu rút từ túi giải này — chờ Admin duyệt.");
       await load();
     } catch (e) {
-      setError(getApiErrorMessage(e, "Tạo yêu cầu rút thất bại."));
+      toastError(e, "Tạo yêu cầu rút thất bại.");
     } finally {
       setBusy(false);
     }
@@ -158,11 +159,32 @@ export default function OrganizerEventWallet({ eventId }: { eventId: string }) {
           {error}
         </div>
       ) : null}
-      {toast ? (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          {toast}
-        </div>
-      ) : null}
+
+      <section className="space-y-2 rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
+        <h2 className="flex items-center gap-2 text-sm font-bold">
+          <FileText className="h-4 w-4 text-orange-500" />
+          Chính sách tài chính (tóm tắt)
+        </h2>
+        <ul className="list-disc space-y-1.5 pl-5 text-xs leading-relaxed text-muted-foreground">
+          <li>
+            <strong className="text-foreground">Hoàn tiền VĐV:</strong> theo
+            trạng thái thanh toán / yêu cầu hoàn trên RaceDay; số đã hoàn hiện ở
+            «Hoàn tiền VĐV» của túi giải.
+          </li>
+          <li>
+            <strong className="text-foreground">Hoa hồng / phí nền tảng:</strong>{" "}
+            đang chờ Business Rule — chưa cấu hình trên UI này.
+          </li>
+          <li>
+            <strong className="text-foreground">Rút tiền BTC:</strong> chỉ từ túi
+            escrow của <em>giải đang mở</em>; cần TK nhận hợp lệ và chờ Admin
+            duyệt yêu cầu rút.
+            {ledger?.withdrawPolicyNote
+              ? ` ${ledger.withdrawPolicyNote}`
+              : ""}
+          </li>
+        </ul>
+      </section>
 
       {ledger ? (
         <section className="space-y-3 rounded-2xl border border-orange-300/50 bg-orange-500/[0.06] p-5 shadow-sm">

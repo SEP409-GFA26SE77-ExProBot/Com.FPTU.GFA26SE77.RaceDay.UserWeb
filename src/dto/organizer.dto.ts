@@ -62,22 +62,10 @@ export interface OrganizerEventItemDto {
 
 /** POST /api/v1/event/organizer/ — tạo giải (draft hoặc gửi duyệt) */
 export interface CreateRaceEventDistanceInput {
-  type: string;
   name: string;
   distanceKm: number;
-  elevationGainM: number;
-  maxElevationM: number;
-  minElevationM: number;
   capacity: number;
-  price: number;
-  currency?: string;
-  color?: string;
-  startLocation: { name: string; lat: number; lng: number };
-  finishLocation: { name: string; lat: number; lng: number };
-  checkpoints?: unknown[] | null;
-  osrmWaypoints?: unknown | null;
-  leafletPolyline?: unknown | null;
-  geoJson?: unknown | null;
+  basePrice: number;
 }
 
 export interface CreateRaceEventDocumentInput {

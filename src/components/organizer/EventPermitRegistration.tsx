@@ -32,50 +32,19 @@ import type {
 } from "@/dto/organizer.dto";
 import OrganizerLocationFields from "@/components/organizer/OrganizerLocationFields";
 import { getApiErrorMessage } from "@/lib/error";
+import { toastError, toastSuccess } from "@/lib/toast";
 import {
   mediaDisplayUrl,
   resolveStoredFileUrl,
 } from "@/lib/media-url";
+import {
+  LEGACY_OPTIONAL_DOC_KEYS,
+  LEGACY_OPTIONAL_DOC_META,
+  PROFILE_DOC_TYPES,
+} from "@/lib/event-profile-docs";
 import { composeLocation, splitLocation } from "@/lib/vn-provinces";
 
-const requiredDocuments = [
-  {
-    id: "official-letter",
-    title: "Công văn đề nghị cấp phép",
-    description: "Văn bản của doanh nghiệp gửi UBND Thành phố/Sở Văn hóa và Thể thao.",
-    required: true,
-  },
-  {
-    id: "security",
-    title: "Phương án an ninh, trật tự và PCCC",
-    description: "Bảo vệ, phân luồng, y tế, phòng cháy chữa cháy và môi trường.",
-    required: true,
-  },
-  {
-    id: "plan",
-    title: "Kế hoạch tổ chức sự kiện",
-    description: "Mục tiêu, quy mô, thời gian, địa điểm và các đơn vị phối hợp.",
-    required: false,
-  },
-  {
-    id: "program",
-    title: "Chương trình và nội dung thi đấu",
-    description: "Lịch trình, nội dung cự ly, khung giờ xuất phát và đích.",
-    required: false,
-  },
-  {
-    id: "rules",
-    title: "Điều lệ giải và trọng tài",
-    description: "Điều lệ thi đấu, bộ phận chuyên môn và danh sách trọng tài.",
-    required: false,
-  },
-  {
-    id: "foreign-list",
-    title: "Danh sách người nước ngoài tham dự",
-    description: "Họ tên, quốc tịch, hộ chiếu và đơn vị liên hệ (nếu có).",
-    required: false,
-  },
-];
+const requiredDocuments = PROFILE_DOC_TYPES.map((d) => ({ ...d }));
 
 const safetyConditions = [
   "Đã có phương án bảo đảm an ninh, trật tự và phân luồng giao thông.",
@@ -231,7 +200,9 @@ function mapEventDistances(distances: EventDistanceDto[]): DistanceDraft[] {
     name: d.name || "",
     distanceKm: d.distanceKm != null ? String(d.distanceKm) : "",
     capacity: d.capacity != null ? String(d.capacity) : "",
-    price: d.price != null ? String(d.price) : "",
+    price: d.basePrice != null || d.price != null
+      ? String(d.basePrice ?? d.price)
+      : "",
     currency: d.currency || "VND",
   }));
 }
@@ -375,43 +346,31 @@ function buildPayload(
   submitForApproval: boolean
 ): CreateRaceEventRequest {
   const totalRunners = parseTotalRunners(form.scale, distances);
-  const placeFallback = form.location.trim() || "Địa điểm giải";
   const distanceInputs: CreateRaceEventDistanceInput[] = distances.map((d) => ({
-    type: d.type.trim() || "road",
     name: d.name.trim(),
     distanceKm: num(d.distanceKm),
-    elevationGainM: 0,
-    maxElevationM: 50,
-    minElevationM: 0,
     capacity: Math.max(1, Math.floor(num(d.capacity, 1))),
-    price: Math.max(0, num(d.price)),
-    currency: d.currency.trim() || "VND",
-    color: "#f97316",
-    startLocation: {
-      name: placeFallback,
-      lat: DEFAULT_LAT,
-      lng: DEFAULT_LNG,
-    },
-    finishLocation: {
-      name: placeFallback,
-      lat: DEFAULT_LAT,
-      lng: DEFAULT_LNG,
-    },
-    checkpoints: null,
-    osrmWaypoints: null,
-    leafletPolyline: null,
-    geoJson: null,
+    basePrice: Math.max(0, num(d.price)),
   }));
 
-  const documents: CreateRaceEventDocumentInput[] = requiredDocuments
-    .filter((d) => docs[d.id])
-    .map((d) => ({
-      documentKey: d.id,
-      title: d.title,
-      fileName: docs[d.id].fileName,
-      fileUrl: docs[d.id].fileUrl,
-      required: d.required,
-    }));
+  const documents: CreateRaceEventDocumentInput[] = [
+    ...requiredDocuments
+      .filter((d) => docs[d.id])
+      .map((d) => ({
+        documentKey: d.id,
+        title: d.title,
+        fileName: docs[d.id].fileName,
+        fileUrl: docs[d.id].fileUrl,
+        required: d.required,
+      })),
+    ...LEGACY_OPTIONAL_DOC_KEYS.filter((k) => docs[k]).map((k) => ({
+      documentKey: k,
+      title: LEGACY_OPTIONAL_DOC_META[k].title,
+      fileName: docs[k].fileName,
+      fileUrl: docs[k].fileUrl,
+      required: false,
+    })),
+  ];
 
   const startTime = form.startTime
     ? form.startTime.length === 5
@@ -494,7 +453,6 @@ export default function EventPermitRegistration({
   const [conditions, setConditions] = useState<boolean[]>(
     safetyConditions.map(() => false)
   );
-  const [toast, setToast] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Set<FieldErrorKey>>(
     () => new Set()
@@ -506,11 +464,6 @@ export default function EventPermitRegistration({
     draftId || null
   );
   const [loadingDraft, setLoadingDraft] = useState(Boolean(draftId));
-
-  const showToast = (message: string) => {
-    setToast(message);
-    window.setTimeout(() => setToast(""), 2400);
-  };
 
   useEffect(() => {
     if (!draftId) {
@@ -598,7 +551,7 @@ export default function EventPermitRegistration({
         },
       }));
     } catch (e) {
-      setError(getApiErrorMessage(e, "Upload hồ sơ thất bại."));
+      toastError(e, "Upload hồ sơ thất bại.");
     } finally {
       setUploadingDocId(null);
     }
@@ -670,13 +623,13 @@ export default function EventPermitRegistration({
         if (!submitForApproval) {
           setCreatedEventId(editingDraftId);
           setCreatedAsDraft(true);
-          showToast("Nháp đã có trên hệ thống");
+          toastSuccess("Nháp đã có trên hệ thống");
           return;
         }
         const submitted = await submitRaceEvent(editingDraftId);
         setCreatedEventId(submitted.id);
         setCreatedAsDraft(false);
-        showToast("Đã gửi hồ sơ thẩm định");
+        toastSuccess("Đã gửi hồ sơ thẩm định");
         return;
       }
 
@@ -691,15 +644,13 @@ export default function EventPermitRegistration({
       setCreatedEventId(created.id);
       setEditingDraftId(created.id);
       setCreatedAsDraft(!submitForApproval);
-      showToast(
+      toastSuccess(
         submitForApproval ? "Đã gửi hồ sơ thẩm định" : "Đã lưu bản nháp"
       );
     } catch (e) {
-      setError(
-        getApiErrorMessage(
-          e,
-          submitForApproval ? "Không gửi được hồ sơ." : "Không tạo được giải."
-        )
+      toastError(
+        e,
+        submitForApproval ? "Không gửi được hồ sơ." : "Không tạo được giải."
       );
     } finally {
       setSubmitting(false);
@@ -717,13 +668,6 @@ export default function EventPermitRegistration({
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
-      {toast && (
-        <div className="fixed right-5 top-24 z-50 flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-xs font-bold text-white shadow-xl">
-          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-          {toast}
-        </div>
-      )}
-
       <section className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
         <div>
           <Link
@@ -1366,11 +1310,7 @@ function DocumentsStep({
                   <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-600">
                     Bắt buộc
                   </span>
-                ) : (
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
-                    Nếu có
-                  </span>
-                )}
+                ) : null}
               </div>
               <p className="mt-1 text-xs leading-5 text-slate-500">
                 {document.description}

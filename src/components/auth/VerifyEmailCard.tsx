@@ -5,19 +5,18 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { OtpInput } from "./OtpInput";
 import { verifyEmail, resendVerificationOtp } from "@/api/auth";
-import { 
-  Mail, 
-  ShieldCheck, 
-  RefreshCw, 
-  AlertCircle, 
-  CheckCircle2, 
-  ArrowLeft, 
-  Loader2, 
-  Edit3, 
-  Check, 
-  Sparkles 
+import {
+  Mail,
+  ShieldCheck,
+  RefreshCw,
+  CheckCircle2,
+  ArrowLeft,
+  Loader2,
+  Edit3,
+  Check,
+  Sparkles,
 } from "lucide-react";
-import { getApiErrorMessage } from "@/lib/error";
+import { toastError, toastSuccess } from "@/lib/toast";
 
 interface VerifyEmailCardProps {
   initialEmail?: string;
@@ -44,8 +43,6 @@ export const VerifyEmailCard: React.FC<VerifyEmailCardProps> = ({
   const [otp, setOtp] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [resending, setResending] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [resendMessage, setResendMessage] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
   const [timeLeft, setTimeLeft] = useState<number>(cooldownSeconds);
 
@@ -71,17 +68,15 @@ export const VerifyEmailCard: React.FC<VerifyEmailCardProps> = ({
     async (codeToVerify?: string) => {
       const code = codeToVerify || otp;
       if (!email.trim()) {
-        setError("Vui lòng cung cấp địa chỉ email hợp lệ.");
+        toastError("Vui lòng cung cấp địa chỉ email hợp lệ.");
         return;
       }
       if (code.length !== 6) {
-        setError("Vui lòng nhập đầy đủ 6 chữ số mã xác thực.");
+        toastError("Vui lòng nhập đầy đủ 6 chữ số mã xác thực.");
         return;
       }
 
       setLoading(true);
-      setError(null);
-      setResendMessage(null);
 
       try {
         await verifyEmail({ email: email.trim(), otp: code });
@@ -94,11 +89,9 @@ export const VerifyEmailCard: React.FC<VerifyEmailCardProps> = ({
           }, 1800);
         }
       } catch (err) {
-        setError(
-          getApiErrorMessage(
-            err,
-            "Xác thực thất bại. Mã có thể không chính xác hoặc đã hết hạn."
-          )
+        toastError(
+          err,
+          "Xác thực thất bại. Mã có thể không chính xác hoặc đã hết hạn."
         );
       } finally {
         setLoading(false);
@@ -115,25 +108,21 @@ export const VerifyEmailCard: React.FC<VerifyEmailCardProps> = ({
   const handleResend = async () => {
     if (timeLeft > 0 || resending) return;
     if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError("Vui lòng nhập địa chỉ email hợp lệ để nhận mã.");
+      toastError("Vui lòng nhập địa chỉ email hợp lệ để nhận mã.");
       return;
     }
 
     setResending(true);
-    setError(null);
-    setResendMessage(null);
 
     try {
       await resendVerificationOtp(email.trim());
-      setResendMessage(`Mã xác thực gồm 6 chữ số mới đã được gửi tới ${email}`);
+      toastSuccess(`Mã xác thực gồm 6 chữ số mới đã được gửi tới ${email}`);
       setTimeLeft(cooldownSeconds);
       setOtp("");
     } catch (err) {
-      setError(
-        getApiErrorMessage(
-          err,
-          "Gửi lại mã xác thực thất bại. Vui lòng thử lại sau giây lát."
-        )
+      toastError(
+        err,
+        "Gửi lại mã xác thực thất bại. Vui lòng thử lại sau giây lát."
       );
     } finally {
       setResending(false);
@@ -143,15 +132,14 @@ export const VerifyEmailCard: React.FC<VerifyEmailCardProps> = ({
   const handleSaveEmail = (e: React.FormEvent) => {
     e.preventDefault();
     if (!tempEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(tempEmail)) {
-      setError("Vui lòng nhập địa chỉ email hợp lệ.");
+      toastError("Vui lòng nhập địa chỉ email hợp lệ.");
       return;
     }
     setEmail(tempEmail.trim());
     setEditingEmail(false);
-    setError(null);
     setTimeLeft(cooldownSeconds);
     setOtp("");
-    setResendMessage(`Đã cập nhật email nhận mã thành ${tempEmail.trim()}`);
+    toastSuccess(`Đã cập nhật email nhận mã thành ${tempEmail.trim()}`);
   };
 
   return (
@@ -227,22 +215,6 @@ export const VerifyEmailCard: React.FC<VerifyEmailCardProps> = ({
         )}
       </div>
 
-      {/* Error alert banner */}
-      {error && (
-        <div className="auth-error" role="alert">
-          <AlertCircle size={16} className="flex-shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
-
-      {/* Resend success notice */}
-      {resendMessage && !error && (
-        <div className="verify-notice-banner" role="status">
-          <CheckCircle2 size={16} className="flex-shrink-0 text-emerald-400" />
-          <span>{resendMessage}</span>
-        </div>
-      )}
-
       {/* 6-Digit OTP Input Box */}
       <div className="verify-otp-section">
         <div className="verify-otp-label-row">
@@ -264,11 +236,10 @@ export const VerifyEmailCard: React.FC<VerifyEmailCardProps> = ({
           value={otp}
           onChange={(newVal) => {
             setOtp(newVal);
-            setError(null);
           }}
           onComplete={handleOtpComplete}
           disabled={loading || isSuccess}
-          isError={!!error}
+          isError={false}
           isSuccess={isSuccess}
           autoFocus={!editingEmail}
         />

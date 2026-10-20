@@ -438,7 +438,7 @@ export function CourseProvider({
         if (!snap) return;
         if (snap.distKm > CP_MAX_OFF_ROUTE_KM) {
           setSnapError(
-            `${isAid ? "Điểm tiếp tế" : "Checkpoint"} phải nằm trên route (cách đường ~${Math.round(snap.distKm * 1000)}m > 45m). Click sát đường xanh.`
+            `${isAid ? "Điểm tiếp tế" : "Checkpoint"} ngoài đường chạy (cách ~${Math.round(snap.distKm * 1000)}m > 45m). Hãy click sát đường xanh trên bản đồ.`
           );
           return;
         }

@@ -23,7 +23,7 @@ export function readConfirmationSession(): ConfirmationSession | null {
  * event.distances, số tiền PayOS, hoặc session checkout.
  *
  * Giá ưu tiên: `price` (QuotedAmount / phase lúc ĐK) → PayOS paidAmount →
- * session checkout → mới tới list price `distance.price` (có thể cao hơn early bird).
+ * session checkout → mới tới list price `distance.basePrice` (có thể cao hơn early bird).
  */
 export function resolveDistanceDisplay(
   reg: Pick<
@@ -67,6 +67,7 @@ export function resolveDistanceDisplay(
       opts?.paidAmount ??
       (reg.distancePrice != null ? Number(reg.distancePrice) : null) ??
       session?.price ??
+      d?.basePrice ??
       d?.price ??
       0,
     phaseName: reg.pricePhaseName ?? null,

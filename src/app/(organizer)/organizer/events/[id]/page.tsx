@@ -21,13 +21,9 @@ import {
 } from "@/api/organizer";
 import type { RaceEventDto } from "@/dto/event.dto";
 import type { ApiRegistration } from "@/dto/organizer.dto";
-import {
-  formatDate,
-  formatPrice,
-  getOrganizerStatusLabel,
-  getStatusColor,
-} from "@/lib/format";
+import { formatDate, formatPrice } from "@/lib/format";
 import { getApiErrorMessage } from "@/lib/error";
+import { toastError, toastSuccess } from "@/lib/toast";
 import { mediaDisplayUrl } from "@/lib/media-url";
 import EventFinancePanel from "@/components/organizer/EventFinancePanel";
 import RegistrationApprovalsPanel from "@/components/organizer/RegistrationApprovalsPanel";
@@ -89,26 +85,22 @@ function MyEventDetailContent() {
   const [loading, setLoading] = useState(true);
   const [regsLoading, setRegsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [regsError, setRegsError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [reason, setReason] = useState("");
 
   const username = Cookies.get("username") || "User";
 
-  const notify = (msg: string) => {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 3200);
-  };
-
   const loadRegs = useCallback(async () => {
     setRegsLoading(true);
+    setRegsError(null);
     try {
       const list = await listEventRegistrations(eventId);
       setRegs(Array.isArray(list) ? list : []);
     } catch (e) {
       setRegs([]);
-      notify(getApiErrorMessage(e, "Không tải được danh sách đăng ký."));
+      setRegsError(getApiErrorMessage(e, "Không tải được danh sách đăng ký."));
     } finally {
       setRegsLoading(false);
     }
@@ -126,7 +118,7 @@ function MyEventDetailContent() {
           return;
         }
         setEvent(data);
-        setError(null);
+
       } catch (e) {
         if (!cancelled) {
           setEvent(null);
@@ -155,14 +147,14 @@ function MyEventDetailContent() {
     setBusyId(id);
     try {
       const updated = await approveRegistrationApi(id);
-      notify(
+      toastSuccess(
         updated.bibNumber
           ? `Đã duyệt — BIB ${updated.bibNumber}`
           : "Đã duyệt đăng ký."
       );
       await loadRegs();
     } catch (e) {
-      notify(getApiErrorMessage(e, "Duyệt thất bại."));
+      toastError(e, "Duyệt thất bại.");
     } finally {
       setBusyId(null);
     }
@@ -175,10 +167,10 @@ function MyEventDetailContent() {
       await rejectRegistrationApi(rejectId, reason.trim());
       setRejectId(null);
       setReason("");
-      notify("Đã từ chối đăng ký.");
+      toastSuccess("Đã từ chối đăng ký.");
       await loadRegs();
     } catch (e) {
-      notify(getApiErrorMessage(e, "Từ chối thất bại."));
+      toastError(e, "Từ chối thất bại.");
     } finally {
       setBusyId(null);
     }
@@ -218,11 +210,6 @@ function MyEventDetailContent() {
 
   return (
     <div className="space-y-6">
-      {toast && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900">
-          {toast}
-        </div>
-      )}
 
       {/* Banner + tab strip — chỉ overview / finance; approvals dùng sidebar + bảng */}
       {tab !== "approvals" && (
@@ -245,13 +232,6 @@ function MyEventDetailContent() {
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/30 to-transparent" />
             <div className="absolute bottom-4 left-4 right-4">
-              <span
-                className={`mb-2 inline-flex rounded-md border px-2.5 py-1 text-[11px] font-extrabold ${getStatusColor(
-                  event.status
-                )}`}
-              >
-                {getOrganizerStatusLabel(event.status)}
-              </span>
               <h1 className="text-2xl font-extrabold text-white sm:text-3xl">
                 {event.name}
               </h1>
@@ -328,7 +308,7 @@ function MyEventDetailContent() {
                           {d.distanceKm}K
                         </td>
                         <td className="py-3 pr-3 font-bold text-orange-600">
-                          {formatPrice(d.price)}
+                          {formatPrice(d.basePrice ?? d.price)}
                         </td>
                         <td className="py-3 text-muted-foreground">
                           {(d.registeredCount ?? 0).toLocaleString("vi-VN")} /{" "}
@@ -365,19 +345,24 @@ function MyEventDetailContent() {
       {tab === "finance" && <EventFinancePanel eventId={eventId} />}
 
       {tab === "approvals" && (
-        <RegistrationApprovalsPanel
-          event={event}
-          regs={regs}
-          loading={regsLoading}
-          busyId={busyId}
-          organizerUsername={username}
-          onReload={() => void loadRegs()}
-          onApprove={(id) => void onApprove(id)}
-          onRejectRequest={(id) => {
-            setRejectId(id);
-            setReason("");
-          }}
-        />
+        <>
+          {regsError && (
+            <p className="mb-3 text-sm text-red-600">{regsError}</p>
+          )}
+          <RegistrationApprovalsPanel
+            event={event}
+            regs={regs}
+            loading={regsLoading}
+            busyId={busyId}
+            organizerUsername={username}
+            onReload={() => void loadRegs()}
+            onApprove={(id) => void onApprove(id)}
+            onRejectRequest={(id) => {
+              setRejectId(id);
+              setReason("");
+            }}
+          />
+        </>
       )}
 
       {rejectId && (

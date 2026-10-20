@@ -35,6 +35,7 @@ import {
   removePending,
 } from "@/lib/check-in-offline";
 import { getApiErrorMessage } from "@/lib/error";
+import { toastError } from "@/lib/toast";
 import { formatDateTime } from "@/lib/format";
 import { PAGE_SHELL } from "@/lib/page-shell";
 import { extractBibFromQrPayload } from "@/lib/registration-qr";
@@ -226,13 +227,12 @@ export default function ScanQrPage() {
   const submit = useCallback(
     async (payload: { bib?: string; qrPayload?: string }) => {
       if (!eventId.trim()) {
-        setError("Chưa có giải được phân công.");
+        toastError("Chưa có giải được phân công.");
         return;
       }
       if (cooldownRef.current || busy) return;
       cooldownRef.current = true;
       setBusy(true);
-      setError(null);
       try {
         if (!navigator.onLine) {
           const result = offlineCheckIn({
@@ -272,7 +272,7 @@ export default function ScanQrPage() {
         }
       } catch (e) {
         setLast(null);
-        setError(
+        toastError(
           e instanceof Error
             ? e.message
             : getApiErrorMessage(e, "Check-in thất bại.")
@@ -292,7 +292,7 @@ export default function ScanQrPage() {
       const raw = detected?.[0]?.rawValue?.trim();
       if (!raw) return;
       if (raw === "[object Object]") {
-        setError(
+        toastError(
           "QR vé lỗi. Mở lại vé trong «Đăng ký của tôi», hoặc nhập BIB."
         );
         return;
@@ -310,7 +310,7 @@ export default function ScanQrPage() {
   const onManual = () => {
     const bib = manualBib.trim();
     if (!bib) {
-      setError("Nhập số BIB.");
+      toastError("Nhập số BIB.");
       return;
     }
     void submit({ bib });

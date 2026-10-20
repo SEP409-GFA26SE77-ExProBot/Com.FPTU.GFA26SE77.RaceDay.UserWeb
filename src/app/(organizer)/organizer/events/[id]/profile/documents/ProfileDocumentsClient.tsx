@@ -5,7 +5,6 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   AlertCircle,
-  CheckCircle2,
   FileText,
   Loader2,
   Save,
@@ -14,11 +13,17 @@ import {
 import { getEventById } from "@/api/events";
 import { uploadOrganizerFile } from "@/api/organizer";
 import { updateEventProfile } from "@/api/event-packages";
+import EventProfileSectionHeader from "@/components/organizer/EventProfileSectionHeader";
 import type { RaceEventDto } from "@/dto/event.dto";
 import { getApiErrorMessage } from "@/lib/error";
-import { getOrganizerStatusLabel, getStatusColor } from "@/lib/format";
+import {
+  LEGACY_OPTIONAL_DOC_KEYS,
+  LEGACY_OPTIONAL_DOC_META,
+  PROFILE_DOC_TYPES,
+} from "@/lib/event-profile-docs";
+import { toastError, toastSuccess } from "@/lib/toast";
 import { mediaDisplayUrl } from "@/lib/media-url";
-import { canEditProfile, PROFILE_DOC_TYPES } from "../_shared";
+import { canEditProfile } from "../_shared";
 
 type DocFile = { fileName: string; fileUrl: string };
 
@@ -28,15 +33,9 @@ export default function ProfileDocumentsClient() {
   const [event, setEvent] = useState<RaceEventDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
   const [files, setFiles] = useState<Record<string, DocFile>>({});
-
-  const notify = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3500);
-  };
 
   useEffect(() => {
     if (!eventId) return;
@@ -74,11 +73,14 @@ export default function ProfileDocumentsClient() {
       const result = await uploadOrganizerFile(file, "document");
       setFiles((prev) => ({
         ...prev,
-        [docId]: { fileName: result.fileName || file.name, fileUrl: result.fileUrl },
+        [docId]: {
+          fileName: result.fileName || file.name,
+          fileUrl: result.fileUrl,
+        },
       }));
-      notify("Đã tải lên.");
+      toastSuccess("Đã tải lên.");
     } catch (e) {
-      notify(getApiErrorMessage(e, "Upload thất bại."));
+      toastError(e, "Upload thất bại.");
     } finally {
       setUploadingKey(null);
     }
@@ -87,21 +89,31 @@ export default function ProfileDocumentsClient() {
   const handleSave = async () => {
     if (!event || saving) return;
     setSaving(true);
-    setError(null);
+
     try {
-      const documents = PROFILE_DOC_TYPES.filter((d) => files[d.id]).map((d) => ({
+      const primary = PROFILE_DOC_TYPES.filter((d) => files[d.id]).map((d) => ({
         documentKey: d.id,
         title: d.title,
         fileName: files[d.id].fileName,
         fileUrl: files[d.id].fileUrl,
         required: d.required,
       }));
-      await updateEventProfile(eventId, { documents });
+      // Giữ file optional cũ nếu chưa chuyển sang `other` — tránh mất dữ liệu khi ReplaceDocuments.
+      const legacy = LEGACY_OPTIONAL_DOC_KEYS.filter((k) => files[k]).map(
+        (k) => ({
+          documentKey: k,
+          title: LEGACY_OPTIONAL_DOC_META[k].title,
+          fileName: files[k].fileName,
+          fileUrl: files[k].fileUrl,
+          required: false,
+        })
+      );
+      await updateEventProfile(eventId, { documents: [...primary, ...legacy] });
       const refreshed = await getEventById(eventId);
       setEvent(refreshed);
-      notify("Đã lưu tài liệu.");
+      toastSuccess("Đã lưu tài liệu.");
     } catch (e) {
-      setError(getApiErrorMessage(e, "Lưu thất bại."));
+      toastError(e, "Lưu thất bại.");
     } finally {
       setSaving(false);
     }
@@ -120,7 +132,10 @@ export default function ProfileDocumentsClient() {
       <div className="py-16 text-center">
         <AlertCircle className="mx-auto h-10 w-10 text-red-500" />
         <p className="mt-4 text-sm text-muted-foreground">{error}</p>
-        <Link href="/my-events" className="mt-4 inline-block text-sm font-bold text-orange-600">
+        <Link
+          href="/my-events"
+          className="mt-4 inline-block text-sm font-bold text-orange-600"
+        >
           Về danh sách
         </Link>
       </div>
@@ -128,40 +143,39 @@ export default function ProfileDocumentsClient() {
   }
 
   const editable = canEditProfile(event.status);
+  const legacyPresent = LEGACY_OPTIONAL_DOC_KEYS.filter((k) => files[k]);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-orange-500">
-            Chi tiết giải
-          </p>
-          <h1 className="mt-1 text-2xl font-extrabold">Giấy phép & tài liệu</h1>
-          <span
-            className={`mt-2 inline-flex rounded-md border px-2.5 py-1 text-[11px] font-extrabold ${getStatusColor(event.status)}`}
-          >
-            {getOrganizerStatusLabel(event.status)}
+      <EventProfileSectionHeader
+        eventId={eventId}
+        eventName={event.name}
+        status={event.status}
+        title="Giấy phép & tài liệu"
+        description={
+          <span>
+            Admin chỉ xác minh hồ sơ có tồn tại / mở được. Hai mục bắt buộc khớp
+            rule BE trước khi gửi duyệt.
           </span>
-        </div>
-        {editable && (
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => void handleSave()}
-            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-orange-500 to-red-600 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Lưu tài liệu
-          </button>
-        )}
-      </div>
-
-      {toast && (
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          <CheckCircle2 className="h-4 w-4" />
-          {toast}
-        </div>
-      )}
+        }
+        actions={
+          editable ? (
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => void handleSave()}
+              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-orange-500 to-red-600 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+            >
+              {saving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              Lưu tài liệu
+            </button>
+          ) : undefined
+        }
+      />
       {error && (
         <div className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-sm text-red-600">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -187,13 +201,11 @@ export default function ProfileDocumentsClient() {
                     <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-600">
                       Bắt buộc
                     </span>
-                  ) : (
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
-                      Tùy chọn
-                    </span>
-                  )}
+                  ) : null}
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground">{doc.description}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {doc.description}
+                </p>
                 {uploaded && (
                   <a
                     href={mediaDisplayUrl(uploaded.fileUrl)}
@@ -230,6 +242,30 @@ export default function ProfileDocumentsClient() {
           );
         })}
       </div>
+
+      {legacyPresent.length > 0 ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-950">
+          <p className="font-bold">Tài liệu tùy chọn đã lưu trước đây</p>
+          <p className="mt-1 text-xs text-amber-900/80">
+            Vẫn được giữ khi lưu. Nên tải gộp vào «Các loại tài liệu khác» nếu
+            muốn gom một file.
+          </p>
+          <ul className="mt-2 space-y-1 text-xs">
+            {legacyPresent.map((k) => (
+              <li key={k}>
+                <a
+                  href={mediaDisplayUrl(files[k].fileUrl)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-semibold text-orange-700 hover:underline"
+                >
+                  {LEGACY_OPTIONAL_DOC_META[k].title}: {files[k].fileName}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </div>
   );
 }

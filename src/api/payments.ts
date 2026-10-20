@@ -88,6 +88,13 @@ export async function syncPayment(paymentId: string): Promise<PaymentDto> {
   return api.post(`${PAYMENT_API}/${paymentId}/sync`);
 }
 
+/** Hủy payment đang pending (chủ đơn) */
+export async function cancelPendingPayment(
+  paymentId: string
+): Promise<PaymentDto> {
+  return api.post(`${PAYMENT_API}/${paymentId}/cancel`);
+}
+
 /** Create checkout for a package purchase (event organizer flow) */
 export async function createPackageCheckout(
   data: CreatePackageCheckoutRequest

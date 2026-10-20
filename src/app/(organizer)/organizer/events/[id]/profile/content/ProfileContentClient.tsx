@@ -7,25 +7,24 @@ import {
   AlertCircle,
   AlertTriangle,
   BookOpen,
-  CheckCircle2,
   Clock,
   Gift,
   Loader2,
   Plus,
   Save,
   ScrollText,
-  Trash2,
-} from "lucide-react";
+  Trash2 } from "lucide-react";
 import { getEventById } from "@/api/events";
 import { updateEventProfile } from "@/api/event-packages";
+import EventProfileSectionHeader from "@/components/organizer/EventProfileSectionHeader";
 import type { RaceEventDto } from "@/dto/event.dto";
 import {
   getRaceDetails,
   type RacePrize,
-  type RaceScheduleItem,
-} from "@/lib/race-details";
+  type RaceScheduleItem } from "@/lib/race-details";
 import { getApiErrorMessage } from "@/lib/error";
-import { getOrganizerStatusLabel, getStatusColor } from "@/lib/format";
+import { isPlanRelatedDocument } from "@/lib/event-profile-docs";
+import { toastError, toastSuccess } from "@/lib/toast";
 import { canEditProfile } from "../_shared";
 
 function asLines(list: string[]) {
@@ -45,7 +44,6 @@ export default function ProfileContentClient() {
   const [event, setEvent] = useState<RaceEventDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const [schedule, setSchedule] = useState<RaceScheduleItem[]>([]);
@@ -53,11 +51,6 @@ export default function ProfileContentClient() {
   const [guidelinesText, setGuidelinesText] = useState("");
   const [penaltiesText, setPenaltiesText] = useState("");
   const [prizes, setPrizes] = useState<RacePrize[]>([]);
-
-  const notify = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3500);
-  };
 
   useEffect(() => {
     if (!eventId) return;
@@ -98,12 +91,9 @@ export default function ProfileContentClient() {
         schedule,
         items: linesToList(rulesText),
         guidelines: linesToList(guidelinesText),
-        penalties: linesToList(penaltiesText),
-      },
+        penalties: linesToList(penaltiesText) },
       rewards: {
-        prizes: prizes.filter((p) => p.category.trim() && p.reward.trim()),
-      },
-    } as RaceEventDto;
+        prizes: prizes.filter((p) => p.category.trim() && p.reward.trim()) } } as RaceEventDto;
   }, [event, schedule, rulesText, guidelinesText, penaltiesText, prizes]);
 
   const preview = previewEvent ? getRaceDetails(previewEvent) : null;
@@ -111,24 +101,21 @@ export default function ProfileContentClient() {
   const handleSave = async () => {
     if (!event || saving) return;
     setSaving(true);
-    setError(null);
+
     try {
       await updateEventProfile(eventId, {
         rules: {
           schedule: schedule.filter((s) => s.time.trim() && s.activity.trim()),
           items: linesToList(rulesText),
           guidelines: linesToList(guidelinesText),
-          penalties: linesToList(penaltiesText),
-        },
+          penalties: linesToList(penaltiesText) },
         rewards: {
-          prizes: prizes.filter((p) => p.category.trim() && p.reward.trim()),
-        },
-      });
+          prizes: prizes.filter((p) => p.category.trim() && p.reward.trim()) } });
       const refreshed = await getEventById(eventId);
       setEvent(refreshed);
-      notify("Đã lưu nội dung giải.");
+      toastSuccess("Đã lưu nội dung giải.");
     } catch (e) {
-      setError(getApiErrorMessage(e, "Lưu thất bại."));
+      toastError(e, "Lưu thất bại.");
     } finally {
       setSaving(false);
     }
@@ -158,50 +145,70 @@ export default function ProfileContentClient() {
   }
 
   const editable = canEditProfile(event.status);
+  const hasPlanDoc = (event.documents || []).some(
+    (d) => (d.fileUrl || d.fileName) && isPlanRelatedDocument(d)
+  );
+  const contentSparse =
+    !schedule.some((s) => s.time.trim() && s.activity.trim()) &&
+    !rulesText.trim() &&
+    !guidelinesText.trim();
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-orange-500">
-            Chi tiết giải
-          </p>
-          <h1 className="mt-1 text-2xl font-extrabold">Quản lý nội dung</h1>
-          <span
-            className={`mt-2 inline-flex rounded-md border px-2.5 py-1 text-[11px] font-extrabold ${getStatusColor(event.status)}`}
-          >
-            {getOrganizerStatusLabel(event.status)}
+      <EventProfileSectionHeader
+        eventId={eventId}
+        eventName={event.name}
+        status={event.status}
+        title="Quản lý nội dung"
+        description={
+          <span>
+            Nội dung nhập tay trên trang này — không tự đọc file «Kế hoạch tổ
+            chức». Hãy đối chiếu với tài liệu đã upload.
           </span>
-        </div>
-        {editable && (
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => void handleSave()}
-            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-orange-500 to-red-600 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
-          >
-            {saving ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
-            Lưu nội dung
-          </button>
-        )}
-      </div>
-
-      {toast && (
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          <CheckCircle2 className="h-4 w-4 shrink-0" />
-          {toast}
-        </div>
-      )}
+        }
+        actions={
+          editable ? (
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => void handleSave()}
+              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-orange-500 to-red-600 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+            >
+              {saving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              Lưu nội dung
+            </button>
+          ) : undefined
+        }
+      />
       {error && (
         <div className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-sm text-red-600">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           {error}
         </div>
       )}
+      {hasPlanDoc ? (
+        <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+          <div>
+            <p className="font-bold">Đã có file kế hoạch / tài liệu liên quan</p>
+            <p className="mt-1 text-xs text-amber-900/90">
+              {contentSparse
+                ? "Phần nội dung bên dưới còn trống — nhập tay theo file đã upload để tránh lệch thông tin công bố."
+                : "Kiểm tra lịch trình / điều lệ khớp file đã upload; hệ thống không đồng bộ tự động từ PDF/DOC."}
+            </p>
+            <Link
+              href={`/organizer/events/${eventId}/profile/documents`}
+              className="mt-2 inline-block text-xs font-bold text-orange-700 hover:underline"
+            >
+              Mở Giấy phép & tài liệu →
+            </Link>
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.9fr)]">
         <div className="min-w-0 space-y-5">
@@ -386,14 +393,27 @@ export default function ProfileContentClient() {
           </h2>
           {preview && (
             <div className="mt-5 space-y-6">
-              <section>
-                <div className="mb-2 flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-orange-500" />
-                  <h3 className="text-sm font-bold">Lịch trình race day</h3>
+              {preview.schedule.length === 0 &&
+              preview.rules.length === 0 &&
+              preview.guidelines.length === 0 &&
+              preview.prizes.length === 0 &&
+              preview.penalties.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border/80 bg-card/60 px-4 py-8 text-center">
+                  <p className="text-sm font-semibold text-foreground">
+                    Chưa có nội dung để xem trước
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Điền form bên trái — khối nào có dữ liệu sẽ hiện ở đây.
+                  </p>
                 </div>
-                {preview.schedule.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">Chưa có lịch trình.</p>
-                ) : (
+              ) : null}
+
+              {preview.schedule.length > 0 ? (
+                <section>
+                  <div className="mb-2 flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-orange-500" />
+                    <h3 className="text-sm font-bold">Lịch trình race day</h3>
+                  </div>
                   <ol className="overflow-hidden rounded-xl border border-border divide-y divide-border bg-card">
                     {preview.schedule.map((row) => (
                       <li
@@ -409,17 +429,15 @@ export default function ProfileContentClient() {
                       </li>
                     ))}
                   </ol>
-                )}
-              </section>
+                </section>
+              ) : null}
 
-              <section>
-                <div className="mb-2 flex items-center gap-2">
-                  <ScrollText className="h-4 w-4 text-orange-500" />
-                  <h3 className="text-sm font-bold">Thể lệ &amp; quy định</h3>
-                </div>
-                {preview.rules.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">Chưa có thể lệ.</p>
-                ) : (
+              {preview.rules.length > 0 ? (
+                <section>
+                  <div className="mb-2 flex items-center gap-2">
+                    <ScrollText className="h-4 w-4 text-orange-500" />
+                    <h3 className="text-sm font-bold">Thể lệ &amp; quy định</h3>
+                  </div>
                   <ul className="space-y-2 rounded-xl border border-border bg-card p-3 sm:p-4">
                     {preview.rules.map((rule) => (
                       <li
@@ -431,17 +449,15 @@ export default function ProfileContentClient() {
                       </li>
                     ))}
                   </ul>
-                )}
-              </section>
+                </section>
+              ) : null}
 
-              <section>
-                <div className="mb-2 flex items-center gap-2">
-                  <BookOpen className="h-4 w-4 text-orange-500" />
-                  <h3 className="text-sm font-bold">Hướng dẫn VĐV</h3>
-                </div>
-                {preview.guidelines.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">Chưa có hướng dẫn.</p>
-                ) : (
+              {preview.guidelines.length > 0 ? (
+                <section>
+                  <div className="mb-2 flex items-center gap-2">
+                    <BookOpen className="h-4 w-4 text-orange-500" />
+                    <h3 className="text-sm font-bold">Hướng dẫn VĐV</h3>
+                  </div>
                   <ul className="space-y-2 rounded-xl border border-border bg-card p-3 sm:p-4">
                     {preview.guidelines.map((g) => (
                       <li
@@ -453,17 +469,15 @@ export default function ProfileContentClient() {
                       </li>
                     ))}
                   </ul>
-                )}
-              </section>
+                </section>
+              ) : null}
 
-              <section>
-                <div className="mb-2 flex items-center gap-2">
-                  <Gift className="h-4 w-4 text-orange-500" />
-                  <h3 className="text-sm font-bold">Giải thưởng chi tiết</h3>
-                </div>
-                {preview.prizes.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">Chưa có giải thưởng.</p>
-                ) : (
+              {preview.prizes.length > 0 ? (
+                <section>
+                  <div className="mb-2 flex items-center gap-2">
+                    <Gift className="h-4 w-4 text-orange-500" />
+                    <h3 className="text-sm font-bold">Giải thưởng chi tiết</h3>
+                  </div>
                   <div className="overflow-hidden rounded-xl border border-border bg-card">
                     <table className="w-full text-xs sm:text-sm">
                       <thead>
@@ -490,21 +504,17 @@ export default function ProfileContentClient() {
                       </tbody>
                     </table>
                   </div>
-                )}
-              </section>
+                </section>
+              ) : null}
 
-              <section>
-                <div className="mb-2 flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-red-500" />
-                  <h3 className="text-sm font-bold">Hình phạt / DSQ</h3>
-                </div>
-                <ul className="space-y-2 rounded-xl border border-red-500/20 bg-red-500/[0.04] p-3 sm:p-4">
-                  {preview.penalties.length === 0 ? (
-                    <li className="text-xs text-muted-foreground">
-                      Chưa có hình phạt — điền ở form bên trái.
-                    </li>
-                  ) : (
-                    preview.penalties.map((p) => (
+              {preview.penalties.length > 0 ? (
+                <section>
+                  <div className="mb-2 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-red-500" />
+                    <h3 className="text-sm font-bold">Hình phạt / DSQ</h3>
+                  </div>
+                  <ul className="space-y-2 rounded-xl border border-red-500/20 bg-red-500/[0.04] p-3 sm:p-4">
+                    {preview.penalties.map((p) => (
                       <li
                         key={p}
                         className="flex gap-2 text-xs leading-relaxed text-foreground/80 sm:text-sm"
@@ -512,10 +522,10 @@ export default function ProfileContentClient() {
                         <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
                         <span className="min-w-0 break-words">{p}</span>
                       </li>
-                    ))
-                  )}
-                </ul>
-              </section>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
             </div>
           )}
         </aside>

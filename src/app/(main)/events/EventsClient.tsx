@@ -109,7 +109,7 @@ function minEventPrice(event: RaceEventListItemDto): number | null {
   const distances = event.distances || [];
   if (distances.length) {
     const prices = distances
-      .map((d) => Number(d.price))
+      .map((d) => Number(d.basePrice ?? d.price))
       .filter((p) => Number.isFinite(p) && p >= 0);
     if (prices.length) return Math.min(...prices);
   }

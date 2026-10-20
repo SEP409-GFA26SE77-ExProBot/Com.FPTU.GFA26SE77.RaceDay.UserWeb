@@ -20,6 +20,7 @@ import {
   getRefundStatusLabel,
 } from "@/lib/format";
 import { getApiErrorMessage } from "@/lib/error";
+import { toastError, toastSuccess } from "@/lib/toast";
 import { PAGE_SHELL } from "@/lib/page-shell";
 import PageLoading from "@/components/ui/PageLoading";
 import Pagination from "@/components/ui/Pagination";
@@ -65,7 +66,6 @@ export default function PaymentsHistoryPage() {
   const [refunds, setRefunds] = useState<RefundRequestDto[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [refundBusyId, setRefundBusyId] = useState<string | null>(null);
-  const [refundMsg, setRefundMsg] = useState<string | null>(null);
   const [refundTarget, setRefundTarget] = useState<Row | null>(null);
   const [refundReason, setRefundReason] = useState("");
   const [payOsMode, setPayOsMode] = useState<PaymentStatusDto["payOsMode"] | null>(
@@ -148,14 +148,12 @@ export default function PaymentsHistoryPage() {
   const openRefund = (row: Row) => {
     setRefundTarget(row);
     setRefundReason("");
-    setRefundMsg(null);
   };
 
   const submitRefund = async () => {
     if (!refundTarget || refundReason.trim().length < 10) return;
     const paymentId = refundTarget.id;
     setRefundBusyId(paymentId);
-    setRefundMsg(null);
     try {
       const row = await createRefundRequest({
         paymentId,
@@ -181,7 +179,7 @@ export default function PaymentsHistoryPage() {
       );
       setRefundTarget(null);
       setRefundReason("");
-      setRefundMsg(
+      toastSuccess(
         row.status === "refunded"
           ? payOsMode === "mock"
             ? "Đã hoàn nội bộ (PayOS mock) — ledger/payment cập nhật; không chuyển khoản ngân hàng thật."
@@ -189,7 +187,7 @@ export default function PaymentsHistoryPage() {
           : "Đã gửi yêu cầu hoàn tiền — theo dõi bảng bên dưới."
       );
     } catch (e) {
-      setRefundMsg(getApiErrorMessage(e, "Gửi yêu cầu hoàn tiền thất bại."));
+      toastError(e, "Gửi yêu cầu hoàn tiền thất bại.");
     } finally {
       setRefundBusyId(null);
     }
@@ -255,12 +253,6 @@ export default function PaymentsHistoryPage() {
           {error}
         </div>
       )}
-      {refundMsg && (
-        <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
-          {refundMsg}
-        </div>
-      )}
-
       {items.length === 0 ? (
         <div className="rounded-2xl border border-dashed p-10 text-center text-sm text-muted-foreground">
           Chưa có giao dịch. Đăng ký giải và thanh toán để xuất hiện tại đây.
@@ -333,13 +325,26 @@ export default function PaymentsHistoryPage() {
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {p.status === "pending" &&
+                            !isPackage &&
                             p.eventId &&
                             p.registrationId && (
                               <Link
                                 href={`/events/${p.eventId}/payment?regId=${p.registrationId}`}
-                                className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 hover:underline"
+                                className="inline-flex items-center gap-1 rounded-full border border-orange-500/30 bg-orange-500/10 px-3 py-1.5 text-xs font-bold text-orange-700 hover:bg-orange-500/15"
                               >
-                                Thanh toán <ExternalLink className="h-3 w-3" />
+                                Tiếp tục thanh toán{" "}
+                                <ExternalLink className="h-3 w-3" />
+                              </Link>
+                            )}
+                          {p.status === "pending" &&
+                            isPackage &&
+                            p.referenceId && (
+                              <Link
+                                href={`/events/create?purchaseId=${p.referenceId}`}
+                                className="inline-flex items-center gap-1 rounded-full border border-orange-500/30 bg-orange-500/10 px-3 py-1.5 text-xs font-bold text-orange-700 hover:bg-orange-500/15"
+                              >
+                                Tiếp tục thanh toán{" "}
+                                <ExternalLink className="h-3 w-3" />
                               </Link>
                             )}
                           {(p.status === "paid" || p.status === "refunded") &&

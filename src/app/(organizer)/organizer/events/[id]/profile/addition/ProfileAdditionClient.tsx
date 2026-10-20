@@ -5,22 +5,19 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   AlertCircle,
-  CheckCircle2,
   Loader2,
   PackagePlus,
   Save,
   Check,
-  RotateCcw,
-} from "lucide-react";
+  RotateCcw } from "lucide-react";
 import { getEventById } from "@/api/events";
 import type { RaceEventDto } from "@/dto/event.dto";
 import { getApiErrorMessage } from "@/lib/error";
-import { getOrganizerStatusLabel, getStatusColor } from "@/lib/format";
+import { toastError, toastSuccess } from "@/lib/toast";
 import { canEditProfile } from "../_shared";
 import {
   ADDITION_PRODUCTS,
-  type AdditionProductItem,
-} from "@/components/product-list";
+  type AdditionProductItem } from "@/components/product-list";
 import { ProductCard } from "@/components/product-card";
 
 const STORAGE_KEY_PREFIX = "raceday_event_additions_";
@@ -32,7 +29,6 @@ export default function ProfileAdditionClient() {
   const [event, setEvent] = useState<RaceEventDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Selected item IDs (organizer group is bundled: either both or neither)
@@ -41,11 +37,6 @@ export default function ProfileAdditionClient() {
     "chip",
     "time-kit",
   ]);
-
-  const notify = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3500);
-  };
 
   const load = useCallback(async () => {
     const data = await getEventById(eventId);
@@ -112,7 +103,7 @@ export default function ProfileAdditionClient() {
   const handleSave = async () => {
     if (saving) return;
     setSaving(true);
-    setError(null);
+
 
     try {
       if (typeof window !== "undefined") {
@@ -123,9 +114,9 @@ export default function ProfileAdditionClient() {
       }
       // Brief delay for UX feedback
       await new Promise((res) => setTimeout(res, 400));
-      notify(`Đã lưu thành công ${selectedIds.length} hạng mục bổ sung.`);
+      toastSuccess(`Đã lưu thành công ${selectedIds.length} hạng mục bổ sung.`);
     } catch (e) {
-      setError(getApiErrorMessage(e, "Lưu thông tin bổ sung thất bại."));
+      toastError(e, "Lưu thông tin bổ sung thất bại.");
     } finally {
       setSaving(false);
     }
@@ -181,18 +172,9 @@ export default function ProfileAdditionClient() {
           <p className="text-xs font-bold uppercase tracking-widest text-orange-500">
             Chi tiết giải
           </p>
-          <div className="mt-1 flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl md:text-3xl font-extrabold text-foreground tracking-tight">
-              Dịch vụ &amp; Vật phẩm bổ sung
-            </h1>
-            <span
-              className={`inline-flex rounded-md border px-2.5 py-0.5 text-[11px] font-extrabold ${getStatusColor(
-                event.status
-              )}`}
-            >
-              {getOrganizerStatusLabel(event.status)}
-            </span>
-          </div>
+          <h1 className="mt-1 text-2xl md:text-3xl font-extrabold text-foreground tracking-tight">
+            Dịch vụ &amp; Vật phẩm bổ sung
+          </h1>
           <p className="text-sm text-muted-foreground mt-2 max-w-3xl">
             Chọn các vật phẩm vận động viên (BIB, áo Finisher, huy chương) và thiết bị ban tổ chức (chip, hệ thống tính giờ) cho giải chạy.
           </p>
@@ -216,12 +198,6 @@ export default function ProfileAdditionClient() {
       </div>
 
       {/* TOAST / ERROR */}
-      {toast && (
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 shadow-sm animate-in fade-in duration-200">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-          <span>{toast}</span>
-        </div>
-      )}
       {error && (
         <div className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-sm text-red-600">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
