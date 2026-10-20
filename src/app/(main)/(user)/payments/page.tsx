@@ -47,15 +47,14 @@ function statusClass(status: string) {
   }
 }
 
-function isRegistrationPayment(p: PaymentDto): boolean {
+function isRegistrationPayment(p: Row): boolean {
   const purpose = (p.purpose || "").toLowerCase();
   if (purpose === "event_package") return false;
   if (purpose === "registration") return true;
   return Boolean(p.registrationId);
 }
 
-type Row = PaymentDto & {
-  eventId?: string;
+type Row = Omit<PaymentDto, "bibNumber"> & {
   bibNumber?: string | null;
 };
 
@@ -73,7 +72,7 @@ export default function PaymentsHistoryPage() {
   );
 
   useEffect(() => {
-    const token = Cookies.get("access_token");
+    const token = Cookies.get("accessToken");
     setLoggedIn(Boolean(token));
     if (!token) {
       setBoot(false);
@@ -233,11 +232,6 @@ export default function PaymentsHistoryPage() {
           Vận động viên
         </p>
         <h1 className="text-3xl font-extrabold tracking-tight">Lịch sử thanh toán</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Theo dõi giao dịch PayOS. Hoàn tiền vé đăng ký cần lý do — BE hoàn theo
-          % chính sách × số đã trả (không theo giá cự ly hiện tại). Gói tạo giải
-          không hoàn qua nút này.
-        </p>
       </div>
 
       {payOsMode === "mock" && (
@@ -324,13 +318,14 @@ export default function PaymentsHistoryPage() {
                           ) : null}
                         </div>
                         <div className="flex flex-wrap gap-2">
+                          {/* Registration: pending → continue paying */}
                           {p.status === "pending" &&
                             !isPackage &&
                             p.eventId &&
                             p.registrationId && (
                               <Link
                                 href={`/events/${p.eventId}/payment?regId=${p.registrationId}`}
-                                className="inline-flex items-center gap-1 rounded-full border border-orange-500/30 bg-orange-500/10 px-3 py-1.5 text-xs font-bold text-orange-700 hover:bg-orange-500/15"
+                                className="inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white hover:bg-orange-600 transition-colors"
                               >
                                 Tiếp tục thanh toán{" "}
                                 <ExternalLink className="h-3 w-3" />
@@ -341,13 +336,24 @@ export default function PaymentsHistoryPage() {
                             p.referenceId && (
                               <Link
                                 href={`/events/create?purchaseId=${p.referenceId}`}
-                                className="inline-flex items-center gap-1 rounded-full border border-orange-500/30 bg-orange-500/10 px-3 py-1.5 text-xs font-bold text-orange-700 hover:bg-orange-500/15"
+                                className="inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white hover:bg-orange-600 transition-colors"
                               >
                                 Tiếp tục thanh toán{" "}
                                 <ExternalLink className="h-3 w-3" />
                               </Link>
                             )}
+                          {/* Package: pending → back to create */}
+                          {p.status === "pending" && isPackage && (
+                            <Link
+                              href="/events/create"
+                              className="inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white hover:bg-orange-600 transition-colors"
+                            >
+                              Tiếp tục mua gói <ExternalLink className="h-3 w-3" />
+                            </Link>
+                          )}
+                          {/* Registration: paid/refunded → view ticket */}
                           {(p.status === "paid" || p.status === "refunded") &&
+                            !isPackage &&
                             p.registrationId && (
                               <Link
                                 href={`/my-registrations/${p.registrationId}`}
@@ -357,6 +363,25 @@ export default function PaymentsHistoryPage() {
                                 <ExternalLink className="h-3 w-3" />
                               </Link>
                             )}
+                          {/* Package: paid → organizer dashboard */}
+                          {p.status === "paid" && isPackage && (
+                            <Link
+                              href="/organizer"
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 hover:underline"
+                            >
+                              Xem giải của tôi <ExternalLink className="h-3 w-3" />
+                            </Link>
+                          )}
+                          {/* Event detail link for any payment that has an eventId */}
+                          {p.eventId && !isPackage && (
+                            <Link
+                              href={`/events/${p.eventId}`}
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:underline"
+                            >
+                              Chi tiết giải <ExternalLink className="h-3 w-3" />
+                            </Link>
+                          )}
+                          {/* Refund */}
                           {canRefund && (
                             <button
                               type="button"
@@ -380,14 +405,6 @@ export default function PaymentsHistoryPage() {
                               )}
                             </span>
                           ) : null}
-                          {p.eventId && (
-                            <Link
-                              href={`/events/${p.eventId}`}
-                              className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:underline"
-                            >
-                              Chi tiết giải <ExternalLink className="h-3 w-3" />
-                            </Link>
-                          )}
                         </div>
                       </div>
                     </li>

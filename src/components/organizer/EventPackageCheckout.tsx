@@ -1,4 +1,5 @@
 "use client";
+import { useOrganizerErrorState } from "@/lib/use-organizer-error-state";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -74,7 +75,7 @@ export default function EventPackageCheckout() {
   const [catalog, setCatalog] = useState<PackageCatalogDto | null>(null);
   const [profile, setProfile] = useState<MyProfileDto | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useOrganizerErrorState();
   const [submitting, setSubmitting] = useState(false);
   const [resuming, setResuming] = useState(Boolean(resumePurchaseId));
 
@@ -275,6 +276,12 @@ export default function EventPackageCheckout() {
       const origin = typeof window !== "undefined" ? window.location.origin : "";
       const returnUrl = `${origin}/events/create/package-return?purchaseId=${purchase.id}`;
       const cancelUrl = `${origin}/events/create`;
+
+      // Check if PayOS is running in mock mode
+      try {
+        const st = await getPaymentStatus();
+        setPayOsMock(String(st.payOsMode || "").toLowerCase() === "mock");
+      } catch { /* ignore */ }
 
       const checkoutRes = await createPackageCheckout({
         packagePurchaseId: purchase.id,

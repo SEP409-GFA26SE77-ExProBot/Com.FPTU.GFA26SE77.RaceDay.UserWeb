@@ -77,7 +77,7 @@ export default function ProfileEditPage() {
   const [savingPw, setSavingPw] = useState(false);
 
   useEffect(() => {
-    const token = Cookies.get("access_token");
+    const token = Cookies.get("accessToken");
     setLoggedIn(Boolean(token));
     setUsername(Cookies.get("username") || "");
     if (!token) {

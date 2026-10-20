@@ -1,4 +1,5 @@
 "use client";
+import { useOrganizerToastState } from "@/lib/use-organizer-toast-state";
 
 import { useMemo, useState } from "react";
 import { Check, CheckCircle2, Download, Eye, Plus, RefreshCw, Search, Trash2, Users, WalletCards, X } from "lucide-react";
@@ -38,7 +39,7 @@ export default function RegistrationPrototype() {
   const [registrations, setRegistrations] = useState(initialRegistrations);
   const [query, setQuery] = useState("");
   const [paymentFilter, setPaymentFilter] = useState<"All" | PaymentStatus>("All");
-  const [toast, setToast] = useState("");
+  const [toast, setToast] = useOrganizerToastState("");
   const [event, setEvent] = useState(organizerEvents[0]);
   const [selectedRegistration, setSelectedRegistration] = useState<Registration | null>(null);
   const [newTier, setNewTier] = useState({ name: "", distance: "10 KM", price: "450000", quota: "500" });

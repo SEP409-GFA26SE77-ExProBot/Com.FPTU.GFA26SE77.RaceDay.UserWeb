@@ -1,4 +1,5 @@
 "use client";
+import { useOrganizerToastState } from "@/lib/use-organizer-toast-state";
 
 import { ChangeEvent, useMemo, useState } from "react";
 import { Check, CheckCircle2, Download, FileCheck2, FileUp, Image as ImageIcon, Plus, QrCode, Search, Upload, Users, X } from "lucide-react";
@@ -29,7 +30,7 @@ const seedPhotos: Photo[] = [{ id: 1, name: "finish-001.jpg", bib: "1023", statu
 export default function OrganizerOperationsPrototype({ module }: { module: Module }) {
   const copy = config[module];
   const [tab, setTab] = useState(copy.tabs[0]);
-  const [toast, setToast] = useState("");
+  const [toast, setToast] = useOrganizerToastState("");
   const [people, setPeople] = useState(seedPeople);
   const [selected, setSelected] = useState(seedPeople[0]);
   const [disputes, setDisputes] = useState(seedDisputes);

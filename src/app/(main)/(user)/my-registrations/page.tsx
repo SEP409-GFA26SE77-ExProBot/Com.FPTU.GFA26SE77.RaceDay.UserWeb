@@ -66,7 +66,7 @@ export default function MyRegistrationsPage() {
   };
 
   useEffect(() => {
-    const token = Cookies.get("access_token");
+    const token = Cookies.get("accessToken");
     setLoggedIn(Boolean(token));
     if (!token) {
       setReady(true);

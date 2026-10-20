@@ -1,4 +1,5 @@
 "use client";
+import { useOrganizerErrorState } from "@/lib/use-organizer-error-state";
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -23,7 +24,7 @@ import type { RaceEventDto } from "@/dto/event.dto";
 import type { ApiRegistration } from "@/dto/organizer.dto";
 import { formatDate, formatPrice } from "@/lib/format";
 import { getApiErrorMessage } from "@/lib/error";
-import { toastError, toastSuccess } from "@/lib/toast";
+import { toastSuccess } from "@/lib/toast";
 import { mediaDisplayUrl } from "@/lib/media-url";
 import EventFinancePanel from "@/components/organizer/EventFinancePanel";
 import RegistrationApprovalsPanel from "@/components/organizer/RegistrationApprovalsPanel";
@@ -84,8 +85,7 @@ function MyEventDetailContent() {
   const [regs, setRegs] = useState<ApiRegistration[]>([]);
   const [loading, setLoading] = useState(true);
   const [regsLoading, setRegsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [regsError, setRegsError] = useState<string | null>(null);
+  const [error, setError] = useOrganizerErrorState();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [reason, setReason] = useState("");
@@ -94,17 +94,16 @@ function MyEventDetailContent() {
 
   const loadRegs = useCallback(async () => {
     setRegsLoading(true);
-    setRegsError(null);
     try {
       const list = await listEventRegistrations(eventId);
       setRegs(Array.isArray(list) ? list : []);
     } catch (e) {
       setRegs([]);
-      setRegsError(getApiErrorMessage(e, "Không tải được danh sách đăng ký."));
+      setError(getApiErrorMessage(e, "Không tải được danh sách đăng ký."));
     } finally {
       setRegsLoading(false);
     }
-  }, [eventId]);
+  }, [eventId, setError]);
 
   useEffect(() => {
     if (!eventId) return;
@@ -154,7 +153,7 @@ function MyEventDetailContent() {
       );
       await loadRegs();
     } catch (e) {
-      toastError(e, "Duyệt thất bại.");
+      setError(getApiErrorMessage(e, "Duyệt thất bại."));
     } finally {
       setBusyId(null);
     }
@@ -170,7 +169,7 @@ function MyEventDetailContent() {
       toastSuccess("Đã từ chối đăng ký.");
       await loadRegs();
     } catch (e) {
-      toastError(e, "Từ chối thất bại.");
+      setError(getApiErrorMessage(e, "Từ chối thất bại."));
     } finally {
       setBusyId(null);
     }
@@ -346,9 +345,6 @@ function MyEventDetailContent() {
 
       {tab === "approvals" && (
         <>
-          {regsError && (
-            <p className="mb-3 text-sm text-red-600">{regsError}</p>
-          )}
           <RegistrationApprovalsPanel
             event={event}
             regs={regs}

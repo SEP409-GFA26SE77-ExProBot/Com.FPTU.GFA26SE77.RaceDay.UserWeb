@@ -1,4 +1,5 @@
 "use client";
+import { useOrganizerToastState } from "@/lib/use-organizer-toast-state";
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -67,7 +68,7 @@ export default function OrganizerPrototype({ module }: { module?: ModuleKey }) {
 
 function DashboardPrototype() {
   const [event, setEvent] = useState(eventNames[0]);
-  const [toast, setToast] = useState("");
+  const [toast, setToast] = useOrganizerToastState("");
   const quickAction = (label: string) => { setToast(`${label} opened in prototype mode`); window.setTimeout(() => setToast(""), 2200); };
   return <div className="space-y-8">
     {toast && <Toast message={toast} />}
@@ -85,7 +86,7 @@ function ModulePrototype({ module }: { module: ModuleKey }) {
   const [tab, setTab] = useState(copy.tabs[0]);
   const [query, setQuery] = useState("");
   const [modal, setModal] = useState<string | null>(null);
-  const [toast, setToast] = useState("");
+  const [toast, setToast] = useOrganizerToastState("");
   const rows = useMemo(() => tableRows[module].filter((row) => row.join(" ").toLowerCase().includes(query.toLowerCase())), [module, query]);
   const action = (message: string) => { setToast(message); window.setTimeout(() => setToast(""), 2200); };
   const formTab = (module === "events" && tab !== "All events") || tab === "Pricing tiers" || tab === "Capacity" || tab === "BIB & cut-off" || tab === "Emergency info";

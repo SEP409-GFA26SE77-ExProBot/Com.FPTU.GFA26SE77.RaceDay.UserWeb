@@ -131,7 +131,7 @@ function RegisterPageContent() {
   const [resumeHint, setResumeHint] = useState<string | null>(null);
   const [step, setStep] = useState<RegStep>(1);
 
-  const loggedIn = Boolean(Cookies.get("access_token"));
+  const loggedIn = Boolean(Cookies.get("accessToken"));
 
   const [formData, setFormData] = useState<FormData>({
     fullName: "",

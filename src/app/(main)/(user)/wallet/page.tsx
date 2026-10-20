@@ -19,7 +19,7 @@ export default function WalletHubPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = Cookies.get("access_token");
+    const token = Cookies.get("accessToken");
     setLoggedIn(Boolean(token));
     if (!token) {
       setBoot(false);
