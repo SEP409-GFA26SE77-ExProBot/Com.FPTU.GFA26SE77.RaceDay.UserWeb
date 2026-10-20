@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { getMyProfile, persistAvatarCookie } from "@/api/auth";
 import { getPackageCatalog, createPackagePurchase } from "@/api/event-packages";
-import { createPackageCheckout, syncPayment } from "@/api/payments";
+import { createPackageCheckout, syncPayment, mockPay, getPaymentStatus } from "@/api/payments";
 import type { MyProfileDto } from "@/dto/auth.dto";
 import type {
   PackageCatalogDto,
@@ -79,6 +79,8 @@ export default function EventPackageCheckout() {
   const [step, setStep] = useState<Step>("form");
   const [checkout, setCheckout] = useState<CheckoutResponseDto | null>(null);
   const [purchaseId, setPurchaseId] = useState<string | null>(null);
+  const [payOsMock, setPayOsMock] = useState(false);
+  const [mockPaying, setMockPaying] = useState(false);
 
   // Load catalog + profile
   useEffect(() => {
@@ -177,6 +179,12 @@ export default function EventPackageCheckout() {
       const returnUrl = `${origin}/events/create/package-return?purchaseId=${purchase.id}`;
       const cancelUrl = `${origin}/events/create`;
 
+      // Check if PayOS is running in mock mode
+      try {
+        const st = await getPaymentStatus();
+        setPayOsMock(String(st.payOsMode || "").toLowerCase() === "mock");
+      } catch { /* ignore */ }
+
       const checkoutRes = await createPackageCheckout({
         packagePurchaseId: purchase.id,
         returnUrl,
@@ -240,6 +248,23 @@ export default function EventPackageCheckout() {
       router.push(`/events/create/package-return?purchaseId=${purchaseId}&paymentId=${activePaymentId}`);
     }, 800);
   }, [purchaseId, activePaymentId, router]);
+
+  const confirmMockPaid = useCallback(async () => {
+    const payId = checkout?.paymentId;
+    if (!payId || mockPaying) return;
+    setMockPaying(true);
+    try {
+      await mockPay(payId);
+      setStep("success");
+      setTimeout(() => {
+        router.push(`/events/create/package-return?purchaseId=${purchaseId}&paymentId=${payId}`);
+      }, 500);
+    } catch (e) {
+      setError(getApiErrorMessage(e, "Giả lập thanh toán thất bại."));
+    } finally {
+      setMockPaying(false);
+    }
+  }, [checkout?.paymentId, mockPaying, purchaseId, router]);
 
   // ── Loading ──
   if (loading) {
@@ -332,8 +357,27 @@ export default function EventPackageCheckout() {
                 <span className="text-xl font-extrabold text-orange-600">{formatPrice(amountToPay)}</span>
               </div>
               <p className="text-[11px] leading-relaxed text-muted-foreground">
-                PayOS xác nhận xong sẽ tự chuyển trang. Giải nháp được tạo sau khi thanh toán thành công.
+                {payOsMock
+                  ? "Đang dùng PayOS mock (dev): QR không trừ tiền thật — bấm nút giả lập bên dưới để coi như đã thanh toán."
+                  : "PayOS xác nhận xong sẽ tự chuyển trang. Giải nháp được tạo sau khi thanh toán thành công."}
               </p>
+
+              {payOsMock && checkout?.paymentId ? (
+                <button
+                  type="button"
+                  onClick={() => void confirmMockPaid()}
+                  disabled={mockPaying}
+                  className="w-full rounded-xl bg-gradient-to-r from-orange-500 to-red-600 py-2.5 text-sm font-bold text-white shadow-sm disabled:opacity-50"
+                >
+                  {mockPaying ? (
+                    <span className="inline-flex items-center justify-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Đang giả lập…
+                    </span>
+                  ) : (
+                    "Giả lập thanh toán thành công"
+                  )}
+                </button>
+              ) : null}
             </aside>
           </div>
         </div>
