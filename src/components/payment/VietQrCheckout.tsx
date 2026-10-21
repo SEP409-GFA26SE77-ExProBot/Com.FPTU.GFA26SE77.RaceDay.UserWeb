@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Check, Copy, Loader2 } from "lucide-react";
-import { formatPrice } from "@/lib/format";
 import type { VietQrFields } from "@/dto/payment.dto";
 
 type VietQrCheckoutProps = VietQrFields & {
@@ -100,15 +99,14 @@ export function VietQrCheckout({
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span>Tổng: <strong className="text-orange-600">{formatPrice(amount)}</strong></span>
-        {polling && (
+      {polling ? (
+        <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1.5 text-emerald-700">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             Đang chờ xác nhận PayOS…
           </span>
-        )}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }

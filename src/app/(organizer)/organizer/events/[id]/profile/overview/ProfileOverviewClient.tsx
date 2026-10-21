@@ -118,12 +118,26 @@ export default function ProfileOverviewClient() {
         label: "Cấu hình BIB",
         href: `${base}/bib`,
         icon: Hash,
-        ok: Boolean(event.bibRangeStart || event.bibPrefix),
-        hint: event.bibPrefix
-          ? `Prefix ${event.bibPrefix} · từ ${event.bibRangeStart ?? 1001}`
-          : event.bibRangeStart
-            ? `Dải từ ${event.bibRangeStart}`
-            : "Mặc định BE: 1001, 1002… (không prefix)",
+        ok:
+          hasDistances &&
+          (event.distances || []).every(
+            (d) =>
+              d.bibRangeStart != null &&
+              d.bibRangeStart > 0 &&
+              d.bibRangeEnd != null &&
+              d.bibRangeEnd >= d.bibRangeStart
+          ),
+        hint: !hasDistances
+          ? "Cần thêm cự ly trước"
+          : (event.distances || []).every(
+                (d) =>
+                  d.bibRangeStart != null &&
+                  d.bibRangeStart > 0 &&
+                  d.bibRangeEnd != null &&
+                  d.bibRangeEnd >= d.bibRangeStart
+              )
+            ? `${event.distances!.length} cự ly đã có dải BIB`
+            : "Mỗi cự ly cần prefix + từ/đến số (không tự cấp 1001…)",
       },
       {
         id: "map",

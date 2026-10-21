@@ -27,6 +27,12 @@ export interface EventDistanceDto {
   geoJson?: unknown | null;
   // Computed / returned by BE
   registeredCount?: number;
+  /** Prefix BIB theo cự ly (vd. 5K, HM) */
+  bibPrefix?: string | null;
+  /** Từ số dải (1–9999) */
+  bibRangeStart?: number | null;
+  /** Đến số dải (1–9999) */
+  bibRangeEnd?: number | null;
 }
 
 /** Legacy matrix type × distance name */
@@ -119,11 +125,11 @@ export interface RaceEventDto {
   packageExpiresAtUtc?: string | null;
   registrationOpensAtUtc?: string | null;
   registrationClosesAtUtc?: string | null;
-  /** Prefix BIB theo giải (vd. HCM26-) — null = số thuần */
+  /** @deprecated Legacy cấp giải — SoT BIB nằm trên distances[].bib* */
   bibPrefix?: string | null;
-  /** Số bắt đầu dải (mặc định BE 1001 nếu null) */
+  /** @deprecated Legacy cấp giải — dùng distances[].bibRangeStart */
   bibRangeStart?: number | null;
-  /** Số kết thúc dải (null = không giới hạn) */
+  /** @deprecated Legacy cấp giải — dùng distances[].bibRangeEnd */
   bibRangeEnd?: number | null;
   createdAt?: string;
   updatedAt?: string;

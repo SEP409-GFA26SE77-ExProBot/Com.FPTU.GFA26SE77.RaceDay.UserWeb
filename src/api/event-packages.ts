@@ -81,6 +81,8 @@ export async function getOrganizerDistances(
   distances: Array<{
     id: string;
     name: string;
+    /** Chip BXH: 3KM, HM… */
+    type?: string;
     distanceKm: number;
     capacity: number;
     registeredCount: number;
@@ -90,6 +92,9 @@ export async function getOrganizerDistances(
     currency: string;
     startAt?: string | null;
     endAt?: string | null;
+    bibPrefix?: string | null;
+    bibRangeStart?: number | null;
+    bibRangeEnd?: number | null;
   }>;
   ticketPricing?: unknown;
 }> {
@@ -111,6 +116,27 @@ export async function replaceEventDistances(
     return result;
   } catch (e) {
     throw new Error(getApiErrorMessage(e, "Cập nhật cự ly thất bại."));
+  }
+}
+
+/** PUT /organizer/{eventId}/bib-configs — dải BIB theo từng cự ly */
+export async function replaceEventBibConfigs(
+  eventId: string,
+  distances: Array<{
+    distanceId: string;
+    bibPrefix?: string | null;
+    bibRangeStart: number;
+    bibRangeEnd: number;
+  }>
+): Promise<unknown> {
+  try {
+    const result = await api.put(`${EVENT_API}/organizer/${eventId}/bib-configs`, {
+      distances,
+    });
+    invalidateEventCache(eventId);
+    return result;
+  } catch (e) {
+    throw new Error(getApiErrorMessage(e, "Lưu cấu hình BIB thất bại."));
   }
 }
 

@@ -66,6 +66,8 @@ export interface CreateRaceEventDistanceInput {
   distanceKm: number;
   capacity: number;
   basePrice: number;
+  /** Mã chip BXH: 3KM, HM, M, OTHER… */
+  type?: string | null;
 }
 
 export interface CreateRaceEventDocumentInput {

@@ -451,7 +451,7 @@ export default function ScanQrPage() {
                     }}
                     inputMode="numeric"
                     autoComplete="off"
-                    placeholder="VD: 1001"
+                    placeholder="VD: 0001 hoặc 150001"
                     className="h-10 w-full rounded-xl border border-border bg-background py-2 pl-10 pr-3 text-sm font-semibold outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20"
                     disabled={busy || !eventId}
                   />

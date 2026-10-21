@@ -1,8 +1,8 @@
 "use client";
+import { getAccessToken } from "@/lib/auth-cookie";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import Cookies from "js-cookie";
 import {
   Ticket,
   Camera,
@@ -66,7 +66,7 @@ export default function MyRegistrationsPage() {
   };
 
   useEffect(() => {
-    const token = Cookies.get("accessToken");
+    const token = getAccessToken();
     setLoggedIn(Boolean(token));
     if (!token) {
       setReady(true);

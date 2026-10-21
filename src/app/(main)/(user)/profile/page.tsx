@@ -1,4 +1,5 @@
 "use client";
+import { getAccessToken } from "@/lib/auth-cookie";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -38,7 +39,7 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = Cookies.get("accessToken");
+    const token = getAccessToken();
     const name = Cookies.get("username") || null;
     setUsername(token ? name : null);
 

@@ -183,6 +183,20 @@ export default function ProfileOpenRegClient() {
         href: `${base}/distances`,
       },
       {
+        id: "bib",
+        label: "Đã cấu hình dải BIB theo từng cự ly",
+        ok:
+          (event.distances?.length || 0) >= 1 &&
+          (event.distances || []).every(
+            (d) =>
+              d.bibRangeStart != null &&
+              d.bibRangeStart > 0 &&
+              d.bibRangeEnd != null &&
+              d.bibRangeEnd >= d.bibRangeStart
+          ),
+        href: `${base}/bib`,
+      },
+      {
         id: "pricing",
         label: "Đã cấu hình giá vé",
         ok: hasPricing(event),

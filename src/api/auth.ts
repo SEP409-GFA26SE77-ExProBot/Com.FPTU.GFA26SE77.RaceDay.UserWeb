@@ -100,6 +100,7 @@ export async function updateMyProfile(
     phone: data.phone?.trim() || null,
     dateOfBirth: data.dateOfBirth || null,
     gender: data.gender ?? 0,
+    idNumber: data.idNumber?.trim() || null,
     ...(data.avatarUrl !== undefined ? { avatarUrl: data.avatarUrl } : {}),
   }) as Promise<MyProfileDto>;
 }

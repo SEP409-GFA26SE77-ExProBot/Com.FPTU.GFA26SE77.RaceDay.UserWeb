@@ -110,6 +110,8 @@ export interface MyProfileDto {
   emailVerified?: boolean;
   /** URL ảnh đại diện (R2 / uploads/avatars) */
   avatarUrl?: string | null;
+  /** CCCD/CMND hoặc hộ chiếu */
+  idNumber?: string | null;
 }
 
 /** Body PUT api/v1/iam/me */
@@ -120,6 +122,7 @@ export interface UpdateMyProfileDto {
   /** 0 Unknown | 1 Male | 2 Female */
   gender?: number;
   avatarUrl?: string | null;
+  idNumber?: string | null;
 }
 
 export function genderToApiNumber(gender: unknown): number {

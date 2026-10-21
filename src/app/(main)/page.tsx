@@ -1,8 +1,8 @@
 "use client";
+import { getAccessToken } from "@/lib/auth-cookie";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import Cookies from "js-cookie";
 import {
   ArrowRight,
   Flag,
@@ -55,7 +55,7 @@ export default function Home() {
 
   useEffect(() => {
     let cancelled = false;
-    if (!Cookies.get("accessToken")) {
+    if (!getAccessToken()) {
       setMyRegByEventId(new Map());
       return;
     }

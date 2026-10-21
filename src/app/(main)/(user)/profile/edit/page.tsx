@@ -1,4 +1,5 @@
 "use client";
+import { getAccessToken } from "@/lib/auth-cookie";
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -27,6 +28,7 @@ import {
 import { getApiErrorMessage } from "@/lib/error";
 import {
   isValidDateOfBirth,
+  isValidOptionalIdNumber,
   isValidOptionalVietnamPhone,
   MSG,
 } from "@/lib/input-rules";
@@ -41,6 +43,7 @@ type ProfileForm = {
   phone: string;
   gender: string;
   dateOfBirth: string;
+  idNumber: string;
 };
 
 export default function ProfileEditPage() {
@@ -57,6 +60,7 @@ export default function ProfileEditPage() {
     phone: "",
     gender: "",
     dateOfBirth: "",
+    idNumber: "",
   });
   const [profileErrors, setProfileErrors] = useState<Record<string, string>>(
     {}
@@ -77,7 +81,7 @@ export default function ProfileEditPage() {
   const [savingPw, setSavingPw] = useState(false);
 
   useEffect(() => {
-    const token = Cookies.get("accessToken");
+    const token = getAccessToken();
     setLoggedIn(Boolean(token));
     setUsername(Cookies.get("username") || "");
     if (!token) {
@@ -97,6 +101,7 @@ export default function ProfileEditPage() {
           phone: me.phone || "",
           gender: genderToFormValue(me.gender),
           dateOfBirth: profileDobToDateInput(me.dateOfBirth),
+          idNumber: me.idNumber || "",
         });
         setLoadError(null);
       } catch (e) {
@@ -117,12 +122,16 @@ export default function ProfileEditPage() {
   const validateProfile = () => {
     const e: Record<string, string> = {};
     if (!form.fullName.trim()) e.fullName = "Vui lòng nhập họ tên";
+    else if (form.fullName.trim().length < 2)
+      e.fullName = "Họ tên tối thiểu 2 ký tự.";
     else if (form.fullName.trim().length > 100)
       e.fullName = "Họ tên tối đa 100 ký tự.";
     if (form.phone.trim() && !isValidOptionalVietnamPhone(form.phone))
       e.phone = MSG.phone;
     if (form.dateOfBirth && !isValidDateOfBirth(form.dateOfBirth))
       e.dateOfBirth = MSG.dateOfBirth;
+    if (form.idNumber.trim() && !isValidOptionalIdNumber(form.idNumber))
+      e.idNumber = MSG.idNumber;
     setProfileErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -158,6 +167,7 @@ export default function ProfileEditPage() {
         phone: form.phone.trim() || null,
         dateOfBirth: form.dateOfBirth || null,
         gender: genderToApiNumber(form.gender),
+        idNumber: form.idNumber.trim() || null,
         avatarUrl: next?.avatarUrl ?? profile?.avatarUrl,
       });
       setProfile(updated);
@@ -416,7 +426,7 @@ export default function ProfileEditPage() {
                 </select>
               </div>
 
-              <div className="sm:col-span-2 sm:max-w-xs">
+              <div>
                 <label className="block text-xs font-semibold mb-1.5">
                   Ngày sinh
                 </label>
@@ -434,6 +444,31 @@ export default function ProfileEditPage() {
                     {profileErrors.dateOfBirth}
                   </p>
                 ) : null}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1.5">
+                  CCCD / Hộ chiếu
+                </label>
+                <input
+                  value={form.idNumber}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, idNumber: e.target.value }))
+                  }
+                  className={inputClass("idNumber")}
+                  disabled={savingProfile}
+                  placeholder="CCCD 12 số hoặc hộ chiếu (VD: B1234567)"
+                  autoComplete="off"
+                />
+                {profileErrors.idNumber ? (
+                  <p className="mt-1 text-xs text-red-500">
+                    {profileErrors.idNumber}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    CCCD 9/12 số · Hộ chiếu bắt đầu bằng chữ
+                  </p>
+                )}
               </div>
             </div>
 

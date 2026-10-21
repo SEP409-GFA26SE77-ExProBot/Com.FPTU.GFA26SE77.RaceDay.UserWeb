@@ -40,6 +40,11 @@ import {
   resolveStoredFileUrl,
 } from "@/lib/media-url";
 import {
+  DISTANCE_LEADERBOARD_TYPES,
+  normalizeDistanceType,
+  suggestedKmForType,
+} from "@/lib/distance-types";
+import {
   LEGACY_OPTIONAL_DOC_KEYS,
   LEGACY_OPTIONAL_DOC_META,
   PROFILE_DOC_TYPES,
@@ -148,9 +153,9 @@ function newDistanceKey() {
 function emptyDistance(): DistanceDraft {
   return {
     key: newDistanceKey(),
-    type: "road",
+    type: "5KM",
     name: "",
-    distanceKm: "",
+    distanceKm: "5",
     capacity: "",
     price: "",
     currency: "VND",
@@ -198,7 +203,10 @@ function mapEventDistances(distances: EventDistanceDto[]): DistanceDraft[] {
   if (!distances.length) return [emptyDistance()];
   return distances.map((d) => ({
     key: d.id || newDistanceKey(),
-    type: d.type || "road",
+    type: normalizeDistanceType(
+      d.type,
+      d.distanceKm != null ? Number(d.distanceKm) : 0
+    ),
     name: d.name || "",
     distanceKm: d.distanceKm != null ? String(d.distanceKm) : "",
     capacity: d.capacity != null ? String(d.capacity) : "",
@@ -353,6 +361,7 @@ function buildPayload(
     distanceKm: num(d.distanceKm),
     capacity: Math.max(1, Math.floor(num(d.capacity, 1))),
     basePrice: Math.max(0, num(d.price)),
+    type: normalizeDistanceType(d.type, num(d.distanceKm)),
   }));
 
   const documents: CreateRaceEventDocumentInput[] = [
@@ -1156,18 +1165,46 @@ function BasicInfoStep({
                   onChange={(v) => onPatchDistance(d.key, { name: v })}
                   placeholder="5K Coastal"
                 />
+                <label className="block space-y-1.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Type *
+                  </span>
+                  <select
+                    value={normalizeDistanceType(d.type, num(d.distanceKm))}
+                    onChange={(e) => {
+                      const type = e.target.value;
+                      const km = suggestedKmForType(type);
+                      onPatchDistance(d.key, {
+                        type,
+                        ...(km != null ? { distanceKm: String(km) } : {}),
+                      });
+                    }}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900"
+                  >
+                    {DISTANCE_LEADERBOARD_TYPES.map((t) => (
+                      <option key={t.code} value={t.code}>
+                        {t.code} — {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <Field
-                  label="Loại (type)"
-                  value={d.type}
-                  onChange={(v) => onPatchDistance(d.key, { type: v })}
-                  placeholder="road / trail / ultra"
-                />
-                <Field
-                  label="Km *"
+                  label={
+                    normalizeDistanceType(d.type, num(d.distanceKm)) === "OTHER"
+                      ? "Km *"
+                      : "Km * (theo type)"
+                  }
                   value={d.distanceKm}
                   invalid={invalid("distances") && num(d.distanceKm) < 0.1}
+                  disabled={
+                    normalizeDistanceType(d.type, num(d.distanceKm)) !== "OTHER"
+                  }
                   onChange={(v) => onPatchDistance(d.key, { distanceKm: v })}
-                  placeholder="5"
+                  placeholder={
+                    normalizeDistanceType(d.type, num(d.distanceKm)) === "OTHER"
+                      ? "VD: 6"
+                      : "Khóa — chọn Khác để sửa"
+                  }
                 />
                 <Field
                   label="Slot (capacity) *"
@@ -1502,6 +1539,7 @@ function Field({
   placeholder,
   invalid,
   hint,
+  disabled,
   onChange,
 }: {
   label: string;
@@ -1510,6 +1548,7 @@ function Field({
   placeholder?: string;
   invalid?: boolean;
   hint?: string;
+  disabled?: boolean;
   onChange?: (value: string) => void;
 }) {
   return (
@@ -1525,9 +1564,10 @@ function Field({
         type={type}
         value={value}
         placeholder={placeholder}
+        disabled={disabled}
         aria-invalid={invalid || undefined}
         onChange={(e) => onChange?.(e.target.value)}
-        className={`h-10 w-full rounded-xl border bg-white px-3 text-sm text-slate-800 outline-none focus:ring-2 ${
+        className={`h-10 w-full rounded-xl border bg-white px-3 text-sm text-slate-800 outline-none focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 ${
           invalid
             ? "border-red-400 focus:border-red-500 focus:ring-red-100"
             : "border-slate-200 focus:border-orange-400 focus:ring-orange-100"

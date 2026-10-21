@@ -1,13 +1,10 @@
 "use client";
-import { useOrganizerToastState } from "@/lib/use-organizer-toast-state";
-import { useOrganizerErrorState } from "@/lib/use-organizer-error-state";
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   AlertCircle,
-  CheckCircle2,
   Loader2,
   Plus,
   Save,
@@ -23,11 +20,17 @@ import {
 import type { RaceEventDto } from "@/dto/event.dto";
 import { getApiErrorMessage } from "@/lib/error";
 import { getOrganizerStatusLabel, getStatusColor } from "@/lib/format";
+import { toastError, toastSuccess } from "@/lib/toast";
 import {
   canEditProfile,
   inputToTimeOnly,
   timeOnlyToInput,
 } from "../_shared";
+import {
+  DISTANCE_LEADERBOARD_TYPES,
+  normalizeDistanceType,
+  suggestedKmForType,
+} from "@/lib/distance-types";
 
 type PriceType = {
   id: string;
@@ -131,15 +134,9 @@ export default function ProfileDistancesClient() {
   const eventId = String(params?.id || "");
   const [event, setEvent] = useState<RaceEventDto | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useOrganizerErrorState();
-  const [toast, setToast] = useOrganizerToastState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [rows, setRows] = useState<DistRow[]>([]);
-
-  const notify = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3500);
-  };
 
   const load = useCallback(async () => {
     const [eventData, distData] = await Promise.all([
@@ -156,7 +153,10 @@ export default function ProfileDistancesClient() {
       );
       return {
         key: d.id || `d-${i}`,
-        type: "road",
+        type: normalizeDistanceType(
+          d.type,
+          d.distanceKm != null ? Number(d.distanceKm) : 0
+        ),
         name,
         distanceKm:
           d.distanceKm != null && d.distanceKm > 0 ? String(d.distanceKm) : "",
@@ -174,7 +174,7 @@ export default function ProfileDistancesClient() {
         : [
             {
               key: "new-1",
-              type: "road",
+              type: "5KM",
               name: "5K",
               distanceKm: "5",
               capacity: 100,
@@ -218,7 +218,7 @@ export default function ProfileDistancesClient() {
       ...prev.map((r) => ({ ...r, pricingOpen: false })),
       {
         key: `new-${Date.now()}`,
-        type: "road",
+        type: "10KM",
         name: "",
         distanceKm: "10",
         capacity: 100,
@@ -252,15 +252,16 @@ export default function ProfileDistancesClient() {
         (r) => !r.name.trim() || parseDistanceKm(r.distanceKm) <= 0 || r.capacity < 1
       )
     ) {
-      setError("Mỗi cự ly cần tên, km > 0 và sức chứa ≥ 1.");
+      toastError("Mỗi cự ly cần tên, km > 0 và sức chứa ≥ 1.");
       return;
     }
     if (event.packagePurchaseId && packageCap > 0 && totalCap > packageCap) {
-      setError(`Tổng slot cự ly (${totalCap}) vượt quy mô gói (${packageCap}).`);
+      toastError(
+        `Tổng slot cự ly (${totalCap}) vượt quy mô gói (${packageCap}).`
+      );
       return;
     }
     setSaving(true);
-    setError(null);
     try {
       const byDistanceName: Record<
         string,
@@ -284,6 +285,7 @@ export default function ProfileDistancesClient() {
         distances: rows.map((r) => ({
           ...(isPersistedDistanceId(r.key) ? { id: r.key } : {}),
           name: r.name.trim(),
+          type: normalizeDistanceType(r.type, parseDistanceKm(r.distanceKm)),
           distanceKm: parseDistanceKm(r.distanceKm),
           capacity: Number(r.capacity),
           basePrice: Number(r.basePrice) || 0,
@@ -293,9 +295,9 @@ export default function ProfileDistancesClient() {
         ticketPricing: { byDistanceName },
       });
       await load();
-      notify("Đã lưu cự ly và giá vé.");
+      toastSuccess("Đã lưu cự ly và giá vé.");
     } catch (e) {
-      setError(getApiErrorMessage(e, "Lưu thất bại."));
+      toastError(e, "Lưu thất bại.");
     } finally {
       setSaving(false);
     }
@@ -388,19 +390,6 @@ export default function ProfileDistancesClient() {
         )}
       </div>
 
-      {toast && (
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          <CheckCircle2 className="h-4 w-4" />
-          {toast}
-        </div>
-      )}
-      {error && (
-        <div className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-sm text-red-600">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          {error}
-        </div>
-      )}
-
       <section className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="min-w-0">
@@ -435,23 +424,67 @@ export default function ProfileDistancesClient() {
                   : "border-border/60 bg-background/50"
               }`}
             >
-              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                 <LabeledField label="Tên cự ly">
                   <input
-                    placeholder="VD: 5K, 10K"
+                    placeholder="VD: 5K Fun Run"
                     value={r.name}
                     disabled={!editable}
                     onChange={(e) => updateRow(r.key, { name: e.target.value })}
                     className={inputClass}
                   />
                 </LabeledField>
-                <LabeledField label="Quãng đường (km)">
+                <LabeledField label="Type">
+                  <select
+                    value={normalizeDistanceType(
+                      r.type,
+                      parseDistanceKm(r.distanceKm)
+                    )}
+                    disabled={!editable}
+                    onChange={(e) => {
+                      const type = e.target.value;
+                      const km = suggestedKmForType(type);
+                      updateRow(r.key, {
+                        type,
+                        ...(km != null ? { distanceKm: String(km) } : {}),
+                      });
+                    }}
+                    className={inputClass}
+                  >
+                    {DISTANCE_LEADERBOARD_TYPES.map((t) => (
+                      <option key={t.code} value={t.code}>
+                        {t.code} — {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </LabeledField>
+                <LabeledField
+                  label={
+                    normalizeDistanceType(r.type, parseDistanceKm(r.distanceKm)) ===
+                    "OTHER"
+                      ? "Quãng đường (km)"
+                      : "Quãng đường (km) — theo type"
+                  }
+                >
                   <input
                     type="text"
                     inputMode="decimal"
-                    placeholder="VD: 3.419 hoặc 42.195"
+                    placeholder={
+                      normalizeDistanceType(
+                        r.type,
+                        parseDistanceKm(r.distanceKm)
+                      ) === "OTHER"
+                        ? "VD: 6 hoặc 8.5"
+                        : "Khóa theo type (chọn Khác để sửa)"
+                    }
                     value={r.distanceKm}
-                    disabled={!editable}
+                    disabled={
+                      !editable ||
+                      normalizeDistanceType(
+                        r.type,
+                        parseDistanceKm(r.distanceKm)
+                      ) !== "OTHER"
+                    }
                     onChange={(e) => {
                       const v = e.target.value.replace(",", ".");
                       if (v !== "" && !/^\d*\.?\d*$/.test(v)) return;

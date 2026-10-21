@@ -53,14 +53,14 @@ const TOOLS: {
     id: "checkpoint",
     short: "Checkpoint",
     hint:
-      "Checkpoint phải nằm trên đường chạy (≤45m). Điểm ngoài route sẽ bị từ chối — click sát đường xanh.",
+      "Checkpoint phải nằm trên đường chạy (≤45m). Điểm ngoài route sẽ bị từ chối — click sát đường cam.",
     icon: MapPin,
   },
   {
     id: "aid",
     short: "Điểm tiếp tế",
     hint:
-      "Điểm tiếp tế phải trên đường chạy (≤45m). Click sát đường xanh — không đặt ngoài route.",
+      "Điểm tiếp tế phải trên đường chạy (≤45m). Click sát đường cam — không đặt ngoài route.",
     icon: Droplets,
   },
 ];
@@ -87,8 +87,6 @@ export default function OrganizerSetupMap() {
     removeMidCheckpoint,
     clearCourse,
     snapping,
-    snapError,
-    mapHint,
     applyCourse,
     startEndPhase,
   } = useCourse();
@@ -140,29 +138,14 @@ export default function OrganizerSetupMap() {
   return (
     <div className="grid h-full min-h-0 grid-cols-1 gap-3 xl:grid-cols-[260px_1fr]">
       <aside className={`${panel} flex min-h-0 flex-col gap-2.5 overflow-hidden p-3`}>
-        <div className="shrink-0 rounded-xl border border-orange-200/70 bg-orange-50/80 px-3 py-2.5 text-sm text-muted-foreground">
+        <div className="shrink-0 rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5 text-sm text-muted-foreground">
           <p className="text-sm font-bold text-foreground">
             {snapping ? "Đang snap…" : routeStatus}
           </p>
-          {mapHint ? (
-            <p className="mt-1 text-sm font-semibold leading-snug text-orange-700">
-              {mapHint}
-            </p>
-          ) : (
-            <p className="mt-1 text-sm leading-snug text-foreground/80">
-              {toolMeta.hint}
-            </p>
-          )}
-        </div>
-
-        {snapError ? (
-          <p
-            role="alert"
-            className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2.5 text-sm font-semibold leading-snug text-red-700"
-          >
-            {snapError}
+          <p className="mt-1 text-sm leading-snug text-foreground/80">
+            {toolMeta.hint}
           </p>
-        ) : null}
+        </div>
 
         <div className="min-h-0 flex-1 space-y-2 border-t border-border/60 pt-3">
           <p className="text-xs font-bold text-foreground">

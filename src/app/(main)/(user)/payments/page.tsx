@@ -1,8 +1,8 @@
 "use client";
+import { getAccessToken } from "@/lib/auth-cookie";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import Cookies from "js-cookie";
 import { Receipt, ExternalLink, LogIn, Undo2, X } from "lucide-react";
 import { getMyPayments, getPaymentStatus } from "@/api/payments";
 import { getMyRegistrations } from "@/api/events";
@@ -72,7 +72,7 @@ export default function PaymentsHistoryPage() {
   );
 
   useEffect(() => {
-    const token = Cookies.get("accessToken");
+    const token = getAccessToken();
     setLoggedIn(Boolean(token));
     if (!token) {
       setBoot(false);

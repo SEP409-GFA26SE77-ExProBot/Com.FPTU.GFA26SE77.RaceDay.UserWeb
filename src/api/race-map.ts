@@ -4,10 +4,10 @@
  * BE: RaceDay Map module `/api/v1/map/...` (+ alias `/api/v1/event/organizer/.../course`).
  * MOCK: `NEXT_PUBLIC_RACE_MAP_USE_MOCK` === "true" (mặc định tắt khi có API URL).
  */
+import { getAccessToken } from "@/lib/auth-cookie";
 import api from "@/config/axios";
 import { BASE_URL } from "@/config/global-config";
 import type { CourseConfigDto } from "@/dto/race-map.dto";
-import Cookies from "js-cookie";
 
 const MAP_API = "api/v1/map";
 
@@ -67,7 +67,7 @@ export async function getEventCoursePublic(
   try {
     const headers: HeadersInit = { Accept: "application/json" };
     if (typeof window !== "undefined") {
-      const token = Cookies.get("accessToken");
+      const token = getAccessToken();
       if (token) headers.Authorization = `Bearer ${token}`;
     }
     const res = await fetch(url, { headers, credentials: "omit" });

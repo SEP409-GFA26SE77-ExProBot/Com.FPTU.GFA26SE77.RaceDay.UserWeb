@@ -1,9 +1,9 @@
 "use client";
+import { getAccessToken } from "@/lib/auth-cookie";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import Cookies from "js-cookie";
 import {
   Calendar,
   Flag,
@@ -180,7 +180,7 @@ export default function MyEventsClient() {
   } | null>(null);
 
   useEffect(() => {
-    const token = Cookies.get("accessToken") || Cookies.get("access_token");
+    const token = getAccessToken();
     setLoggedIn(Boolean(token));
     if (!token) {
       setReady(true);

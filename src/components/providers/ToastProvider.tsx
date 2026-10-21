@@ -17,6 +17,7 @@ export default function ToastProvider() {
       pauseOnHover
       theme="colored"
       style={{ zIndex: 9999 }}
+      toastClassName="app-toast"
     />
   );
 }

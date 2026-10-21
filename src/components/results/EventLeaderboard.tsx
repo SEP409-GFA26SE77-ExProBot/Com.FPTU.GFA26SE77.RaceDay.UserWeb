@@ -1,8 +1,8 @@
 "use client";
+import { getAccessToken } from "@/lib/auth-cookie";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import Cookies from "js-cookie";
 import { ArrowLeft, ArrowUpRight, Loader2, Trophy } from "lucide-react";
 import { getEventById } from "@/api/events";
 import { getEventLeaderboard, getLeaderboardDistances, getMyLeaderboard } from "@/api/leaderboards";
@@ -107,7 +107,7 @@ function CategoryLeaderboard({ eventId, distance, gender }: {
 
   useEffect(() => {
     let cancelled = false;
-    const request = Cookies.get("accessToken") ? getMyLeaderboard(eventId, distance.id, gender) : Promise.resolve(null);
+    const request = getAccessToken() ? getMyLeaderboard(eventId, distance.id, gender) : Promise.resolve(null);
     request
       .then((entry) => { if (!cancelled) setMine(entry); })
       .catch((err: unknown) => {

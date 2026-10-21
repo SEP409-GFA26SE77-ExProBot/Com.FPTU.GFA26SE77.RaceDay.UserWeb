@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import Cookies from "js-cookie";
+import { isLoggedIn } from "@/lib/auth-cookie";
 import {
   ArrowLeft,
   User,
@@ -131,7 +131,7 @@ function RegisterPageContent() {
   const [resumeHint, setResumeHint] = useState<string | null>(null);
   const [step, setStep] = useState<RegStep>(1);
 
-  const loggedIn = Boolean(Cookies.get("accessToken"));
+  const loggedIn = isLoggedIn();
 
   const [formData, setFormData] = useState<FormData>({
     fullName: "",
@@ -268,6 +268,7 @@ function RegisterPageContent() {
             gender: genderToFormValue(me.gender) || prev.gender,
             dateOfBirth:
               profileDobToDateInput(me.dateOfBirth) || prev.dateOfBirth,
+            idNumber: me.idNumber || prev.idNumber,
           };
         });
       } catch {
