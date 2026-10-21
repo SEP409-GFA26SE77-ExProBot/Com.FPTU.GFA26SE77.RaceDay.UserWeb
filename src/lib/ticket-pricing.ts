@@ -4,7 +4,7 @@ import type {
   TicketPricingDto,
 } from "@/dto/event.dto";
 
-export type ResolvedTicketPhase = {
+export type ResolvedTicketType = {
   key: string;
   name: string;
   dateFrom: string;
@@ -16,10 +16,14 @@ export type ResolvedTicketPhase = {
 
 export type ResolvedTicketPrice = {
   price: number;
-  /** null = đang dùng giá gốc (base), không có phase active */
-  phase: ResolvedTicketPhase | null;
+  /** null = đang dùng giá gốc (base), không có type active */
+  activeType: ResolvedTicketType | null;
+  /** @deprecated alias activeType — giữ cho UI cũ */
+  phase: ResolvedTicketType | null;
   basePrice: number;
-  phases: ResolvedTicketPhase[];
+  types: ResolvedTicketType[];
+  /** @deprecated alias types */
+  phases: ResolvedTicketType[];
 };
 
 function ymdLocal(d: Date): string {
@@ -27,7 +31,7 @@ function ymdLocal(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-function isStandardPhase(key: string, name: string): boolean {
+function isStandardType(key: string, name: string): boolean {
   const blob = `${key} ${name}`.toLowerCase();
   return /^(regular|standard|base|gốc|gia goc|giá gốc)$/i.test(key.trim())
     || /\b(regular|standard|giá gốc|gia goc|mặc định|mac dinh)\b/i.test(blob);
@@ -40,47 +44,54 @@ function inDateRange(today: string, from: string, to: string): boolean {
   return true;
 }
 
-function phasesForDistance(
+function rowTypes(
+  byName: TicketPricingByDistanceDto
+): NonNullable<TicketPricingByDistanceDto["types"]> {
+  return byName.types?.length ? byName.types : byName.phases || [];
+}
+
+function typesForDistance(
   pricing: unknown,
   distanceName: string,
   fallbackBase: number
-): { basePrice: number; phases: ResolvedTicketPhase[] } {
+): { basePrice: number; types: ResolvedTicketType[] } {
   const raw = (pricing || {}) as TicketPricingDto;
   const byName = raw.byDistanceName?.[distanceName] as
     | TicketPricingByDistanceDto
     | undefined;
 
   if (byName) {
-    const phases = (byName.phases || []).map((p, i) => {
-      const key = String(p.key || `phase-${i}`);
-      const name = String(p.name || key || "Phase");
+    const types = rowTypes(byName).map((p, i) => {
+      const key = String(p.key || `type-${i}`);
+      const name = String(p.name || key || "Type");
       return {
         key,
         name,
         dateFrom: String(p.dateFrom || "").slice(0, 10),
         dateTo: String(p.dateTo || "").slice(0, 10),
         price: Number(p.price) || 0,
-        isStandard: isStandardPhase(key, name),
+        isStandard: isStandardType(key, name),
       };
     });
     return {
       basePrice: Number(byName.basePrice ?? fallbackBase) || 0,
-      phases,
+      types,
     };
   }
 
-  // Legacy: phases[].pricesByDistanceName[name]
-  if (Array.isArray(raw.phases) && raw.phases.length) {
-    const phases: ResolvedTicketPhase[] = [];
+  // Legacy root array: types | phases với pricesByDistanceName
+  const legacy = (raw.types?.length ? raw.types : raw.phases) || [];
+  if (legacy.length) {
+    const types: ResolvedTicketType[] = [];
     let basePrice = fallbackBase;
-    for (const p of raw.phases) {
+    for (const p of legacy) {
       const key = String(p.key || "");
-      const name = String(p.name || key || "Phase");
+      const name = String(p.name || key || "Type");
       const prices = p.pricesByDistanceName || {};
       const price = Number(prices[distanceName] ?? 0) || 0;
-      if (isStandardPhase(key, name) || key === "base") {
+      if (isStandardType(key, name) || key === "base") {
         if (price > 0) basePrice = price;
-        phases.push({
+        types.push({
           key: key || "regular",
           name: name || "Regular",
           dateFrom: String(p.dateFrom || "").slice(0, 10),
@@ -91,8 +102,8 @@ function phasesForDistance(
         continue;
       }
       if (price > 0 || p.name) {
-        phases.push({
-          key: key || `legacy-${phases.length}`,
+        types.push({
+          key: key || `legacy-${types.length}`,
           name,
           dateFrom: String(p.dateFrom || "").slice(0, 10),
           dateTo: String(p.dateTo || "").slice(0, 10),
@@ -101,50 +112,67 @@ function phasesForDistance(
         });
       }
     }
-    return { basePrice, phases };
+    return { basePrice, types };
   }
 
-  return { basePrice: fallbackBase, phases: [] };
+  return { basePrice: fallbackBase, types: [] };
 }
 
 /**
  * Giá áp dụng tại `now`:
- * 1. Phase đang trong khoảng ngày và KHÔNG phải standard → ưu tiên (early bird, …)
- * 2. Không có đợt ưu tiên → phase standard đang mở (nếu có)
- * 3. Không còn phase nào → giá gốc (basePrice / distance.price)
+ * 1. Type đang trong khoảng ngày và KHÔNG phải standard → ưu tiên (early bird, …)
+ * 2. Không có đợt ưu tiên → type standard đang mở (nếu có)
+ * 3. Không còn type nào → giá gốc (ticket basePrice / distance.basePrice)
  */
 export function resolveDistanceTicketPrice(
   pricing: unknown,
-  distance: Pick<EventDistanceDto, "name" | "type" | "price">,
+  distance: Pick<EventDistanceDto, "name" | "type" | "basePrice" | "price">,
   now: Date = new Date()
 ): ResolvedTicketPrice {
   const name = (distance.name || distance.type || "").trim();
-  const fallback = Number(distance.price) || 0;
-  const { basePrice, phases } = phasesForDistance(pricing, name, fallback);
+  const fallback = Number(distance.basePrice ?? distance.price) || 0;
+  const { basePrice, types } = typesForDistance(pricing, name, fallback);
   const today = ymdLocal(now);
 
-  const active = phases.filter(
+  const active = types.filter(
     (p) => p.price > 0 && inDateRange(today, p.dateFrom, p.dateTo)
   );
   const promo = active.find((p) => !p.isStandard);
   if (promo) {
-    return { price: promo.price, phase: promo, basePrice, phases };
+    return {
+      price: promo.price,
+      activeType: promo,
+      phase: promo,
+      basePrice,
+      types,
+      phases: types,
+    };
   }
   const standard = active.find((p) => p.isStandard);
   if (standard) {
-    return { price: standard.price, phase: standard, basePrice, phases };
+    return {
+      price: standard.price,
+      activeType: standard,
+      phase: standard,
+      basePrice,
+      types,
+      phases: types,
+    };
   }
+  const base = basePrice > 0 ? basePrice : fallback;
   return {
-    price: basePrice > 0 ? basePrice : fallback,
+    price: base,
+    activeType: null,
     phase: null,
-    basePrice: basePrice > 0 ? basePrice : fallback,
-    phases,
+    basePrice: base,
+    types,
+    phases: types,
   };
 }
 
 export function minResolvedEventPrice(
   pricing: unknown,
-  distances: Array<Pick<EventDistanceDto, "name" | "type" | "price">>,
+  distances: Array<Pick<EventDistanceDto, "name" | "type" | "basePrice" | "price">>,
   now: Date = new Date()
 ): number | null {
   if (!distances.length) return null;

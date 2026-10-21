@@ -1,8 +1,8 @@
 "use client";
+import { getAccessToken } from "@/lib/auth-cookie";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import Cookies from "js-cookie";
 import { Receipt, ExternalLink, LogIn, Undo2, X } from "lucide-react";
 import { getMyPayments, getPaymentStatus } from "@/api/payments";
 import { getMyRegistrations } from "@/api/events";
@@ -20,6 +20,7 @@ import {
   getRefundStatusLabel,
 } from "@/lib/format";
 import { getApiErrorMessage } from "@/lib/error";
+import { toastError, toastSuccess } from "@/lib/toast";
 import { PAGE_SHELL } from "@/lib/page-shell";
 import PageLoading from "@/components/ui/PageLoading";
 import Pagination from "@/components/ui/Pagination";
@@ -64,7 +65,6 @@ export default function PaymentsHistoryPage() {
   const [refunds, setRefunds] = useState<RefundRequestDto[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [refundBusyId, setRefundBusyId] = useState<string | null>(null);
-  const [refundMsg, setRefundMsg] = useState<string | null>(null);
   const [refundTarget, setRefundTarget] = useState<Row | null>(null);
   const [refundReason, setRefundReason] = useState("");
   const [payOsMode, setPayOsMode] = useState<PaymentStatusDto["payOsMode"] | null>(
@@ -72,7 +72,7 @@ export default function PaymentsHistoryPage() {
   );
 
   useEffect(() => {
-    const token = Cookies.get("accessToken");
+    const token = getAccessToken();
     setLoggedIn(Boolean(token));
     if (!token) {
       setBoot(false);
@@ -147,14 +147,12 @@ export default function PaymentsHistoryPage() {
   const openRefund = (row: Row) => {
     setRefundTarget(row);
     setRefundReason("");
-    setRefundMsg(null);
   };
 
   const submitRefund = async () => {
     if (!refundTarget || refundReason.trim().length < 10) return;
     const paymentId = refundTarget.id;
     setRefundBusyId(paymentId);
-    setRefundMsg(null);
     try {
       const row = await createRefundRequest({
         paymentId,
@@ -180,7 +178,7 @@ export default function PaymentsHistoryPage() {
       );
       setRefundTarget(null);
       setRefundReason("");
-      setRefundMsg(
+      toastSuccess(
         row.status === "refunded"
           ? payOsMode === "mock"
             ? "Đã hoàn nội bộ (PayOS mock) — ledger/payment cập nhật; không chuyển khoản ngân hàng thật."
@@ -188,7 +186,7 @@ export default function PaymentsHistoryPage() {
           : "Đã gửi yêu cầu hoàn tiền — theo dõi bảng bên dưới."
       );
     } catch (e) {
-      setRefundMsg(getApiErrorMessage(e, "Gửi yêu cầu hoàn tiền thất bại."));
+      toastError(e, "Gửi yêu cầu hoàn tiền thất bại.");
     } finally {
       setRefundBusyId(null);
     }
@@ -249,12 +247,6 @@ export default function PaymentsHistoryPage() {
           {error}
         </div>
       )}
-      {refundMsg && (
-        <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
-          {refundMsg}
-        </div>
-      )}
-
       {items.length === 0 ? (
         <div className="rounded-2xl border border-dashed p-10 text-center text-sm text-muted-foreground">
           Chưa có giao dịch. Đăng ký giải và thanh toán để xuất hiện tại đây.
@@ -335,7 +327,19 @@ export default function PaymentsHistoryPage() {
                                 href={`/events/${p.eventId}/payment?regId=${p.registrationId}`}
                                 className="inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white hover:bg-orange-600 transition-colors"
                               >
-                                Tiếp tục thanh toán <ExternalLink className="h-3 w-3" />
+                                Tiếp tục thanh toán{" "}
+                                <ExternalLink className="h-3 w-3" />
+                              </Link>
+                            )}
+                          {p.status === "pending" &&
+                            isPackage &&
+                            p.referenceId && (
+                              <Link
+                                href={`/events/create?purchaseId=${p.referenceId}`}
+                                className="inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white hover:bg-orange-600 transition-colors"
+                              >
+                                Tiếp tục thanh toán{" "}
+                                <ExternalLink className="h-3 w-3" />
                               </Link>
                             )}
                           {/* Package: pending → back to create */}

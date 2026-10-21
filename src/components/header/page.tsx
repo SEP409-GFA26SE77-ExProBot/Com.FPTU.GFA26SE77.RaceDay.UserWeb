@@ -59,7 +59,8 @@ let cachedAuthState = {
 };
 
 function getAuthSnapshot() {
-  const accessToken = Cookies.get("accessToken") || "";
+  const accessToken =
+    Cookies.get("access_token") || Cookies.get("accessToken") || "";
   const username = Cookies.get("username");
   const rawRole = Cookies.get("role") || "";
   const avatarUrl = Cookies.get("avatar_url") || "";
@@ -540,10 +541,10 @@ export default function Header() {
                     <Link
                       href="/my-events"
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                      pathname.startsWith("/my-events")
-                        ? "bg-orange-500/10 text-orange-600 font-semibold"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
-                    }`}
+                        pathname.startsWith("/my-events")
+                          ? "bg-orange-500/10 text-orange-600 font-semibold"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
+                      }`}
                     >
                       <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
                       Quản lý giải của tôi
@@ -551,10 +552,10 @@ export default function Header() {
                     <Link
                       href="/wallet"
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                      pathname.startsWith("/wallet")
-                        ? "bg-orange-500/10 text-orange-600 font-semibold"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
-                    }`}
+                        pathname.startsWith("/wallet")
+                          ? "bg-orange-500/10 text-orange-600 font-semibold"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
+                      }`}
                       onClick={closeMenus}
                     >
                       <Wallet className="h-4 w-4 text-muted-foreground" />

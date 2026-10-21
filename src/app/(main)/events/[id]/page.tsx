@@ -1,10 +1,10 @@
 "use client";
+import { getAccessToken } from "@/lib/auth-cookie";
 
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import Cookies from "js-cookie";
 import {
   Calendar,
   MapPin,
@@ -88,7 +88,7 @@ export default function EventDetailPage() {
   }, [eventId]);
 
   useEffect(() => {
-    const token = Cookies.get("accessToken");
+    const token = getAccessToken();
     if (!token || !eventId) {
       setMyReg(null);
       return;

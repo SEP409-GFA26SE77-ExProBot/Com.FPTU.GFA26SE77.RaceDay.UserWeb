@@ -1,8 +1,8 @@
 "use client";
+import { isLoggedIn } from "@/lib/auth-cookie";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Cookies from "js-cookie";
 import { Flag, LogIn, MapPin, Ticket } from "lucide-react";
 import { getMyRegistrations, getEventById } from "@/api/events";
 import { RegistrationDto, RaceEventDto } from "@/dto/event.dto";
@@ -17,7 +17,7 @@ export default function RaceDayPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const loggedIn = Boolean(Cookies.get("accessToken"));
+  const loggedIn = isLoggedIn();
 
   useEffect(() => {
     if (!loggedIn) {

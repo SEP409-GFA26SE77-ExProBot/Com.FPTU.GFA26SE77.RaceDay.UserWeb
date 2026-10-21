@@ -31,6 +31,7 @@ import { getEventById } from "@/api/events";
 import type { EventDistanceDto } from "@/dto/event.dto";
 import { fetchOsrmRoute } from "@/lib/race-map/osrm";
 import { nearestPointOnPolyline } from "@/lib/race-map/geo";
+import { toastError, toastInfo, toastSuccess } from "@/lib/toast";
 
 /** CP / điểm tiếp tế phải nằm trong ~45m so với polyline */
 const CP_MAX_OFF_ROUTE_KM = 0.045;
@@ -81,8 +82,6 @@ interface CourseContextValue {
   /** Xóa route cũ, vào chế độ chọn Start rồi Finish tự do trên map */
   beginRedrawStartFinish: () => void;
   snapping: boolean;
-  snapError: string | null;
-  mapHint: string | null;
   /** Lưu / áp dụng course cho cự ly đang chọn */
   applyCourse: () => void;
   resetToDefault: () => void;
@@ -110,8 +109,6 @@ export function CourseProvider({
   const [draft, setDraft] = useState<CourseConfig>(empty);
   const [cpDrafts, setCpDraftsState] = useState<CheckpointDraft[]>([]);
   const [snapping, setSnapping] = useState(false);
-  const [snapError, setSnapError] = useState<string | null>(null);
-  const [mapHint, setMapHint] = useState<string | null>(null);
   const [appliedVersion, setAppliedVersion] = useState(0);
   const [hydrated, setHydrated] = useState(false);
   const [pendingStart, setPendingStart] = useState<LatLng | null>(null);
@@ -143,14 +140,11 @@ export function CourseProvider({
     setDraft(normalized);
     setCpDraftsState(drafts);
     setPendingStart(null);
-    setSnapError(null);
     setAppliedVersion((v) => v + 1);
     if (normalized.polyline.length >= 2) {
       setTool("checkpoint");
-      setMapHint(null);
     } else {
       setTool("start-end");
-      setMapHint("Chọn cự ly xong — click Start rồi Finish trên map");
     }
   }, []);
 
@@ -258,7 +252,6 @@ export function CourseProvider({
   const runSnap = useCallback(
     async (waypoints: LatLng[], keepMidFraction = true, switchToReshape = true) => {
       setSnapping(true);
-      setSnapError(null);
       try {
         if (waypoints.length < 2) throw new Error("Cần Start và Finish.");
         const result = await fetchOsrmRoute(waypoints);
@@ -306,12 +299,12 @@ export function CourseProvider({
         setDraft(next);
         setCpDraftsState(draftsFromCourse(next));
         setPendingStart(null);
-        setMapHint(
+        toastInfo(
           `Route gợi ý ~${dist}km · ${result.polyline.length} điểm bám đường — kéo START/FINISH để đổi chỗ`
         );
         if (switchToReshape) setTool("reshape");
       } catch (e) {
-        setSnapError(e instanceof Error ? e.message : "Không gợi ý được route");
+        toastError(e, "Không gợi ý được route");
       } finally {
         setSnapping(false);
       }
@@ -333,8 +326,7 @@ export function CourseProvider({
       { km: 0, name: "Xuất phát", cutoff: "06:10" },
       { km: 0, name: "Vạch đích", cutoff: "07:00" },
     ]);
-    setSnapError(null);
-    setMapHint("Click map chọn START (chỗ bất kỳ trên đường) → rồi click FINISH");
+    toastInfo("Click map chọn START (chỗ bất kỳ trên đường) → rồi click FINISH");
   }, []);
 
   const moveWaypoint = useCallback(
@@ -356,9 +348,6 @@ export function CourseProvider({
     async (p: LatLng) => {
       if (tool === "view") return;
 
-      setSnapError(null);
-      setMapHint(null);
-
       if (tool === "start-end") {
         // Nếu đang có route sẵn mà chưa vào bước chọn lại → click đầu = bắt đầu vẽ lại
         if (!pendingStart && draft.polyline.length >= 2) {
@@ -374,7 +363,7 @@ export function CourseProvider({
             { km: 0, name: "Xuất phát", cutoff: "06:10" },
             { km: 0, name: "Vạch đích", cutoff: "07:00" },
           ]);
-          setMapHint("Đã chọn START mới — click FINISH (chỗ bạn muốn kết thúc)");
+          toastInfo("Đã chọn START mới — click FINISH (chỗ bạn muốn kết thúc)");
           return;
         }
 
@@ -391,7 +380,7 @@ export function CourseProvider({
             { km: 0, name: "Xuất phát", cutoff: "06:10" },
             { km: 0, name: "Vạch đích", cutoff: "07:00" },
           ]);
-          setMapHint("Đã chọn START — click FINISH trên map");
+          toastInfo("Đã chọn START — click FINISH trên map");
           return;
         }
 
@@ -401,7 +390,7 @@ export function CourseProvider({
 
       if (tool === "reshape") {
         if (draft.waypoints.length < 2 || draft.polyline.length < 2) {
-          setSnapError("Chọn Start → Finish trước (tool Start/End).");
+          toastError("Chọn Start → Finish trước (tool Start/End).");
           return;
         }
         // chèn via theo vị trí dọc route hiện tại
@@ -422,7 +411,6 @@ export function CourseProvider({
         ].sort((a, b) => a.frac - b.frac);
 
         const nextWps = [start, ...withFrac.map((x) => x.p), end];
-        setMapHint("Đang chỉnh khúc route (via)…");
         await runSnap(nextWps, true);
         return;
       }
@@ -431,27 +419,27 @@ export function CourseProvider({
         const isAid = tool === "aid";
         const label = isAid ? "điểm tiếp tế" : "checkpoint";
         if (draft.polyline.length < 2 || draft.distanceKm <= 0) {
-          setSnapError(`Cần có route trước khi đặt ${label}.`);
+          toastError(`Cần có route trước khi đặt ${label}.`);
           return;
         }
         const snap = nearestPointOnPolyline(draft.polyline, p);
         if (!snap) return;
         if (snap.distKm > CP_MAX_OFF_ROUTE_KM) {
-          setSnapError(
-            `${isAid ? "Điểm tiếp tế" : "Checkpoint"} phải nằm trên route (cách đường ~${Math.round(snap.distKm * 1000)}m > 45m). Click sát đường xanh.`
+          toastError(
+            `${isAid ? "Điểm tiếp tế" : "Checkpoint"} ngoài đường chạy (cách ~${Math.round(snap.distKm * 1000)}m > 45m). Hãy click sát đường cam trên bản đồ.`
           );
           return;
         }
         const km = Math.round(snap.kmAlong * 1000) / 1000;
         if (km < 0.05 || km > draft.distanceKm - 0.05) {
-          setSnapError(
+          toastError(
             "Start/Finish đã cố định ở hai đầu — đặt điểm ở giữa route."
           );
           return;
         }
         const tooClose = cpDrafts.some((d) => Math.abs(d.km - km) < 0.08);
         if (tooClose) {
-          setSnapError("Đã có điểm gần vị trí này.");
+          toastError("Đã có điểm gần vị trí này.");
           return;
         }
 
@@ -482,7 +470,7 @@ export function CourseProvider({
           checkpoints: buildCheckpoints(d.polyline, d.distanceKm, defs),
           updatedAt: new Date().toISOString(),
         }));
-        setMapHint(
+        toastSuccess(
           isAid
             ? `Đã đặt điểm tiếp tế @ ${km}km`
             : `Đã đặt CP @ ${km}km (snap trên route)`
@@ -550,17 +538,16 @@ export function CourseProvider({
       { km: 0, name: "Vạch đích", cutoff: "07:00" },
     ]);
     setTool("start-end");
-    setMapHint("Click Start trên map");
-    setSnapError(null);
+    toastInfo("Click Start trên map");
   }, []);
 
   const applyCourse = useCallback(() => {
     if (!selectedDistanceId) {
-      setSnapError("Chọn cự ly trước khi áp dụng.");
+      toastError("Chọn cự ly trước khi áp dụng.");
       return;
     }
     if (draft.polyline.length < 2 || draft.checkpoints.length < 2) {
-      setSnapError("Cần Start/Finish + route trước khi áp dụng.");
+      toastError("Cần Start/Finish + route trước khi áp dụng.");
       return;
     }
     const next = {
@@ -570,22 +557,25 @@ export function CourseProvider({
     };
     setApplied(next);
     setAppliedVersion((v) => v + 1);
-    setSnapError(null);
-    void saveEventCourse(eventId, selectedDistanceId, next).then(() => {
-      setMapHint(
-        "Thiết lập thành công — đã lưu lộ trình, checkpoint & điểm tiếp tế cự ly này."
-      );
-      setCourseReadyByDistance((prev) => ({
-        ...prev,
-        [selectedDistanceId]: true,
-      }));
-    });
+    void saveEventCourse(eventId, selectedDistanceId, next)
+      .then(() => {
+        toastSuccess(
+          "Thiết lập thành công — đã lưu lộ trình, checkpoint & điểm tiếp tế cự ly này."
+        );
+        setCourseReadyByDistance((prev) => ({
+          ...prev,
+          [selectedDistanceId]: true,
+        }));
+      })
+      .catch((e) => {
+        toastError(e, "Lưu bản đồ thất bại.");
+      });
   }, [draft, eventId, selectedDistanceId]);
 
   const resetToDefault = useCallback(() => {
     const d = createDefaultCourse(selectedDistanceId);
     applyCourseLocal(d);
-    setMapHint("Đã load route demo Mỹ Khê 5K cho cự ly đang chọn");
+    toastSuccess("Đã load route demo Mỹ Khê 5K cho cự ly đang chọn");
   }, [applyCourseLocal, selectedDistanceId]);
 
   const startEndPhase: CourseContextValue["startEndPhase"] = pendingStart
@@ -615,8 +605,6 @@ export function CourseProvider({
     clearCourse,
     beginRedrawStartFinish,
     snapping,
-    snapError,
-    mapHint,
     applyCourse,
     resetToDefault,
     appliedVersion,

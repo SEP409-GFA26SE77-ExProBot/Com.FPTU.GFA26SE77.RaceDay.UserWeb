@@ -1,13 +1,10 @@
 "use client";
-import { useOrganizerToastState } from "@/lib/use-organizer-toast-state";
-import { useOrganizerErrorState } from "@/lib/use-organizer-error-state";
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   AlertCircle,
-  CheckCircle2,
   Loader2,
   Plus,
   Save,
@@ -16,17 +13,26 @@ import {
   X,
 } from "lucide-react";
 import { getEventById } from "@/api/events";
-import { replaceEventDistances } from "@/api/event-packages";
+import {
+  getOrganizerDistances,
+  replaceEventDistances,
+} from "@/api/event-packages";
 import type { RaceEventDto } from "@/dto/event.dto";
 import { getApiErrorMessage } from "@/lib/error";
 import { getOrganizerStatusLabel, getStatusColor } from "@/lib/format";
+import { toastError, toastSuccess } from "@/lib/toast";
 import {
   canEditProfile,
   inputToTimeOnly,
   timeOnlyToInput,
 } from "../_shared";
+import {
+  DISTANCE_LEADERBOARD_TYPES,
+  normalizeDistanceType,
+  suggestedKmForType,
+} from "@/lib/distance-types";
 
-type PricePhase = {
+type PriceType = {
   id: string;
   name: string;
   dateFrom: string;
@@ -43,7 +49,7 @@ type DistRow = {
   basePrice: number;
   startAt: string;
   endAt: string;
-  phases: PricePhase[];
+  types: PriceType[];
   pricingOpen: boolean;
 };
 
@@ -62,24 +68,30 @@ function isPersistedDistanceId(key: string): boolean {
 type PricingByDistance = {
   byDistanceName?: Record<
     string,
-    { basePrice?: number; phases?: Array<Record<string, unknown>> }
+    {
+      basePrice?: number;
+      types?: Array<Record<string, unknown>>;
+      phases?: Array<Record<string, unknown>>;
+    }
   >;
+  types?: Array<Record<string, unknown>>;
   phases?: Array<Record<string, unknown>>;
 };
 
-function loadPhasesForDistance(
+function loadTypesForDistance(
   pricing: unknown,
   distanceName: string,
   fallbackBase: number
-): { basePrice: number; phases: PricePhase[] } {
+): { basePrice: number; types: PriceType[] } {
   const raw = (pricing || {}) as PricingByDistance;
   const byName = raw.byDistanceName?.[distanceName];
   if (byName) {
+    const rows = byName.types?.length ? byName.types : byName.phases || [];
     return {
       basePrice: Number(byName.basePrice ?? fallbackBase) || 0,
-      phases: (byName.phases || []).map((p, i) => ({
-        id: String(p.key || p.id || `phase-${i}`),
-        name: String(p.name || "Phase"),
+      types: rows.map((p, i) => ({
+        id: String(p.key || p.id || `type-${i}`),
+        name: String(p.name || "Type"),
         dateFrom: String(p.dateFrom || ""),
         dateTo: String(p.dateTo || ""),
         price: Number(p.price ?? 0) || 0,
@@ -87,11 +99,12 @@ function loadPhasesForDistance(
     };
   }
 
-  // Legacy matrix: phases[].pricesByDistanceName[name]
-  if (Array.isArray(raw.phases) && raw.phases.length) {
-    const phases: PricePhase[] = [];
+  // Legacy matrix: types|phases[].pricesByDistanceName[name]
+  const legacy = (raw.types?.length ? raw.types : raw.phases) || [];
+  if (legacy.length) {
+    const types: PriceType[] = [];
     let basePrice = fallbackBase;
-    for (const p of raw.phases) {
+    for (const p of legacy) {
       const key = String(p.key || "");
       const prices =
         (p.pricesByDistanceName as Record<string, number> | undefined) || {};
@@ -101,19 +114,19 @@ function loadPhasesForDistance(
         continue;
       }
       if (price > 0 || p.name) {
-        phases.push({
-          id: key || `legacy-${phases.length}`,
-          name: String(p.name || key || "Phase"),
+        types.push({
+          id: key || `legacy-${types.length}`,
+          name: String(p.name || key || "Type"),
           dateFrom: String(p.dateFrom || ""),
           dateTo: String(p.dateTo || ""),
           price,
         });
       }
     }
-    return { basePrice, phases };
+    return { basePrice, types };
   }
 
-  return { basePrice: fallbackBase, phases: [] };
+  return { basePrice: fallbackBase, types: [] };
 }
 
 export default function ProfileDistancesClient() {
@@ -121,25 +134,29 @@ export default function ProfileDistancesClient() {
   const eventId = String(params?.id || "");
   const [event, setEvent] = useState<RaceEventDto | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useOrganizerErrorState();
-  const [toast, setToast] = useOrganizerToastState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [rows, setRows] = useState<DistRow[]>([]);
 
-  const notify = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3500);
-  };
-
   const load = useCallback(async () => {
-    const data = await getEventById(eventId);
-    setEvent(data);
-    const mapped: DistRow[] = (data.distances || []).map((d, i) => {
+    const [eventData, distData] = await Promise.all([
+      getEventById(eventId),
+      getOrganizerDistances(eventId),
+    ]);
+    setEvent(eventData);
+    const mapped: DistRow[] = (distData.distances || []).map((d, i) => {
       const name = d.name || "";
-      const parsed = loadPhasesForDistance(data.ticketPricing, name, d.price || 0);
+      const parsed = loadTypesForDistance(
+        distData.ticketPricing,
+        name,
+        d.basePrice ?? d.price ?? 0
+      );
       return {
         key: d.id || `d-${i}`,
-        type: d.type || "road",
+        type: normalizeDistanceType(
+          d.type,
+          d.distanceKm != null ? Number(d.distanceKm) : 0
+        ),
         name,
         distanceKm:
           d.distanceKm != null && d.distanceKm > 0 ? String(d.distanceKm) : "",
@@ -147,7 +164,7 @@ export default function ProfileDistancesClient() {
         basePrice: parsed.basePrice,
         startAt: timeOnlyToInput(d.startAt),
         endAt: timeOnlyToInput(d.endAt),
-        phases: parsed.phases,
+        types: parsed.types,
         pricingOpen: false,
       };
     });
@@ -157,14 +174,14 @@ export default function ProfileDistancesClient() {
         : [
             {
               key: "new-1",
-              type: "road",
+              type: "5KM",
               name: "5K",
               distanceKm: "5",
               capacity: 100,
               basePrice: 0,
               startAt: "",
               endAt: "",
-              phases: [],
+              types: [],
               pricingOpen: false,
             },
           ]
@@ -201,14 +218,14 @@ export default function ProfileDistancesClient() {
       ...prev.map((r) => ({ ...r, pricingOpen: false })),
       {
         key: `new-${Date.now()}`,
-        type: "road",
+        type: "10KM",
         name: "",
         distanceKm: "10",
         capacity: 100,
         basePrice: 0,
         startAt: "",
         endAt: "",
-        phases: [],
+        types: [],
         pricingOpen: false,
       },
     ]);
@@ -235,25 +252,26 @@ export default function ProfileDistancesClient() {
         (r) => !r.name.trim() || parseDistanceKm(r.distanceKm) <= 0 || r.capacity < 1
       )
     ) {
-      setError("Mỗi cự ly cần tên, km > 0 và sức chứa ≥ 1.");
+      toastError("Mỗi cự ly cần tên, km > 0 và sức chứa ≥ 1.");
       return;
     }
     if (event.packagePurchaseId && packageCap > 0 && totalCap > packageCap) {
-      setError(`Tổng slot cự ly (${totalCap}) vượt quy mô gói (${packageCap}).`);
+      toastError(
+        `Tổng slot cự ly (${totalCap}) vượt quy mô gói (${packageCap}).`
+      );
       return;
     }
     setSaving(true);
-    setError(null);
     try {
       const byDistanceName: Record<
         string,
-        { basePrice: number; phases: Array<Record<string, unknown>> }
+        { basePrice: number; types: Array<Record<string, unknown>> }
       > = {};
       for (const r of rows) {
         const n = r.name.trim();
         byDistanceName[n] = {
           basePrice: Number(r.basePrice) || 0,
-          phases: r.phases.map((p) => ({
+          types: r.types.map((p) => ({
             key: p.id,
             name: p.name,
             dateFrom: p.dateFrom,
@@ -266,21 +284,20 @@ export default function ProfileDistancesClient() {
       await replaceEventDistances(eventId, {
         distances: rows.map((r) => ({
           ...(isPersistedDistanceId(r.key) ? { id: r.key } : {}),
-          type: r.type || "road",
           name: r.name.trim(),
+          type: normalizeDistanceType(r.type, parseDistanceKm(r.distanceKm)),
           distanceKm: parseDistanceKm(r.distanceKm),
           capacity: Number(r.capacity),
-          price: Number(r.basePrice) || 0,
-          currency: "VND",
+          basePrice: Number(r.basePrice) || 0,
           startAt: inputToTimeOnly(r.startAt),
           endAt: inputToTimeOnly(r.endAt),
         })),
         ticketPricing: { byDistanceName },
       });
       await load();
-      notify("Đã lưu cự ly và giá vé.");
+      toastSuccess("Đã lưu cự ly và giá vé.");
     } catch (e) {
-      setError(getApiErrorMessage(e, "Lưu thất bại."));
+      toastError(e, "Lưu thất bại.");
     } finally {
       setSaving(false);
     }
@@ -373,19 +390,6 @@ export default function ProfileDistancesClient() {
         )}
       </div>
 
-      {toast && (
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-          <CheckCircle2 className="h-4 w-4" />
-          {toast}
-        </div>
-      )}
-      {error && (
-        <div className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-sm text-red-600">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          {error}
-        </div>
-      )}
-
       <section className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="min-w-0">
@@ -420,23 +424,67 @@ export default function ProfileDistancesClient() {
                   : "border-border/60 bg-background/50"
               }`}
             >
-              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                 <LabeledField label="Tên cự ly">
                   <input
-                    placeholder="VD: 5K, 10K"
+                    placeholder="VD: 5K Fun Run"
                     value={r.name}
                     disabled={!editable}
                     onChange={(e) => updateRow(r.key, { name: e.target.value })}
                     className={inputClass}
                   />
                 </LabeledField>
-                <LabeledField label="Quãng đường (km)">
+                <LabeledField label="Type">
+                  <select
+                    value={normalizeDistanceType(
+                      r.type,
+                      parseDistanceKm(r.distanceKm)
+                    )}
+                    disabled={!editable}
+                    onChange={(e) => {
+                      const type = e.target.value;
+                      const km = suggestedKmForType(type);
+                      updateRow(r.key, {
+                        type,
+                        ...(km != null ? { distanceKm: String(km) } : {}),
+                      });
+                    }}
+                    className={inputClass}
+                  >
+                    {DISTANCE_LEADERBOARD_TYPES.map((t) => (
+                      <option key={t.code} value={t.code}>
+                        {t.code} — {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </LabeledField>
+                <LabeledField
+                  label={
+                    normalizeDistanceType(r.type, parseDistanceKm(r.distanceKm)) ===
+                    "OTHER"
+                      ? "Quãng đường (km)"
+                      : "Quãng đường (km) — theo type"
+                  }
+                >
                   <input
                     type="text"
                     inputMode="decimal"
-                    placeholder="VD: 3.419 hoặc 42.195"
+                    placeholder={
+                      normalizeDistanceType(
+                        r.type,
+                        parseDistanceKm(r.distanceKm)
+                      ) === "OTHER"
+                        ? "VD: 6 hoặc 8.5"
+                        : "Khóa theo type (chọn Khác để sửa)"
+                    }
                     value={r.distanceKm}
-                    disabled={!editable}
+                    disabled={
+                      !editable ||
+                      normalizeDistanceType(
+                        r.type,
+                        parseDistanceKm(r.distanceKm)
+                      ) !== "OTHER"
+                    }
                     onChange={(e) => {
                       const v = e.target.value.replace(",", ".");
                       if (v !== "" && !/^\d*\.?\d*$/.test(v)) return;
@@ -492,7 +540,7 @@ export default function ProfileDistancesClient() {
                   {r.basePrice > 0
                     ? ` · ${r.basePrice.toLocaleString("vi-VN")}đ`
                     : ""}
-                  {r.phases.length > 0 ? ` · ${r.phases.length} phase` : ""}
+                  {r.types.length > 0 ? ` · ${r.types.length} type` : ""}
                 </button>
                 {editable && (
                   <button
@@ -514,7 +562,7 @@ export default function ProfileDistancesClient() {
                         {r.name || "cự ly"}
                       </p>
                       <p className="text-[11px] text-muted-foreground">
-                        Fallback ngoài phase · Early bird ưu tiên khi trùng ngày.
+                        Fallback ngoài type · Early bird ưu tiên khi trùng ngày.
                       </p>
                     </div>
                     <button
@@ -545,17 +593,17 @@ export default function ProfileDistancesClient() {
                   <div className="mt-3">
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                       <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                        Phase theo ngày ({r.phases.length})
+                        Type theo ngày ({r.types.length})
                       </p>
                       {editable && (
                         <button
                           type="button"
                           onClick={() =>
                             updateRow(r.key, {
-                              phases: [
-                                ...r.phases,
+                              types: [
+                                ...r.types,
                                 {
-                                  id: `phase-${Date.now()}`,
+                                  id: `type-${Date.now()}`,
                                   name: "Early Bird",
                                   dateFrom: "",
                                   dateTo: "",
@@ -566,18 +614,18 @@ export default function ProfileDistancesClient() {
                           }
                           className="inline-flex items-center gap-1 rounded-lg border border-dashed border-orange-300 px-2.5 py-1 text-[11px] font-bold text-orange-600 hover:bg-orange-50"
                         >
-                          <Plus className="h-3 w-3" /> Thêm phase
+                          <Plus className="h-3 w-3" /> Thêm type
                         </button>
                       )}
                     </div>
 
-                    {r.phases.length === 0 ? (
+                    {r.types.length === 0 ? (
                       <p className="text-xs text-muted-foreground">
-                        Chưa có phase — dùng giá fallback.
+                        Chưa có type — dùng giá fallback.
                       </p>
                     ) : (
                       <div className="max-h-56 space-y-2 overflow-y-auto overscroll-contain pr-0.5 sm:max-h-64">
-                        {r.phases.map((p, pi) => (
+                        {r.types.map((p, pi) => (
                           <div
                             key={p.id}
                             className="grid grid-cols-1 gap-2 rounded-lg border border-border/60 bg-muted/20 p-2.5 sm:grid-cols-5"
@@ -589,7 +637,7 @@ export default function ProfileDistancesClient() {
                                 onChange={(e) => {
                                   const v = e.target.value;
                                   updateRow(r.key, {
-                                    phases: r.phases.map((x, i) =>
+                                    types: r.types.map((x, i) =>
                                       i === pi ? { ...x, name: v } : x
                                     ),
                                   });
@@ -606,7 +654,7 @@ export default function ProfileDistancesClient() {
                                 onChange={(e) => {
                                   const v = e.target.value;
                                   updateRow(r.key, {
-                                    phases: r.phases.map((x, i) =>
+                                    types: r.types.map((x, i) =>
                                       i === pi ? { ...x, dateFrom: v } : x
                                     ),
                                   });
@@ -622,7 +670,7 @@ export default function ProfileDistancesClient() {
                                 onChange={(e) => {
                                   const v = e.target.value;
                                   updateRow(r.key, {
-                                    phases: r.phases.map((x, i) =>
+                                    types: r.types.map((x, i) =>
                                       i === pi ? { ...x, dateTo: v } : x
                                     ),
                                   });
@@ -639,7 +687,7 @@ export default function ProfileDistancesClient() {
                                 onChange={(e) => {
                                   const v = Number(e.target.value) || 0;
                                   updateRow(r.key, {
-                                    phases: r.phases.map((x, i) =>
+                                    types: r.types.map((x, i) =>
                                       i === pi ? { ...x, price: v } : x
                                     ),
                                   });
@@ -653,7 +701,7 @@ export default function ProfileDistancesClient() {
                                   type="button"
                                   onClick={() =>
                                     updateRow(r.key, {
-                                      phases: r.phases.filter((_, i) => i !== pi),
+                                      types: r.types.filter((_, i) => i !== pi),
                                     })
                                   }
                                   className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-border py-2 text-xs font-semibold text-red-600 hover:bg-red-50"

@@ -267,7 +267,7 @@ export default function OrganizerEventStatusModal({
                             </span>
                           </span>
                           <span className="shrink-0 text-muted-foreground">
-                            {formatPrice(d.price ?? 0)} ·{" "}
+                            {formatPrice(d.basePrice ?? d.price ?? 0)} ·{" "}
                             {(d.capacity ?? 0).toLocaleString("vi-VN")} slot
                           </span>
                         </li>

@@ -6,5 +6,5 @@ export default async function EventProfileRedirectPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  redirect(`/organizer/events/${id}/profile/basic`);
+  redirect(`/organizer/events/${id}/profile/overview`);
 }

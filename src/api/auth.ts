@@ -41,10 +41,14 @@ export async function login(data: LoginDto): Promise<LoginResponse> {
 
   if (accessToken) {
     const days = expiredTime ? expiredTime / (1000 * 60 * 60 * 24) : 7;
-    Cookies.set("accessToken", accessToken, { expires: days, sameSite: "lax", path: "/" });
+    // Chuẩn rule_design: access_token / role / username / user_id
+    Cookies.set("access_token", accessToken, { expires: days, sameSite: "lax", path: "/" });
     Cookies.set("role", role, { expires: days, sameSite: "lax", path: "/" });
     if (username) Cookies.set("username", username, { expires: days, sameSite: "lax", path: "/" });
-    if (userId) Cookies.set("userId", userId.toString(), { expires: days, sameSite: "lax", path: "/" });
+    if (userId) Cookies.set("user_id", userId.toString(), { expires: days, sameSite: "lax", path: "/" });
+    // Dọn cookie camelCase cũ (nếu còn từ phiên trước)
+    Cookies.remove("accessToken", { path: "/" });
+    Cookies.remove("userId", { path: "/" });
     // Avatar không có trong login response — lấy nhẹ từ /me (không chặn login nếu fail)
     try {
       const me = await getMyProfile();
@@ -96,6 +100,7 @@ export async function updateMyProfile(
     phone: data.phone?.trim() || null,
     dateOfBirth: data.dateOfBirth || null,
     gender: data.gender ?? 0,
+    idNumber: data.idNumber?.trim() || null,
     ...(data.avatarUrl !== undefined ? { avatarUrl: data.avatarUrl } : {}),
   }) as Promise<MyProfileDto>;
 }
@@ -123,10 +128,14 @@ export function persistAvatarCookie(avatarUrl?: string | null) {
 }
 
 export async function logout(): Promise<void> {
-  Cookies.remove('accessToken');
-  Cookies.remove('role');
-  Cookies.remove('username');
-  Cookies.remove('userId');
+  const opts = { path: "/" as const };
+  Cookies.remove("access_token", opts);
+  Cookies.remove("role", opts);
+  Cookies.remove("username", opts);
+  Cookies.remove("user_id", opts);
+  // Legacy camelCase (login từng set sai tên → logout không xóa → UI còn "U")
+  Cookies.remove("accessToken", opts);
+  Cookies.remove("userId", opts);
   persistAvatarCookie(null);
-  window.location.href = '/';
+  window.location.href = "/";
 }

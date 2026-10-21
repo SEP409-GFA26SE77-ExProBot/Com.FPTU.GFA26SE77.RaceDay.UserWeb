@@ -1,4 +1,5 @@
 "use client";
+import { getAccessToken } from "@/lib/auth-cookie";
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -6,7 +7,6 @@ import Cookies from "js-cookie";
 import {
   ArrowLeft,
   Camera,
-  CheckCircle2,
   KeyRound,
   Loader2,
   LogIn,
@@ -28,11 +28,13 @@ import {
 import { getApiErrorMessage } from "@/lib/error";
 import {
   isValidDateOfBirth,
+  isValidOptionalIdNumber,
   isValidOptionalVietnamPhone,
   MSG,
 } from "@/lib/input-rules";
 import { mediaDisplayUrl } from "@/lib/media-url";
 import { PAGE_SHELL } from "@/lib/page-shell";
+import { toastError, toastSuccess } from "@/lib/toast";
 import PageLoading from "@/components/ui/PageLoading";
 
 type ProfileForm = {
@@ -41,6 +43,7 @@ type ProfileForm = {
   phone: string;
   gender: string;
   dateOfBirth: string;
+  idNumber: string;
 };
 
 export default function ProfileEditPage() {
@@ -57,13 +60,12 @@ export default function ProfileEditPage() {
     phone: "",
     gender: "",
     dateOfBirth: "",
+    idNumber: "",
   });
   const [profileErrors, setProfileErrors] = useState<Record<string, string>>(
     {}
   );
   const [savingProfile, setSavingProfile] = useState(false);
-  const [profileSaved, setProfileSaved] = useState(false);
-  const [profileApiError, setProfileApiError] = useState<string | null>(null);
   /** File staged — chỉ upload khi bấm Lưu hồ sơ */
   const [pendingAvatar, setPendingAvatar] = useState<File | null>(null);
   const [pendingAvatarPreview, setPendingAvatarPreview] = useState<
@@ -77,11 +79,9 @@ export default function ProfileEditPage() {
   });
   const [pwErrors, setPwErrors] = useState<Record<string, string>>({});
   const [savingPw, setSavingPw] = useState(false);
-  const [pwSaved, setPwSaved] = useState(false);
-  const [pwApiError, setPwApiError] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = Cookies.get("accessToken");
+    const token = getAccessToken();
     setLoggedIn(Boolean(token));
     setUsername(Cookies.get("username") || "");
     if (!token) {
@@ -101,6 +101,7 @@ export default function ProfileEditPage() {
           phone: me.phone || "",
           gender: genderToFormValue(me.gender),
           dateOfBirth: profileDobToDateInput(me.dateOfBirth),
+          idNumber: me.idNumber || "",
         });
         setLoadError(null);
       } catch (e) {
@@ -121,12 +122,16 @@ export default function ProfileEditPage() {
   const validateProfile = () => {
     const e: Record<string, string> = {};
     if (!form.fullName.trim()) e.fullName = "Vui lòng nhập họ tên";
+    else if (form.fullName.trim().length < 2)
+      e.fullName = "Họ tên tối thiểu 2 ký tự.";
     else if (form.fullName.trim().length > 100)
       e.fullName = "Họ tên tối đa 100 ký tự.";
     if (form.phone.trim() && !isValidOptionalVietnamPhone(form.phone))
       e.phone = MSG.phone;
     if (form.dateOfBirth && !isValidDateOfBirth(form.dateOfBirth))
       e.dateOfBirth = MSG.dateOfBirth;
+    if (form.idNumber.trim() && !isValidOptionalIdNumber(form.idNumber))
+      e.idNumber = MSG.idNumber;
     setProfileErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -151,8 +156,6 @@ export default function ProfileEditPage() {
     ev.preventDefault();
     if (!validateProfile()) return;
     setSavingProfile(true);
-    setProfileApiError(null);
-    setProfileSaved(false);
     try {
       let next = profile;
       if (pendingAvatar) {
@@ -164,15 +167,14 @@ export default function ProfileEditPage() {
         phone: form.phone.trim() || null,
         dateOfBirth: form.dateOfBirth || null,
         gender: genderToApiNumber(form.gender),
+        idNumber: form.idNumber.trim() || null,
         avatarUrl: next?.avatarUrl ?? profile?.avatarUrl,
       });
       setProfile(updated);
       persistAvatarCookie(updated.avatarUrl);
-      setProfileSaved(true);
+      toastSuccess("Đã lưu hồ sơ cá nhân.");
     } catch (err) {
-      setProfileApiError(
-        getApiErrorMessage(err, "Cập nhật hồ sơ thất bại.")
-      );
+      toastError(err, "Cập nhật hồ sơ thất bại.");
     } finally {
       setSavingProfile(false);
     }
@@ -181,14 +183,13 @@ export default function ProfileEditPage() {
   const handleAvatarPick = (file: File | null) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      setProfileApiError("Chỉ chọn file ảnh.");
+      toastError("Chỉ chọn file ảnh.");
       return;
     }
     if (file.size > 2 * 1024 * 1024) {
-      setProfileApiError("Ảnh tối đa 2MB.");
+      toastError("Ảnh tối đa 2MB.");
       return;
     }
-    setProfileApiError(null);
     setPendingAvatarPreview((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return URL.createObjectURL(file);
@@ -211,17 +212,15 @@ export default function ProfileEditPage() {
     ev.preventDefault();
     if (!validatePw()) return;
     setSavingPw(true);
-    setPwApiError(null);
-    setPwSaved(false);
     try {
       await changePassword({
         currentPassword: pw.currentPassword,
         newPassword: pw.newPassword,
       });
-      setPwSaved(true);
       setPw({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      toastSuccess("Đã đổi mật khẩu.");
     } catch (err) {
-      setPwApiError(getApiErrorMessage(err, "Đổi mật khẩu thất bại."));
+      toastError(err, "Đổi mật khẩu thất bại.");
     } finally {
       setSavingPw(false);
     }
@@ -357,18 +356,6 @@ export default function ProfileEditPage() {
               Thông tin cá nhân
             </h2>
 
-            {profileApiError ? (
-              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                {profileApiError}
-              </div>
-            ) : null}
-            {profileSaved ? (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 shrink-0" />
-                Đã lưu hồ sơ cá nhân.
-              </div>
-            ) : null}
-
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <label className="block text-xs font-semibold mb-1.5">
@@ -439,7 +426,7 @@ export default function ProfileEditPage() {
                 </select>
               </div>
 
-              <div className="sm:col-span-2 sm:max-w-xs">
+              <div>
                 <label className="block text-xs font-semibold mb-1.5">
                   Ngày sinh
                 </label>
@@ -457,6 +444,31 @@ export default function ProfileEditPage() {
                     {profileErrors.dateOfBirth}
                   </p>
                 ) : null}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1.5">
+                  CCCD / Hộ chiếu
+                </label>
+                <input
+                  value={form.idNumber}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, idNumber: e.target.value }))
+                  }
+                  className={inputClass("idNumber")}
+                  disabled={savingProfile}
+                  placeholder="CCCD 12 số hoặc hộ chiếu (VD: B1234567)"
+                  autoComplete="off"
+                />
+                {profileErrors.idNumber ? (
+                  <p className="mt-1 text-xs text-red-500">
+                    {profileErrors.idNumber}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    CCCD 9/12 số · Hộ chiếu bắt đầu bằng chữ
+                  </p>
+                )}
               </div>
             </div>
 
@@ -481,18 +493,6 @@ export default function ProfileEditPage() {
               <KeyRound className="h-4 w-4 text-orange-500" />
               Đổi mật khẩu
             </h2>
-
-            {pwApiError ? (
-              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                {pwApiError}
-              </div>
-            ) : null}
-            {pwSaved ? (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 shrink-0" />
-                Đã đổi mật khẩu.
-              </div>
-            ) : null}
 
             <div className="grid gap-4 sm:grid-cols-2">
               {(

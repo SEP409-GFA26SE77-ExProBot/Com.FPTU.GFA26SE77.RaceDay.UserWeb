@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import Cookies from "js-cookie";
 import {
   AlertCircle,
   CheckCircle2,
@@ -11,6 +12,7 @@ import {
 } from "lucide-react";
 import { syncPayment } from "@/api/payments";
 import { getPackagePurchase } from "@/api/event-packages";
+import { Role } from "@/interfaces/role";
 import { getApiErrorMessage } from "@/lib/error";
 
 type Status = "syncing" | "success" | "error";
@@ -46,6 +48,13 @@ export default function PackageReturnClient() {
         if (purchase.createdEventId) {
           doneRef.current = true;
           setStatus("success");
+          // BE gán Organizer sau RaceEventCreated; JWT cũ chưa có claim —
+          // cập nhật cookie role để Header/proxy nhận diện ngay (không cần login lại).
+          Cookies.set("role", Role.ORGANIZER, {
+            expires: 7,
+            sameSite: "lax",
+            path: "/",
+          });
           setTimeout(() => {
             router.push(`/organizer/events/${purchase.createdEventId}/profile`);
           }, 1200);

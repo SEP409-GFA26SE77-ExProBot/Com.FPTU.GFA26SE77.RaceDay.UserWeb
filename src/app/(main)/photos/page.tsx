@@ -1,4 +1,5 @@
 "use client";
+import { isLoggedIn } from "@/lib/auth-cookie";
 
 import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
@@ -9,7 +10,6 @@ import { RegistrationDto } from "@/dto/event.dto";
 import { getApiErrorMessage } from "@/lib/error";
 import { PAGE_SHELL } from "@/lib/page-shell";
 import PageLoading from "@/components/ui/PageLoading";
-import Cookies from "js-cookie";
 
 function PhotosInner() {
   const searchParams = useSearchParams();
@@ -17,7 +17,7 @@ function PhotosInner() {
   const [regs, setRegs] = useState<RegistrationDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const loggedIn = Boolean(Cookies.get("accessToken"));
+  const loggedIn = isLoggedIn();
 
   useEffect(() => {
     if (!loggedIn) {

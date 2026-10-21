@@ -8,7 +8,6 @@ import Link from "next/link";
 import {
   AlertCircle,
   Boxes,
-  CheckCircle2,
   Loader2,
   Minus,
   Package,
@@ -16,17 +15,15 @@ import {
   Save,
   Search,
   Sparkles,
-  Trash2,
-} from "lucide-react";
+  Trash2 } from "lucide-react";
 import { getEventById } from "@/api/events";
 import {
   getEventSupplies,
   updateEventSupplies,
-  type EventSupplyItemDto,
-} from "@/api/supplies";
+  type EventSupplyItemDto } from "@/api/supplies";
 import type { RaceEventDto } from "@/dto/event.dto";
 import { getApiErrorMessage } from "@/lib/error";
-import { getOrganizerStatusLabel, getStatusColor } from "@/lib/format";
+import { toastError, toastSuccess } from "@/lib/toast";
 import { canEditProfile } from "../_shared";
 
 export interface SupplyItem {
@@ -43,33 +40,27 @@ const QUICK_PRESETS = [
   {
     name: "Nước tinh khiết 500ml",
     defaultQty: 60,
-    notes: "Quy cách 24 chai/thùng. Yêu cầu giao trước 04:00 sáng.",
-  },
+    notes: "Quy cách 24 chai/thùng. Yêu cầu giao trước 04:00 sáng." },
   {
     name: "Nước điện giải Isotonic (Pocari/Revive)",
     defaultQty: 40,
-    notes: "Quy cách 24 chai/thùng. Ưu tiên ướp mát trước giờ xuất phát.",
-  },
+    notes: "Quy cách 24 chai/thùng. Ưu tiên ướp mát trước giờ xuất phát." },
   {
     name: "Chuối tiêu tươi tiếp sức",
     defaultQty: 25,
-    notes: "Thùng 15kg quả chín vừa, cắt khúc 5-7cm sẵn phục vụ.",
-  },
+    notes: "Thùng 15kg quả chín vừa, cắt khúc 5-7cm sẵn phục vụ." },
   {
     name: "Gel năng lượng thể thao",
     defaultQty: 15,
-    notes: "Thùng 24 gói. Bảo quản nơi khô ráo, tránh ánh nắng trực tiếp.",
-  },
+    notes: "Thùng 24 gói. Bảo quản nơi khô ráo, tránh ánh nắng trực tiếp." },
   {
     name: "Băng xịt lạnh giảm đau & Sơ cứu",
     defaultQty: 8,
-    notes: "Thùng 12 chai xịt lạnh + túi bông băng sơ cứu nhanh khẩn cấp.",
-  },
+    notes: "Thùng 12 chai xịt lạnh + túi bông băng sơ cứu nhanh khẩn cấp." },
   {
     name: "Ly giấy sinh học dùng 1 lần",
     defaultQty: 20,
-    notes: "Thùng 1.000 ly giấy tự phân hủy bảo vệ môi trường.",
-  },
+    notes: "Thùng 1.000 ly giấy tự phân hủy bảo vệ môi trường." },
 ];
 
 const DEFAULT_SUPPLIES: SupplyItem[] = [
@@ -78,36 +69,31 @@ const DEFAULT_SUPPLIES: SupplyItem[] = [
     name: "Nước khoáng thiên nhiên 500ml",
     quantity: 80,
     unit: "thùng",
-    notes: "Thùng 24 chai. Phân bổ đồng đều cho các trạm tiếp nước.",
-  },
+    notes: "Thùng 24 chai. Phân bổ đồng đều cho các trạm tiếp nước." },
   {
     id: "sup-2",
     name: "Nước điện giải thể thao Pocari Sweat 500ml",
     quantity: 50,
     unit: "thùng",
-    notes: "Thùng 24 chai. Cần chuẩn bị thùng xốp ướp đá lạnh.",
-  },
+    notes: "Thùng 24 chai. Cần chuẩn bị thùng xốp ướp đá lạnh." },
   {
     id: "sup-3",
     name: "Chuối tiêu chín tiếp sức VĐV",
     quantity: 30,
     unit: "thùng",
-    notes: "Thùng 15kg quả chín vừa, chia đều cho trạm giữa và vạch đích.",
-  },
+    notes: "Thùng 15kg quả chín vừa, chia đều cho trạm giữa và vạch đích." },
   {
     id: "sup-4",
     name: "Gel năng lượng chạy bộ thể thao",
     quantity: 12,
     unit: "thùng",
-    notes: "Thùng 24 gói. Kiểm tra hạn sử dụng trước khi giao nhận.",
-  },
+    notes: "Thùng 24 gói. Kiểm tra hạn sử dụng trước khi giao nhận." },
   {
     id: "sup-5",
     name: "Bình xịt lạnh giảm đau & Dụng cụ y tế",
     quantity: 6,
     unit: "thùng",
-    notes: "Thùng 12 bình xịt lạnh + bông băng thun co giãn sơ cứu.",
-  },
+    notes: "Thùng 12 bình xịt lạnh + bông băng thun co giãn sơ cứu." },
 ];
 
 export default function ProfileSuppliesClient() {
@@ -125,11 +111,6 @@ export default function ProfileSuppliesClient() {
 
   // Search
   const [searchTerm, setSearchTerm] = useState("");
-
-  const notify = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3500);
-  };
 
   const load = useCallback(async () => {
     const [eventData, suppliesData] = await Promise.all([
@@ -149,8 +130,7 @@ export default function ProfileSuppliesClient() {
           name: s.name,
           quantity: Number(s.quantity) || 1,
           unit: "thùng" as const,
-          notes: s.notes || "",
-        }))
+          notes: s.notes || "" }))
       );
     }
   }, [eventId]);
@@ -232,8 +212,7 @@ export default function ProfileSuppliesClient() {
       name: "Vật phẩm tiếp tế mới",
       quantity: 10,
       unit: "thùng",
-      notes: "",
-    };
+      notes: "" };
     setSupplies((prev) => [newItem, ...prev]);
   };
 
@@ -244,32 +223,30 @@ export default function ProfileSuppliesClient() {
       name: preset.name,
       quantity: preset.defaultQty,
       unit: "thùng",
-      notes: preset.notes,
-    };
+      notes: preset.notes };
     setSupplies((prev) => [newItem, ...prev]);
-    notify(`Đã thêm "${preset.name}" (${preset.defaultQty} thùng).`);
+    toastSuccess(`Đã thêm "${preset.name}" (${preset.defaultQty} thùng).`);
   };
 
   // Save to API & storage
   const handleSave = async () => {
     if (saving) return;
     setSaving(true);
-    setError(null);
+
     try {
       const payload: EventSupplyItemDto[] = supplies.map((item) => ({
         id: item.id,
         name: item.name,
         quantity: item.quantity,
         unit: "thùng",
-        notes: item.notes,
-      }));
+        notes: item.notes }));
 
       await updateEventSupplies(eventId, payload);
-      notify(
+      toastSuccess(
         `Đã lưu danh sách tiếp tế thành công (${supplies.length} loại, tổng ${totalBoxes} thùng).`
       );
     } catch (e) {
-      setError(getApiErrorMessage(e, "Lưu danh sách tiếp tế thất bại."));
+      toastError(e, "Lưu danh sách tiếp tế thất bại.");
     } finally {
       setSaving(false);
     }
@@ -309,18 +286,9 @@ export default function ProfileSuppliesClient() {
           <p className="text-xs font-bold uppercase tracking-widest text-orange-500">
             Hậu cần đường chạy
           </p>
-          <div className="mt-1 flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl md:text-3xl font-extrabold text-foreground tracking-tight">
-              Vật phẩm tiếp tế
-            </h1>
-            <span
-              className={`inline-flex rounded-md border px-2.5 py-0.5 text-[11px] font-extrabold ${getStatusColor(
-                event.status
-              )}`}
-            >
-              {getOrganizerStatusLabel(event.status)}
-            </span>
-          </div>
+          <h1 className="mt-1 text-2xl md:text-3xl font-extrabold text-foreground tracking-tight">
+            Vật phẩm tiếp tế
+          </h1>
           <p className="text-sm text-muted-foreground mt-2 max-w-3xl">
             Quản lý số lượng nước uống, đồ ăn nhẹ và vật tư tiếp sức phân bổ tại giải chạy (đơn vị: <strong>thùng</strong>).
           </p>
@@ -340,12 +308,6 @@ export default function ProfileSuppliesClient() {
       </div>
 
       {/* TOAST / ERROR */}
-      {toast && (
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 shadow-sm animate-in fade-in duration-200">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-          <span>{toast}</span>
-        </div>
-      )}
       {error && (
         <div className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-sm text-red-600">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />

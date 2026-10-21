@@ -21,9 +21,10 @@ const ROLE_PERMISSIONS: Record<string, (Role | string)[] | '*'> = {
 
 export function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
+    // Chuẩn cookie: access_token (fallback accessToken phiên cũ)
     const token =
-        request.cookies.get('accessToken')?.value ||
-        request.cookies.get('access_token')?.value;
+        request.cookies.get('access_token')?.value ||
+        request.cookies.get('accessToken')?.value;
     const rawRole = request.cookies.get('role')?.value;
     const tokenRole = extractRoleFromToken(token);
     // USER (IAM) / trống → RUNNER
@@ -57,8 +58,10 @@ export function proxy(request: NextRequest) {
         // Return URL sau thanh toán gói tổ chức
         allowedRoles = '*';
     } else if (pathname === '/organizer' || pathname.startsWith('/organizer/')) {
-        // Every organizer route requires the Organizer role.
-        allowedRoles = [Role.ORGANIZER];
+        // Khớp BE: /api/v1/event/organizer dùng PublicUser (mọi user đã login),
+        // không bắt cookie role ORGANIZER — ownership check ở API.
+        // (Mua gói tạo draft trước khi JWT/cookie kịp có ORGANIZER.)
+        allowedRoles = '*';
     }
 
     if (allowedRoles) {
