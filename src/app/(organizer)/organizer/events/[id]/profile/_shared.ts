@@ -59,27 +59,9 @@ export const PROFILE_DOC_TYPES = [
     required: true,
   },
   {
-    id: "plan",
-    title: "Kế hoạch tổ chức sự kiện",
-    description: "Mục tiêu, quy mô, thời gian, địa điểm và các đơn vị phối hợp.",
-    required: false,
-  },
-  {
-    id: "program",
-    title: "Chương trình và nội dung thi đấu",
-    description: "Lịch trình, nội dung cự ly, khung giờ xuất phát và đích.",
-    required: false,
-  },
-  {
-    id: "rules",
-    title: "Điều lệ giải và trọng tài",
-    description: "Điều lệ thi đấu, bộ phận chuyên môn và danh sách trọng tài.",
-    required: false,
-  },
-  {
-    id: "foreign-list",
-    title: "Danh sách người nước ngoài tham dự",
-    description: "Họ tên, quốc tịch, hộ chiếu và đơn vị liên hệ (nếu có).",
+    id: "other-documents",
+    title: "Các tài liệu khác",
+    description: "Kế hoạch tổ chức, chương trình thi đấu, điều lệ giải và các tài liệu bổ sung (nếu có).",
     required: false,
   },
 ] as const;
