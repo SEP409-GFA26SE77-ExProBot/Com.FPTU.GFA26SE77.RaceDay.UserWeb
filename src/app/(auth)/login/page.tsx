@@ -11,7 +11,8 @@ import { LoginSchema } from "@/dto/auth.dto";
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const fromPath = searchParams.get("from") || "/";
+  const requestedPath = searchParams.get("from") || "/";
+  const fromPath = requestedPath.startsWith("/") && !requestedPath.startsWith("//") && !requestedPath.includes("\\") ? requestedPath : "/";
 
   const [form, setForm] = useState<{ username: string; password: string }>({
     username: "",

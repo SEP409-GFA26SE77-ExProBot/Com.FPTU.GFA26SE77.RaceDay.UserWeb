@@ -1,8 +1,8 @@
 "use client";
+import { getAuthUser } from "@/stores/auth-store";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import Cookies from "js-cookie";
 import { Receipt, ExternalLink, LogIn, Undo2, X } from "lucide-react";
 import { getMyPayments, getPaymentStatus } from "@/api/payments";
 import { getMyRegistrations } from "@/api/events";
@@ -72,9 +72,9 @@ export default function PaymentsHistoryPage() {
   );
 
   useEffect(() => {
-    const token = Cookies.get("accessToken");
-    setLoggedIn(Boolean(token));
-    if (!token) {
+    const authenticatedUser = getAuthUser();
+    setLoggedIn(Boolean(authenticatedUser));
+    if (!authenticatedUser) {
       setBoot(false);
       return;
     }
@@ -326,25 +326,13 @@ export default function PaymentsHistoryPage() {
                           ) : null}
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          {/* Registration: pending → continue paying */}
-                          {p.status === "pending" &&
-                            !isPackage &&
-                            p.eventId &&
-                            p.registrationId && (
-                              <Link
-                                href={`/events/${p.eventId}/payment?regId=${p.registrationId}`}
-                                className="inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white hover:bg-orange-600 transition-colors"
-                              >
-                                Tiếp tục thanh toán <ExternalLink className="h-3 w-3" />
-                              </Link>
-                            )}
-                          {/* Package: pending → back to create */}
-                          {p.status === "pending" && isPackage && (
+                          {["pending", "cancelled", "failed", "expired"].includes(p.status) && (
                             <Link
-                              href="/events/create"
+                              href={`/payments/${encodeURIComponent(p.id)}/continue`}
                               className="inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white hover:bg-orange-600 transition-colors"
                             >
-                              Tiếp tục mua gói <ExternalLink className="h-3 w-3" />
+                              {p.status === "pending" ? "Tiếp tục thanh toán" : "Thanh toán lại"}
+                              <ExternalLink className="h-3 w-3" />
                             </Link>
                           )}
                           {/* Registration: paid/refunded → view ticket */}

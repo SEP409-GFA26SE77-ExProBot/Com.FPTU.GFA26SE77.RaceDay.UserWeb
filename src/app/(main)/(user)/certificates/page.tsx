@@ -1,8 +1,8 @@
 "use client";
+import { getAuthUser } from "@/stores/auth-store";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Cookies from "js-cookie";
 import { Award, LogIn } from "lucide-react";
 import { getMyRegistrations } from "@/api/events";
 import { RegistrationDto } from "@/dto/event.dto";
@@ -15,7 +15,7 @@ export default function CertificatesPage() {
   const [regs, setRegs] = useState<RegistrationDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const loggedIn = Boolean(Cookies.get("accessToken"));
+  const loggedIn = Boolean(getAuthUser());
 
   useEffect(() => {
     if (!loggedIn) {

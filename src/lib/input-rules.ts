@@ -86,7 +86,7 @@ export function isValidDateOfBirth(isoDate: string, today = new Date()): boolean
 
 export function isValidOptionalIdNumber(idNumber: string): boolean {
   const t = idNumber.trim();
-  return !t || VN_ID.test(t);
+  return !t || VN_ID.test(t) || /^[A-Za-z][A-Za-z0-9]{5,11}$/.test(t);
 }
 
 export function isValidRequiredIdNumber(idNumber: string): boolean {

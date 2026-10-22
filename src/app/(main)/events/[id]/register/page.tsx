@@ -1,9 +1,9 @@
 "use client";
+import { getAuthUser } from "@/stores/auth-store";
 
 import { useState, useEffect, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import Cookies from "js-cookie";
 import {
   ArrowLeft,
   User,
@@ -131,7 +131,7 @@ function RegisterPageContent() {
   const [resumeHint, setResumeHint] = useState<string | null>(null);
   const [step, setStep] = useState<RegStep>(1);
 
-  const loggedIn = Boolean(Cookies.get("accessToken"));
+  const loggedIn = Boolean(getAuthUser());
 
   const [formData, setFormData] = useState<FormData>({
     fullName: "",

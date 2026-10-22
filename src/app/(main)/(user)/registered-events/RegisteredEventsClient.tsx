@@ -1,8 +1,8 @@
 "use client";
+import { getAuthUser } from "@/stores/auth-store";
 
 import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
-import Cookies from "js-cookie";
 import {
   Search,
   X,
@@ -113,9 +113,9 @@ export default function RegisteredEventsClient() {
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
-    const token = Cookies.get("accessToken");
-    setLoggedIn(Boolean(token));
-    if (!token) {
+    const authenticatedUser = getAuthUser();
+    setLoggedIn(Boolean(authenticatedUser));
+    if (!authenticatedUser) {
       setBoot(false);
       return;
     }

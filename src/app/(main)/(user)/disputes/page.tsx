@@ -1,13 +1,13 @@
 "use client";
+import { getAuthUser } from "@/stores/auth-store";
 
 import Link from "next/link";
-import Cookies from "js-cookie";
 import { AlertTriangle, LogIn } from "lucide-react";
 import { PAGE_SHELL } from "@/lib/page-shell";
 
 /** BE chưa có dispute API — không dùng mock */
 export default function DisputesPage() {
-  const loggedIn = Boolean(Cookies.get("accessToken"));
+  const loggedIn = Boolean(getAuthUser());
 
   if (!loggedIn) {
     return (

@@ -1,8 +1,8 @@
 "use client";
+import { getAuthUser } from "@/stores/auth-store";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Cookies from "js-cookie";
 import { ChevronRight, LogIn, Wallet } from "lucide-react";
 import { getOrganizerWallet } from "@/api/finance";
 import type { OrganizerWalletDto } from "@/dto/finance.dto";
@@ -19,9 +19,9 @@ export default function WalletHubPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = Cookies.get("accessToken");
-    setLoggedIn(Boolean(token));
-    if (!token) {
+    const authenticatedUser = getAuthUser();
+    setLoggedIn(Boolean(authenticatedUser));
+    if (!authenticatedUser) {
       setBoot(false);
       return;
     }

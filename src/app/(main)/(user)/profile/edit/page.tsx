@@ -1,8 +1,8 @@
 "use client";
+import { getAuthUser } from "@/stores/auth-store";
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import Cookies from "js-cookie";
 import {
   ArrowLeft,
   Camera,
@@ -15,7 +15,7 @@ import {
 import {
   changePassword,
   getMyProfile,
-  persistAvatarCookie,
+  updateAuthAvatar,
   updateMyProfile,
   uploadMyAvatar,
 } from "@/api/auth";
@@ -28,6 +28,7 @@ import {
 import { getApiErrorMessage } from "@/lib/error";
 import {
   isValidDateOfBirth,
+  isValidOptionalIdNumber,
   isValidOptionalVietnamPhone,
   MSG,
 } from "@/lib/input-rules";
@@ -37,6 +38,7 @@ import PageLoading from "@/components/ui/PageLoading";
 
 type ProfileForm = {
   fullName: string;
+  idNumber: string;
   email: string;
   phone: string;
   gender: string;
@@ -53,6 +55,7 @@ export default function ProfileEditPage() {
 
   const [form, setForm] = useState<ProfileForm>({
     fullName: "",
+    idNumber: "",
     email: "",
     phone: "",
     gender: "",
@@ -81,10 +84,10 @@ export default function ProfileEditPage() {
   const [pwApiError, setPwApiError] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = Cookies.get("accessToken");
-    setLoggedIn(Boolean(token));
-    setUsername(Cookies.get("username") || "");
-    if (!token) {
+    const authenticatedUser = getAuthUser();
+    setLoggedIn(Boolean(authenticatedUser));
+    setUsername(getAuthUser()?.username || "");
+    if (!authenticatedUser) {
       setReady(true);
       return;
     }
@@ -94,9 +97,10 @@ export default function ProfileEditPage() {
         const me = await getMyProfile();
         if (cancelled) return;
         setProfile(me);
-        persistAvatarCookie(me.avatarUrl);
+        updateAuthAvatar(me.avatarUrl);
         setForm({
           fullName: me.fullName || "",
+          idNumber: me.idNumber || "",
           email: me.email || "",
           phone: me.phone || "",
           gender: genderToFormValue(me.gender),
@@ -125,6 +129,8 @@ export default function ProfileEditPage() {
       e.fullName = "Họ tên tối đa 100 ký tự.";
     if (form.phone.trim() && !isValidOptionalVietnamPhone(form.phone))
       e.phone = MSG.phone;
+    if (!isValidOptionalIdNumber(form.idNumber))
+      e.idNumber = "Nhập CCCD/CMND gồm 9 hoặc 12 chữ số, hoặc hộ chiếu gồm 6–12 ký tự bắt đầu bằng chữ.";
     if (form.dateOfBirth && !isValidDateOfBirth(form.dateOfBirth))
       e.dateOfBirth = MSG.dateOfBirth;
     setProfileErrors(e);
@@ -161,13 +167,15 @@ export default function ProfileEditPage() {
       }
       const updated = await updateMyProfile({
         fullName: form.fullName.trim(),
+        idNumber: form.idNumber.trim(),
         phone: form.phone.trim() || null,
         dateOfBirth: form.dateOfBirth || null,
         gender: genderToApiNumber(form.gender),
         avatarUrl: next?.avatarUrl ?? profile?.avatarUrl,
       });
       setProfile(updated);
-      persistAvatarCookie(updated.avatarUrl);
+      setForm((current) => ({ ...current, idNumber: updated.idNumber || "" }));
+      updateAuthAvatar(updated.avatarUrl);
       setProfileSaved(true);
     } catch (err) {
       setProfileApiError(
@@ -437,6 +445,29 @@ export default function ProfileEditPage() {
                   <option value="Female">Nữ</option>
                   <option value="Other">Khác</option>
                 </select>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label htmlFor="profile-identity-number" className="block text-xs font-semibold mb-1.5">
+                  Identity number (CCCD/CMND/Hộ chiếu)
+                </label>
+                <input
+                  id="profile-identity-number"
+                  type="text"
+                  value={form.idNumber}
+                  onChange={(e) => setForm((current) => ({ ...current, idNumber: e.target.value }))}
+                  className={inputClass("idNumber")}
+                  disabled={savingProfile}
+                  maxLength={30}
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  aria-invalid={Boolean(profileErrors.idNumber)}
+                  aria-describedby={profileErrors.idNumber ? "profile-identity-number-error" : undefined}
+                  placeholder="Số CCCD/CMND hoặc hộ chiếu"
+                />
+                {profileErrors.idNumber && (
+                  <p id="profile-identity-number-error" className="mt-1 text-xs text-red-500">{profileErrors.idNumber}</p>
+                )}
               </div>
 
               <div className="sm:col-span-2 sm:max-w-xs">

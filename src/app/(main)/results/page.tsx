@@ -1,4 +1,5 @@
 "use client";
+import { getAuthUser } from "@/stores/auth-store";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -15,14 +16,13 @@ import {
 import { getApiErrorMessage } from "@/lib/error";
 import { PAGE_SHELL } from "@/lib/page-shell";
 import PageLoading from "@/components/ui/PageLoading";
-import Cookies from "js-cookie";
 
 export default function ResultsHubPage() {
   const [events, setEvents] = useState<RaceEventListItemDto[]>([]);
   const [myRegs, setMyRegs] = useState<RegistrationDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const loggedIn = Boolean(Cookies.get("accessToken"));
+  const loggedIn = Boolean(getAuthUser());
 
   useEffect(() => {
     let cancelled = false;
@@ -30,7 +30,7 @@ export default function ResultsHubPage() {
       try {
         const list = await getEvents();
         if (!cancelled) setEvents(Array.isArray(list) ? list : []);
-        if (Cookies.get("accessToken")) {
+        if (getAuthUser()) {
           try {
             const regs = await getMyRegistrations();
             if (!cancelled) setMyRegs(Array.isArray(regs) ? regs : []);
