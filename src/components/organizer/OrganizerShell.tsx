@@ -1,9 +1,9 @@
 "use client";
+import { getAuthUser } from "@/stores/auth-store";
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import Cookies from "js-cookie";
 import { logout } from "@/api/auth";
 import { getEventById } from "@/api/events";
 import { getPackagePurchase } from "@/api/event-packages";
@@ -167,8 +167,8 @@ function useLoggedInUser() {
   });
 
   useEffect(() => {
-    const username = Cookies.get("username") || "User";
-    const avatarUrl = Cookies.get("avatar_url") || null;
+    const username = getAuthUser()?.username || "User";
+    const avatarUrl = getAuthUser()?.avatarUrl || null;
     setUser({
       username,
       initial: username.charAt(0).toUpperCase() || "U",

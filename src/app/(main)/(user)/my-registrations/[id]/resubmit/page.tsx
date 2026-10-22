@@ -328,7 +328,7 @@ export default function ResubmitRegistrationPage() {
     }
   };
 
-  if (loading) return <PageLoading label="Đang tải hồ sơ…" />;
+  if (loading) return <PageLoading title="Đang tải hồ sơ…" />;
 
   if (!form || !reg || reg.status !== "rejected") {
     return (

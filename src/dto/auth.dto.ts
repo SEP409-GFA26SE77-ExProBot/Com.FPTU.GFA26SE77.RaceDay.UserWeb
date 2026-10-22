@@ -48,7 +48,6 @@ export const LoginResponseSchema = z.object({
   username: z.string().optional(),
   fullName: z.string().optional(),
   email: z.string().optional(),
-  accessToken: z.string().optional(),
   role: z.string().optional(),
   mustChangePassword: z.boolean().optional(),
 });
@@ -98,6 +97,12 @@ export type ChangePasswordDto = z.infer<typeof ChangePasswordSchema>;
 
 /** GET / PUT api/v1/iam/me */
 export interface MyProfileDto {
+  roleId: string;
+  roleName: string | null;
+  profileDescription?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  idNumber?: string | null;
   id: string;
   email: string;
   username: string;
@@ -115,6 +120,8 @@ export interface MyProfileDto {
 /** Body PUT api/v1/iam/me */
 export interface UpdateMyProfileDto {
   fullName: string;
+  /** CCCD/CMND or passport number; empty string clears the saved value. */
+  idNumber?: string | null;
   phone?: string | null;
   dateOfBirth?: string | null;
   /** 0 Unknown | 1 Male | 2 Female */
@@ -144,3 +151,5 @@ export function profileDobToDateInput(iso?: string | null): string {
   const m = String(iso).match(/^(\d{4}-\d{2}-\d{2})/);
   return m ? m[1] : "";
 }
+
+export type AuthUser = MyProfileDto;

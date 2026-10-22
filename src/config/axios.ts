@@ -1,29 +1,14 @@
-import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
-import { BASE_URL } from "./global-config";
-import Cookies from 'js-cookie';
+import axios, { AxiosError } from "axios";
+import { useAuthStore } from "@/stores/auth-store";
 
 const api = axios.create({
-    baseURL: BASE_URL,
+    baseURL: "/api/backend/",
+    withCredentials: true,
     timeout: 15000,
     headers: {
         'Content-Type': 'application/json',
     }
 })
-
-api.interceptors.request.use(
-    (config: InternalAxiosRequestConfig) => {
-        if (typeof window !== 'undefined') {
-            const token = Cookies.get('accessToken');
-            if (token && config.headers) {
-                config.headers.Authorization = `Bearer ${token}`;
-            }
-        }
-        return config;
-    },
-    (error) => {
-        return Promise.reject(error);
-    }
-);
 
 api.interceptors.response.use(
     (response) => {
@@ -41,7 +26,8 @@ api.interceptors.response.use(
                     // Validation / business rule errors are handled and displayed directly by the calling UI forms
                     break;
                 case 401:
-                    Cookies.remove('accessToken');
+                    if (error.config?.url?.endsWith("/me")) return Promise.reject(error);
+                    useAuthStore.getState().clearAuth();
                     if (typeof window !== 'undefined') {
                         const currentPath = window.location.pathname;
                         if (currentPath !== '/login' && currentPath !== '/register' && currentPath !== '/verify-email') {
@@ -69,4 +55,4 @@ api.interceptors.response.use(
     }
 );
 
-export default api; 
+export default api;

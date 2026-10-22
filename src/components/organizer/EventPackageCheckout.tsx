@@ -18,7 +18,7 @@ import {
   User,
   Users,
 } from "lucide-react";
-import { getMyProfile, persistAvatarCookie } from "@/api/auth";
+import { getMyProfile, updateAuthAvatar } from "@/api/auth";
 import { getPackageCatalog, createPackagePurchase } from "@/api/event-packages";
 import { createPackageCheckout, syncPayment, mockPay, getPaymentStatus } from "@/api/payments";
 import type { MyProfileDto } from "@/dto/auth.dto";
@@ -94,7 +94,7 @@ export default function EventPackageCheckout() {
         if (cancelled) return;
         setCatalog(data);
         setProfile(me);
-        if (me?.avatarUrl) persistAvatarCookie(me.avatarUrl);
+        if (me?.avatarUrl) updateAuthAvatar(me.avatarUrl);
         if (data.durations.length > 0) setSelectedDuration(data.durations[0]);
         if (data.capacities.length > 0) setSelectedCapacity(data.capacities[0]);
       } catch (e) {

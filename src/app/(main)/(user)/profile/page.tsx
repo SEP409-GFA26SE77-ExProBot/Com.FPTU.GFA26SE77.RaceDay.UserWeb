@@ -1,10 +1,10 @@
 "use client";
+import { getAuthUser } from "@/stores/auth-store";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Cookies from "js-cookie";
 import { User, Ticket, LogIn, Pencil } from "lucide-react";
-import { getMyProfile, persistAvatarCookie } from "@/api/auth";
+import { getMyProfile, updateAuthAvatar } from "@/api/auth";
 import { getMyRegistrations } from "@/api/events";
 import {
   genderToFormValue,
@@ -38,11 +38,11 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = Cookies.get("accessToken");
-    const name = Cookies.get("username") || null;
-    setUsername(token ? name : null);
+    const authenticatedUser = getAuthUser();
+    const name = getAuthUser()?.username || null;
+    setUsername(authenticatedUser ? name : null);
 
-    if (!token) {
+    if (!authenticatedUser) {
       setLoading(false);
       return;
     }
@@ -59,7 +59,7 @@ export default function ProfilePage() {
         if (!cancelled) {
           setRegs(Array.isArray(list) ? list : []);
           setMe(profile);
-          if (profile?.avatarUrl) persistAvatarCookie(profile.avatarUrl);
+          if (profile?.avatarUrl) updateAuthAvatar(profile.avatarUrl);
           setError(null);
         }
       } catch (e) {
@@ -152,6 +152,12 @@ export default function ProfilePage() {
           </Link>
         </div>
         <div className="grid sm:grid-cols-2 gap-3 text-sm">
+          <div className="rounded-xl bg-muted/40 p-3">
+            <p className="text-[10px] uppercase text-muted-foreground font-semibold">
+              Identity number
+            </p>
+            <p className="font-medium break-all">{me?.idNumber || "—"}</p>
+          </div>
           <div className="rounded-xl bg-muted/40 p-3">
             <p className="text-[10px] uppercase text-muted-foreground font-semibold">
               Email

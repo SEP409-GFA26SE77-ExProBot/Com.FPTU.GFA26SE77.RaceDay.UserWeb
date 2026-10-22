@@ -1,4 +1,5 @@
 "use client";
+import { getAuthUser } from "@/stores/auth-store";
 import { useOrganizerToastState } from "@/lib/use-organizer-toast-state";
 import { useOrganizerErrorState } from "@/lib/use-organizer-error-state";
 
@@ -6,7 +7,6 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import Cookies from "js-cookie";
 import {
   Calendar,
   ClipboardList,
@@ -96,7 +96,7 @@ function MyEventDetailContent() {
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [reason, setReason] = useState("");
 
-  const username = Cookies.get("username") || "User";
+  const username = getAuthUser()?.username || "User";
 
   const notify = (msg: string) => {
     setToast(msg);
