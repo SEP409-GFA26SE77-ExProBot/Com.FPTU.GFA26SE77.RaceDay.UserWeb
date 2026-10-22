@@ -1,6 +1,7 @@
 import api from "@/config/axios";
 import { getApiErrorMessage } from "@/lib/error";
 import { invalidateEventCache } from "@/api/events";
+import type { OrganizerDistancesDetailDto, ReplaceEventDistancesRequest } from "@/dto/event-distance.dto";
 import type {
   PackageCatalogDto,
   CreatePackagePurchaseRequest,
@@ -59,10 +60,19 @@ export async function updateEventProfile(
   }
 }
 
-/** PUT /organizer/{eventId}/distances — replace distances (+ optional ticketPricing) */
+/** GET /organizer/{eventId}/distances — full organizer setup, including pricing. */
+export async function getOrganizerDistances(eventId: string): Promise<OrganizerDistancesDetailDto> {
+  try {
+    return (await api.get(`${EVENT_API}/organizer/${eventId}/distances`)) as OrganizerDistancesDetailDto;
+  } catch (e) {
+    throw new Error(getApiErrorMessage(e, "Không tải được cự ly và giá vé."));
+  }
+}
+
+/** PUT /organizer/{eventId}/distances — replace distances (+ ticketPricing) */
 export async function replaceEventDistances(
   eventId: string,
-  data: { distances: Record<string, unknown>[]; ticketPricing?: unknown }
+  data: ReplaceEventDistancesRequest
 ): Promise<unknown> {
   try {
     const result = await api.put(`${EVENT_API}/organizer/${eventId}/distances`, data);
