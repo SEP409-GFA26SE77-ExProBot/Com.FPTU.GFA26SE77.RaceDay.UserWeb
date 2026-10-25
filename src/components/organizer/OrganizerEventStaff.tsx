@@ -31,6 +31,7 @@ import type {
 } from "@/dto/event-staff.dto";
 import { getApiErrorMessage } from "@/lib/error";
 import { PAGE_SHELL } from "@/lib/page-shell";
+import { toastError, toastSuccess } from "@/lib/toast";
 
 const ROLE_TABS: {
   id: EventStaffRole;
@@ -58,6 +59,49 @@ const INVITE_ROLE_LABELS: Record<EventStaffRole, string> = {
   coordinator: "Điều phối viên",
   photographer: "Nhiếp ảnh gia",
   volunteer: "Tình nguyện viên",
+};
+
+/** Mẫu điền form mời — không gọi API cho đến khi bấm gửi. */
+const STAFF_FORM_PRESETS: Record<
+  EventStaffRole,
+  { fullName: string; email: string; phone: string; label: string }[]
+> = {
+  coordinator: [
+    {
+      label: "Điều hành chính",
+      fullName: "Nguyễn Văn Điều Hành",
+      email: "coordinator@example.com",
+      phone: "0901000001",
+    },
+    {
+      label: "Y tế giải",
+      fullName: "Trần Thị Y Tế",
+      email: "medic@example.com",
+      phone: "0901000002",
+    },
+  ],
+  photographer: [
+    {
+      label: "Photographer KM5",
+      fullName: "Lê Minh Ảnh",
+      email: "photo.km5@example.com",
+      phone: "0901000003",
+    },
+  ],
+  volunteer: [
+    {
+      label: "Tình nguyện viên kit",
+      fullName: "Phạm Quốc Tình Nguyện",
+      email: "volunteer.kit@example.com",
+      phone: "0901000004",
+    },
+    {
+      label: "Check-in desk",
+      fullName: "Hoàng Thị Check-in",
+      email: "checkin@example.com",
+      phone: "0901000005",
+    },
+  ],
 };
 
 function StationPicker({
@@ -339,6 +383,7 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
       });
       setInviteOpen(false);
       resetForm();
+      toastSuccess("Đã gửi lời mời nhân sự.");
       await load();
       setToast("Đã mời nhân sự vào giải.");
     } catch (e) {
@@ -357,10 +402,11 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
         stationId: nextStation || null,
         stationLabel: nextStation ? stationLabelOf(nextStation) ?? null : null,
       });
+      toastSuccess("Đã cập nhật vị trí.");
       await load();
       setToast("Đã cập nhật vị trí nhân sự.");
     } catch (e) {
-      setError(getApiErrorMessage(e, "Gán vị trí thất bại."));
+      toastError(e, "Gán vị trí thất bại.");
     } finally {
       setBusy(false);
     }
@@ -370,14 +416,14 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
     if (!revokeTarget) return;
     const memberId = revokeTarget.id;
     setBusy(true);
-    setError(null);
     try {
       await revokeEventStaff(eventId, memberId);
       setRevokeTarget(null);
+      toastSuccess("Đã gỡ nhân sự khỏi giải.");
       await load();
       setToast("Đã gỡ nhân sự khỏi giải.");
     } catch (e) {
-      setError(getApiErrorMessage(e, "Gỡ thất bại."));
+      toastError(e, "Gỡ thất bại.");
     } finally {
       setBusy(false);
     }
@@ -437,6 +483,30 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
         ))}
       </div>
       <p className="text-xs text-muted-foreground">{roleMeta.hint}</p>
+      <div className="rounded-2xl border border-border/60 bg-card p-3 shadow-sm">
+        <p className="text-xs font-bold text-foreground">Mẫu sẵn có (điền form)</p>
+        <p className="mt-0.5 text-[11px] text-muted-foreground">
+          Chọn mẫu để mở form mời — chỉnh email thật trước khi gửi.
+        </p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {STAFF_FORM_PRESETS[role].map((p) => (
+            <button
+              key={p.email}
+              type="button"
+              onClick={() => {
+                setFullName(p.fullName);
+                setEmail(p.email);
+                setPhone(p.phone);
+                setFormError(null);
+                setInviteOpen(true);
+              }}
+              className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-[11px] font-bold text-orange-700 hover:bg-orange-100"
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
       {stations.filter((s) => s.source === "map").length === 0 ? (
         <p className="rounded-xl border border-amber-200/80 bg-amber-50 px-3 py-2 text-xs text-amber-900">
           Chưa có điểm map phù hợp role này. Vào{" "}

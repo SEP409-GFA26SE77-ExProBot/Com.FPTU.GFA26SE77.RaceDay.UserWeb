@@ -61,7 +61,10 @@ export async function getEventCoursePublic(
 
   const url = `/api/backend/${MAP_API}/events/${encodeURIComponent(eventId)}/distances/${encodeURIComponent(distanceId)}/course`;
   try {
-    const res = await fetch(url, { headers: { Accept: "application/json" }, credentials: "same-origin" });
+    const res = await fetch(url, {
+      headers: { Accept: "application/json" },
+      credentials: "same-origin",
+    });
     if (!res.ok) return null;
     const body: unknown = await res.json();
     const c = unwrapCourse(body);

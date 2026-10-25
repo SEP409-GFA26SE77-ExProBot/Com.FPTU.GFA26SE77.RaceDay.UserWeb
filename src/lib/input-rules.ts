@@ -14,13 +14,16 @@ export const MAX_WEIGHT_KG = 250;
 const VN_MOBILE = /^(0|\+84)(3|5|7|8|9)\d{8}$/;
 /** CCCD/CMND: 9 hoặc 12 chữ số */
 const VN_ID = /^\d{9}$|^\d{12}$/;
+/** Hộ chiếu: bắt đầu bằng chữ, 6–12 ký tự chữ/số (VD: B1234567) */
+const PASSPORT = /^[A-Za-z][A-Za-z0-9]{5,11}$/;
 /** ABO ± Rh */
 const BLOOD_TYPE = /^(A|B|AB|O)([+-])?$/i;
 
 export const MSG = {
   phone: "Số điện thoại không hợp lệ.",
   dateOfBirth: "Ngày sinh không hợp lệ.",
-  idNumber: "Số CCCD/CMND phải gồm 9 hoặc 12 chữ số.",
+  idNumber:
+    "Số CCCD/CMND phải gồm 9 hoặc 12 chữ số; hộ chiếu 6–12 ký tự bắt đầu bằng chữ (VD: B1234567).",
   idNumberRequired: "Vui lòng nhập số CCCD / hộ chiếu.",
   bloodType: "Nhóm máu không hợp lệ (VD: O, A, B, AB hoặc O+/A-/…).",
   bloodTypeRequired: "Vui lòng chọn nhóm máu.",
@@ -85,13 +88,13 @@ export function isValidDateOfBirth(isoDate: string, today = new Date()): boolean
 }
 
 export function isValidOptionalIdNumber(idNumber: string): boolean {
-  const t = idNumber.trim();
-  return !t || VN_ID.test(t) || /^[A-Za-z][A-Za-z0-9]{5,11}$/.test(t);
+  const t = idNumber.trim().toUpperCase();
+  return !t || VN_ID.test(t) || PASSPORT.test(t);
 }
 
 export function isValidRequiredIdNumber(idNumber: string): boolean {
-  const t = idNumber.trim();
-  return Boolean(t) && VN_ID.test(t);
+  const t = idNumber.trim().toUpperCase();
+  return Boolean(t) && (VN_ID.test(t) || PASSPORT.test(t));
 }
 
 export function isValidOptionalBloodType(bloodType: string): boolean {

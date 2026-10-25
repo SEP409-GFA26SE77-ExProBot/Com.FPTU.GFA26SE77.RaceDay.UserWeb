@@ -11,7 +11,6 @@ import {
   MapPin,
   PencilRuler,
   Trash2,
-  Undo2,
   X,
 } from "lucide-react";
 import { useCourse, type SetupTool } from "@/components/organizer/race-map/CourseContext";
@@ -53,13 +52,15 @@ const TOOLS: {
   {
     id: "checkpoint",
     short: "Checkpoint",
-    hint: "Click sát đường đua để đặt CP timing",
+    hint:
+      "Checkpoint phải nằm trên đường chạy (≤45m). Điểm ngoài route sẽ bị từ chối — click sát đường cam.",
     icon: MapPin,
   },
   {
     id: "aid",
     short: "Điểm tiếp tế",
-    hint: "Click sát đường đua để đặt điểm tiếp tế",
+    hint:
+      "Điểm tiếp tế phải trên đường chạy (≤45m). Click sát đường cam — không đặt ngoài route.",
     icon: Droplets,
   },
 ];
@@ -85,11 +86,7 @@ export default function OrganizerSetupMap() {
     renameCheckpoint,
     removeMidCheckpoint,
     clearCourse,
-    undo,
-    canUndo,
     snapping,
-    snapError,
-    mapHint,
     applyCourse,
     startEndPhase,
   } = useCourse();
@@ -141,22 +138,14 @@ export default function OrganizerSetupMap() {
   return (
     <div className="grid h-full min-h-0 grid-cols-1 gap-3 xl:grid-cols-[260px_1fr]">
       <aside className={`${panel} flex min-h-0 flex-col gap-2.5 overflow-hidden p-3`}>
-        <div className="shrink-0 rounded-lg bg-muted/40 px-2.5 py-1.5 text-[11px] text-muted-foreground">
-          <p className="font-semibold text-foreground">
+        <div className="shrink-0 rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5 text-sm text-muted-foreground">
+          <p className="text-sm font-bold text-foreground">
             {snapping ? "Đang snap…" : routeStatus}
           </p>
-          {mapHint ? (
-            <p className="mt-0.5 text-orange-600">{mapHint}</p>
-          ) : (
-            <p className="mt-0.5">{toolMeta.hint}</p>
-          )}
-        </div>
-
-        {snapError ? (
-          <p className="rounded-lg border border-red-500/25 bg-red-500/5 px-2.5 py-2 text-[11px] text-red-700">
-            {snapError}
+          <p className="mt-1 text-sm leading-snug text-foreground/80">
+            {toolMeta.hint}
           </p>
-        ) : null}
+        </div>
 
         <div className="min-h-0 flex-1 space-y-2 border-t border-border/60 pt-3">
           <p className="text-xs font-bold text-foreground">
@@ -263,15 +252,6 @@ export default function OrganizerSetupMap() {
               }`}
             >
               <Eye className="h-3.5 w-3.5" /> View
-            </button>
-            <button
-              type="button"
-              onClick={undo}
-              disabled={!canUndo}
-              title="Hoàn tác thay đổi gần nhất"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-white px-3 py-2 text-xs font-bold text-muted-foreground hover:border-orange-400/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <Undo2 className="h-3.5 w-3.5" /> Hoàn tác
             </button>
             <button
               type="button"

@@ -330,7 +330,7 @@ function MyEventDetailContent() {
                           {d.distanceKm}K
                         </td>
                         <td className="py-3 pr-3 font-bold text-orange-600">
-                          {formatPrice(d.price)}
+                          {formatPrice(d.price ?? d.basePrice ?? 0)}
                         </td>
                         <td className="py-3 text-muted-foreground">
                           {(d.registeredCount ?? 0).toLocaleString("vi-VN")} /{" "}

@@ -4,8 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { register } from "@/api/auth";
-import { Eye, EyeOff, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
-import { getApiErrorMessage, getZodFieldErrors } from "@/lib/error";
+import { Eye, EyeOff, Loader2, CheckCircle2 } from "lucide-react";
+import { getZodFieldErrors } from "@/lib/error";
+import { toastError } from "@/lib/toast";
 import { RegisterFormSchema } from "@/dto/auth.dto";
 
 interface RegisterForm {
@@ -43,7 +44,6 @@ export default function RegisterPage() {
   const [showPw, setShowPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [success, setSuccess] = useState(false);
 
@@ -52,7 +52,6 @@ export default function RegisterPage() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
-    setError(null);
     setFieldErrors((prev) => {
       if (!prev[name]) return prev;
       const next = { ...prev };
@@ -69,7 +68,6 @@ export default function RegisterPage() {
       return;
     }
     setLoading(true);
-    setError(null);
     setFieldErrors({});
     try {
       const { confirmPassword: _confirmPassword, ...payload } = parsed.data;
@@ -83,7 +81,7 @@ export default function RegisterPage() {
         1500
       );
     } catch (err) {
-      setError(getApiErrorMessage(err, "Đăng ký thất bại. Vui lòng thử lại."));
+      toastError(err, "Đăng ký thất bại. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
@@ -118,12 +116,6 @@ export default function RegisterPage() {
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="auth-form" noValidate>
-        {error && (
-          <div className="auth-error" role="alert">
-            <AlertCircle size={16} />
-            <span>{error}</span>
-          </div>
-        )}
 
         {/* 2-col grid on large screens */}
         <div className="auth-grid">

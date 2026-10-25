@@ -45,23 +45,9 @@ export function inputToTimeOnly(t: string): string | null {
   return t.length === 5 ? `${t}:00` : t;
 }
 
-export const PROFILE_DOC_TYPES = [
-  {
-    id: "official-letter",
-    title: "Công văn đề nghị cấp phép",
-    description: "Văn bản của doanh nghiệp gửi UBND Thành phố/Sở Văn hóa và Thể thao.",
-    required: true,
-  },
-  {
-    id: "security",
-    title: "Phương án an ninh, trật tự và PCCC",
-    description: "Bảo vệ, phân luồng, y tế, phòng cháy chữa cháy và môi trường.",
-    required: true,
-  },
-  {
-    id: "other-documents",
-    title: "Các tài liệu khác",
-    description: "Kế hoạch tổ chức, chương trình thi đấu, điều lệ giải và các tài liệu bổ sung (nếu có).",
-    required: false,
-  },
-] as const;
+export {
+  PROFILE_DOC_TYPES,
+  LEGACY_OPTIONAL_DOC_KEYS,
+  LEGACY_OPTIONAL_DOC_META,
+  isPlanRelatedDocument,
+} from "@/lib/event-profile-docs";

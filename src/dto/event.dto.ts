@@ -5,40 +5,38 @@ export interface CoordinatesDto {
   lng: number;
 }
 
-export interface DistanceLocationDto {
-  name: string;
-  lat: number;
-  lng: number;
-}
-
 export interface EventDistanceDto {
   id: string;
   type: string;
   name: string;
   distanceKm: number;
-  elevationGainM?: number;
-  maxElevationM?: number;
-  minElevationM?: number;
   capacity: number;
-  price: number;
+  /** Giá gốc / fallback khi không có type ticket đang mở */
+  basePrice: number;
+  /** @deprecated dùng basePrice */
+  price?: number;
   currency: string;
   color?: string;
   /** Giờ xuất phát cự ly (HH:mm:ss) */
   startAt?: string | null;
   /** Giờ kết thúc / cutoff cự ly */
   endAt?: string | null;
-  startLocation?: DistanceLocationDto;
-  finishLocation?: DistanceLocationDto;
   checkpoints?: unknown[] | null;
   osrmWaypoints?: unknown | null;
   leafletPolyline?: unknown | null;
   geoJson?: unknown | null;
   // Computed / returned by BE
   registeredCount?: number;
+  /** Prefix BIB theo cự ly (vd. 5K, HM) */
+  bibPrefix?: string | null;
+  /** Từ số dải (1–9999) */
+  bibRangeStart?: number | null;
+  /** Đến số dải (1–9999) */
+  bibRangeEnd?: number | null;
 }
 
-/** ticketPricing JSON — ma trận phase × cự ly (key = tên cự ly) */
-export interface TicketPricingPhaseDto {
+/** Legacy matrix type × distance name */
+export interface TicketPricingTypeMatrixDto {
   key: string;
   name: string;
   dateFrom: string;
@@ -46,20 +44,27 @@ export interface TicketPricingPhaseDto {
   pricesByDistanceName: Record<string, number>;
 }
 
+export interface TicketPricingTypeDto {
+  key?: string;
+  name?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  price?: number;
+}
+
 export interface TicketPricingByDistanceDto {
   basePrice?: number;
-  phases?: Array<{
-    key?: string;
-    name?: string;
-    dateFrom?: string;
-    dateTo?: string;
-    price?: number;
-  }>;
+  /** Đợt giá (early / late / …) — tên tự đặt, không hardcode */
+  types?: TicketPricingTypeDto[];
+  /** @deprecated đọc legacy — dùng types */
+  phases?: TicketPricingTypeDto[];
 }
 
 export interface TicketPricingDto {
-  /** Legacy matrix phase × distance name */
-  phases?: TicketPricingPhaseDto[];
+  /** Legacy matrix */
+  types?: TicketPricingTypeMatrixDto[];
+  /** @deprecated đọc legacy — dùng types */
+  phases?: TicketPricingTypeMatrixDto[];
   /** Format hồ sơ distances hiện tại */
   byDistanceName?: Record<string, TicketPricingByDistanceDto>;
 }
@@ -120,6 +125,12 @@ export interface RaceEventDto {
   packageExpiresAtUtc?: string | null;
   registrationOpensAtUtc?: string | null;
   registrationClosesAtUtc?: string | null;
+  /** @deprecated Legacy cấp giải — SoT BIB nằm trên distances[].bib* */
+  bibPrefix?: string | null;
+  /** @deprecated Legacy cấp giải — dùng distances[].bibRangeStart */
+  bibRangeStart?: number | null;
+  /** @deprecated Legacy cấp giải — dùng distances[].bibRangeEnd */
+  bibRangeEnd?: number | null;
   createdAt?: string;
   updatedAt?: string;
   createdAtUtc?: string;

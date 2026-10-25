@@ -4,8 +4,9 @@ import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { login } from "@/api/auth";
-import { Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
-import { getApiErrorMessage, getZodFieldErrors } from "@/lib/error";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { getZodFieldErrors } from "@/lib/error";
+import { toastError } from "@/lib/toast";
 import { LoginSchema } from "@/dto/auth.dto";
 
 function LoginForm() {
@@ -20,14 +21,12 @@ function LoginForm() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [mustChangePasswordHint, setMustChangePasswordHint] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
-    setError(null);
     setFieldErrors((prev) => {
       if (!prev[name]) return prev;
       const next = { ...prev };
@@ -44,7 +43,6 @@ function LoginForm() {
       return;
     }
     setLoading(true);
-    setError(null);
     setFieldErrors({});
     try {
       const res = await login(parsed.data);
@@ -54,12 +52,7 @@ function LoginForm() {
       }
       router.push(fromPath);
     } catch (err) {
-      setError(
-        getApiErrorMessage(
-          err,
-          "Tên đăng nhập/email hoặc mật khẩu không chính xác."
-        )
-      );
+      toastError(err, "Tên đăng nhập/email hoặc mật khẩu không chính xác.");
     } finally {
       setLoading(false);
     }
@@ -86,12 +79,6 @@ function LoginForm() {
       {/* Form */}
       <form onSubmit={handleSubmit} className="auth-form" noValidate>
         {/* Error */}
-        {error && (
-          <div className="auth-error" role="alert">
-            <AlertCircle size={16} />
-            <span>{error}</span>
-          </div>
-        )}
 
         {/* Username / Email */}
         <div className="auth-field">

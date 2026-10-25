@@ -4,6 +4,7 @@ import type {
   LeaderboardGender,
   LeaderboardPageDto,
 } from "@/dto/leaderboard.dto";
+import { normalizeDistanceType } from "@/lib/distance-types";
 
 export const LEADERBOARD_GENDERS: {
   value: LeaderboardGender;
@@ -16,11 +17,14 @@ export const LEADERBOARD_GENDERS: {
 ];
 
 export function distanceCategory(distance: LeaderboardDistanceDto): string {
+  // Ưu tiên type chip BXH đã lưu; fallback suy từ km (map vẫn dùng distanceKm).
+  const fromType = normalizeDistanceType(distance.type, distance.distanceKm);
+  if (fromType !== "OTHER") return fromType;
   if (Math.abs(distance.distanceKm - 42.195) < 0.3) return "M";
   if (Math.abs(distance.distanceKm - 21.0975) < 0.2) return "HM";
   return distance.distanceKm > 0
-    ? `${distance.distanceKm}KM`
-    : distance.type.toUpperCase();
+    ? `${distance.distanceKm}KM`.replace(/\.0+KM$/, "KM")
+    : fromType;
 }
 
 export function leaderboardEntryKey(entry: LeaderboardEntryDto): string {

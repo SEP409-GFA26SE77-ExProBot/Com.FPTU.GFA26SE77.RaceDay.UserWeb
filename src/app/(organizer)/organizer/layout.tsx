@@ -1,7 +1,5 @@
 import { requireServerUser } from "@/lib/require-server-user";
 import { Suspense } from "react";
-import { ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
 import OrganizerShell from "@/components/organizer/OrganizerShell";
 
 export default async function OrganizerDetailLayout({
@@ -18,19 +16,7 @@ export default async function OrganizerDetailLayout({
         </div>
       }
     >
-      <OrganizerShell>
-        {children}
-        <ToastContainer
-          position="top-center"
-          autoClose={5000}
-          closeOnClick
-          pauseOnHover
-          draggable
-          hideProgressBar
-          icon={false}
-          toastClassName="organizer-toast"
-        />
-      </OrganizerShell>
+      <OrganizerShell>{children}</OrganizerShell>
     </Suspense>
   );
 }

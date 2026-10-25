@@ -46,6 +46,19 @@ export async function getPackagePurchase(
   }
 }
 
+/** POST /organizer/packages/purchases/{id}/cancel — hủy đơn chờ thanh toán */
+export async function cancelPackagePurchase(
+  id: string
+): Promise<PackagePurchaseDto> {
+  try {
+    return (await api.post(
+      `${EVENT_API}/organizer/packages/purchases/${id}/cancel`
+    )) as PackagePurchaseDto;
+  } catch (e) {
+    throw new Error(getApiErrorMessage(e, "Hủy đơn mua gói thất bại."));
+  }
+}
+
 /** PUT /organizer/{eventId}/profile — update draft event fields */
 export async function updateEventProfile(
   eventId: string,
@@ -60,10 +73,40 @@ export async function updateEventProfile(
   }
 }
 
-/** GET /organizer/{eventId}/distances — full organizer setup, including pricing. */
-export async function getOrganizerDistances(eventId: string): Promise<OrganizerDistancesDetailDto> {
+/** GET /organizer/{eventId}/distances — cự ly, giá vé và cấu hình BIB (organizer setup) */
+export async function getOrganizerDistances(
+  eventId: string
+): Promise<
+  OrganizerDistancesDetailDto & {
+    distances: Array<
+      OrganizerDistancesDetailDto["distances"][number] & {
+        /** Chip BXH: 3KM, HM… */
+        type?: string;
+        /** @deprecated */
+        price?: number;
+        bibPrefix?: string | null;
+        bibRangeStart?: number | null;
+        bibRangeEnd?: number | null;
+      }
+    >;
+    ticketPricing?: OrganizerDistancesDetailDto["ticketPricing"] | unknown;
+  }
+> {
   try {
-    return (await api.get(`${EVENT_API}/organizer/${eventId}/distances`)) as OrganizerDistancesDetailDto;
+    return (await api.get(
+      `${EVENT_API}/organizer/${eventId}/distances`
+    )) as OrganizerDistancesDetailDto & {
+      distances: Array<
+        OrganizerDistancesDetailDto["distances"][number] & {
+          type?: string;
+          price?: number;
+          bibPrefix?: string | null;
+          bibRangeStart?: number | null;
+          bibRangeEnd?: number | null;
+        }
+      >;
+      ticketPricing?: OrganizerDistancesDetailDto["ticketPricing"] | unknown;
+    };
   } catch (e) {
     throw new Error(getApiErrorMessage(e, "Không tải được cự ly và giá vé."));
   }
@@ -80,6 +123,27 @@ export async function replaceEventDistances(
     return result;
   } catch (e) {
     throw new Error(getApiErrorMessage(e, "Cập nhật cự ly thất bại."));
+  }
+}
+
+/** PUT /organizer/{eventId}/bib-configs — dải BIB theo từng cự ly */
+export async function replaceEventBibConfigs(
+  eventId: string,
+  distances: Array<{
+    distanceId: string;
+    bibPrefix?: string | null;
+    bibRangeStart: number;
+    bibRangeEnd: number;
+  }>
+): Promise<unknown> {
+  try {
+    const result = await api.put(`${EVENT_API}/organizer/${eventId}/bib-configs`, {
+      distances,
+    });
+    invalidateEventCache(eventId);
+    return result;
+  } catch (e) {
+    throw new Error(getApiErrorMessage(e, "Lưu cấu hình BIB thất bại."));
   }
 }
 

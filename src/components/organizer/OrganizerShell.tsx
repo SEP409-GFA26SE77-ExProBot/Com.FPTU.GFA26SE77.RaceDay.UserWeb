@@ -32,6 +32,7 @@ import {
   Building2,
   PackagePlus,
   Boxes,
+  Hash,
 } from "lucide-react";
 
 function eventIdFromPath(pathname: string): string | null {
@@ -79,12 +80,6 @@ function eventWorkspaceGroups(eventId: string): NavGroup[] {
           tab: "approvals",
         },
         {
-          label: "Thiết lập bản đồ",
-          href: `${base}/setup-map`,
-          icon: Map,
-          matchPath: `${base}/setup-map`,
-        },
-        {
           label: "Giả lập đua",
           href: `${base}/race-simulation`,
           icon: Flag,
@@ -119,6 +114,12 @@ function eventWorkspaceGroups(eventId: string): NavGroup[] {
       heading: "Chi tiết giải",
       items: [
         {
+          label: "Tổng hợp",
+          href: `${base}/profile/overview`,
+          icon: LayoutDashboard,
+          matchPath: `${base}/profile/overview`,
+        },
+        {
           label: "Thông tin cơ bản",
           href: `${base}/profile/basic`,
           icon: Building2,
@@ -129,6 +130,18 @@ function eventWorkspaceGroups(eventId: string): NavGroup[] {
           href: `${base}/profile/distances`,
           icon: Route,
           matchPath: `${base}/profile/distances`,
+        },
+        {
+          label: "Cấu hình BIB",
+          href: `${base}/profile/bib`,
+          icon: Hash,
+          matchPath: `${base}/profile/bib`,
+        },
+        {
+          label: "Thiết lập bản đồ",
+          href: `${base}/setup-map`,
+          icon: Map,
+          matchPath: `${base}/setup-map`,
         },
         {
           label: "Giấy phép & tài liệu",

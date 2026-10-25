@@ -1,6 +1,7 @@
 import AuthProvider from "@/components/AuthProvider";
 import type { Metadata } from "next";
 import { Inter, Roboto_Mono } from "next/font/google";
+import ToastProvider from "@/components/providers/ToastProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -33,7 +34,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="vi"
       className={`${inter.variable} ${robotoMono.variable} h-full antialiased`}
     >
-      <body className={`${inter.className} min-h-full flex flex-col font-sans`}><AuthProvider>{children}</AuthProvider></body>
+      <body className={`${inter.className} min-h-full flex flex-col font-sans`}>
+        <AuthProvider>{children}</AuthProvider>
+        <ToastProvider />
+      </body>
     </html>
   );
 }

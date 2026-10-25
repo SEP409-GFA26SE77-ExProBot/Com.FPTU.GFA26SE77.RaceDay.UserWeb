@@ -16,7 +16,12 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(login);
     }
     if (user && authPage) return NextResponse.redirect(new URL("/", request.url));
-    if (user && permission !== null && permission !== "*" && !permission.includes(mapAppRole(user.roleName))) {
+    if (
+      user &&
+      permission !== null &&
+      permission !== "*" &&
+      !permission.includes(mapAppRole(user.roleName))
+    ) {
       return NextResponse.redirect(new URL("/403", request.url));
     }
     return NextResponse.next();
@@ -24,4 +29,7 @@ export async function proxy(request: NextRequest) {
     return new NextResponse("Authentication service unavailable", { status: 503 });
   }
 }
-export const config = { matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\..*).*)"] };
+
+export const config = {
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\..*).*)"],
+};

@@ -20,9 +20,17 @@ export interface OrganizerDistanceDto {
   capacity: number;
   registeredCount: number;
   basePrice: number;
+  /** Alias legacy — một số response cũ dùng `price` thay `basePrice`. */
+  price?: number;
   currency: string;
+  /** Chip BXH / BIB prefix: 5KM | HM | M | OTHER … */
+  type?: string | null;
   startAt?: string | null;
   endAt?: string | null;
+  bibPrefix?: string | null;
+  bibStartNumber?: number | null;
+  bibEndNumber?: number | null;
+  bibNextNumber?: number | null;
 }
 
 export interface OrganizerDistancesDetailDto {
