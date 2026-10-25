@@ -1,5 +1,5 @@
 "use client";
-import { isLoggedIn } from "@/lib/auth-cookie";
+import { getAuthUser } from "@/stores/auth-store";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -15,7 +15,7 @@ export default function CertificatesPage() {
   const [regs, setRegs] = useState<RegistrationDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const loggedIn = isLoggedIn();
+  const loggedIn = Boolean(getAuthUser());
 
   useEffect(() => {
     if (!loggedIn) {

@@ -1,5 +1,5 @@
 "use client";
-import { getAccessToken, isLoggedIn } from "@/lib/auth-cookie";
+import { getAuthUser } from "@/stores/auth-store";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -22,7 +22,7 @@ export default function ResultsHubPage() {
   const [myRegs, setMyRegs] = useState<RegistrationDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const loggedIn = isLoggedIn();
+  const loggedIn = Boolean(getAuthUser());
 
   useEffect(() => {
     let cancelled = false;
@@ -30,7 +30,7 @@ export default function ResultsHubPage() {
       try {
         const list = await getEvents();
         if (!cancelled) setEvents(Array.isArray(list) ? list : []);
-        if (getAccessToken()) {
+        if (getAuthUser()) {
           try {
             const regs = await getMyRegistrations();
             if (!cancelled) setMyRegs(Array.isArray(regs) ? regs : []);

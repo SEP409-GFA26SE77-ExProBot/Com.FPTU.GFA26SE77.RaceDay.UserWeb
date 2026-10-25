@@ -1,5 +1,5 @@
 "use client";
-import { getAccessToken } from "@/lib/auth-cookie";
+import { getAuthUser } from "@/stores/auth-store";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -180,9 +180,9 @@ export default function MyEventsClient() {
   } | null>(null);
 
   useEffect(() => {
-    const token = getAccessToken();
-    setLoggedIn(Boolean(token));
-    if (!token) {
+    const authenticatedUser = getAuthUser();
+    setLoggedIn(Boolean(authenticatedUser));
+    if (!authenticatedUser) {
       setReady(true);
       return;
     }

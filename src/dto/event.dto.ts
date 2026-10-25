@@ -165,7 +165,7 @@ export interface CreateRegistrationDto {
   fullName: string;
   email: string;
   phone: string;
-  dateOfBirth: string;
+  dateOfBirth?: string;
   gender: string;
   idNumber?: string;
   heightCm?: number;

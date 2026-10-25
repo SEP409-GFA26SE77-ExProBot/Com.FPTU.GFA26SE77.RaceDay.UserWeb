@@ -163,6 +163,7 @@ export default function OrganizerSetupMap() {
                 {isMidEditable(cp.type) ? (
                   <input
                     value={cp.name}
+                    disabled={snapping}
                     onChange={(e) => renameCheckpoint(cp.km, e.target.value)}
                     className="min-w-0 flex-1 rounded border border-border bg-background px-1.5 py-1"
                   />
@@ -178,6 +179,7 @@ export default function OrganizerSetupMap() {
                   <button
                     type="button"
                     onClick={() => removeMidCheckpoint(cp.km)}
+                    disabled={snapping}
                     className="text-red-500 hover:text-red-600"
                     title="Xóa điểm"
                   >
@@ -254,6 +256,7 @@ export default function OrganizerSetupMap() {
             <button
               type="button"
               onClick={clearCourse}
+              disabled={snapping}
               className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-white px-3 py-2 text-xs font-bold text-muted-foreground hover:border-orange-400/60 hover:text-foreground"
             >
               <Trash2 className="h-3.5 w-3.5" /> Xóa

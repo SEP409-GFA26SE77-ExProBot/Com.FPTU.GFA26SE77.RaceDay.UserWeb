@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef, useSyncExternalStore } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import Cookies from "js-cookie";
+import { useAuthStore } from "@/stores/auth-store";
 import { logout } from "@/api/auth";
 import { Role } from "@/interfaces/role";
 import { mapAppRole } from "@/lib/role";
@@ -26,7 +26,7 @@ import {
   LayoutDashboard,
   Wallet,
 } from "lucide-react";
-import { extractRoleFromToken } from "@/lib/jwt";
+
 
 interface NavLink {
   label: string;
@@ -49,60 +49,6 @@ const NAV_LINKS: NavLink[] = [
   { label: "Kết quả", href: "/results", icon: Trophy },
   { label: "Tìm ảnh", href: "/photos", icon: Camera },
 ];
-
-let cachedAuthRaw = "";
-let cachedAuthState = {
-  isLoggedIn: false,
-  username: null as string | null | undefined,
-  role: null as string | null,
-  avatarUrl: null as string | null,
-};
-
-function getAuthSnapshot() {
-  const accessToken =
-    Cookies.get("access_token") || Cookies.get("accessToken") || "";
-  const username = Cookies.get("username");
-  const rawRole = Cookies.get("role") || "";
-  const avatarUrl = Cookies.get("avatar_url") || "";
-  // USER (IAM) / trống → RUNNER để hiện Vé, Chứng nhận, menu runner
-  const role = accessToken
-    ? mapAppRole(rawRole || extractRoleFromToken(accessToken) || Role.RUNNER)
-    : "";
-  // Đồng bộ cookie nếu còn lưu USER cũ
-  if (accessToken && rawRole && mapAppRole(rawRole) !== rawRole.toUpperCase()) {
-    Cookies.set("role", role, { sameSite: "lax", path: "/" });
-  }
-  const raw = `${accessToken}:${username}:${role}:${avatarUrl}`;
-  if (raw !== cachedAuthRaw) {
-    cachedAuthRaw = raw;
-    cachedAuthState = {
-      isLoggedIn: Boolean(accessToken),
-      username: accessToken ? username : null,
-      role: accessToken && role ? role : null,
-      avatarUrl: accessToken && avatarUrl ? avatarUrl : null,
-    };
-  }
-  return cachedAuthState;
-}
-
-const SERVER_AUTH_SNAPSHOT = {
-  isLoggedIn: false,
-  username: null as string | null,
-  role: null as string | null,
-  avatarUrl: null as string | null,
-};
-
-function subscribeAuth(callback: () => void) {
-  window.addEventListener("focus", callback);
-  window.addEventListener("storage", callback);
-  // Cookie set sau login cùng tab — poll nhẹ khi focus chưa đủ
-  const id = window.setInterval(callback, 2000);
-  return () => {
-    window.removeEventListener("focus", callback);
-    window.removeEventListener("storage", callback);
-    window.clearInterval(id);
-  };
-}
 
 function UserAvatarMark({
   username,
@@ -138,11 +84,11 @@ function UserAvatarMark({
 
 export default function Header() {
   const pathname = usePathname();
-  const { isLoggedIn, username, role, avatarUrl } = useSyncExternalStore(
-    subscribeAuth,
-    getAuthSnapshot,
-    () => SERVER_AUTH_SNAPSHOT,
-  );
+  const user = useAuthStore((state) => state.user);
+  const isLoggedIn = Boolean(user);
+  const username = user?.username;
+  const role = user ? mapAppRole(user.roleName) : null;
+  const avatarUrl = user?.avatarUrl || null;
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -541,10 +487,10 @@ export default function Header() {
                     <Link
                       href="/my-events"
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                        pathname.startsWith("/my-events")
-                          ? "bg-orange-500/10 text-orange-600 font-semibold"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
-                      }`}
+                      pathname.startsWith("/my-events")
+                        ? "bg-orange-500/10 text-orange-600 font-semibold"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
+                    }`}
                     >
                       <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
                       Quản lý giải của tôi
@@ -552,10 +498,10 @@ export default function Header() {
                     <Link
                       href="/wallet"
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                        pathname.startsWith("/wallet")
-                          ? "bg-orange-500/10 text-orange-600 font-semibold"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
-                      }`}
+                      pathname.startsWith("/wallet")
+                        ? "bg-orange-500/10 text-orange-600 font-semibold"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
+                    }`}
                       onClick={closeMenus}
                     >
                       <Wallet className="h-4 w-4 text-muted-foreground" />

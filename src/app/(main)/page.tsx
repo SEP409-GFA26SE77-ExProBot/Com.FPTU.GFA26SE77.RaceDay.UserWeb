@@ -1,5 +1,5 @@
 "use client";
-import { getAccessToken } from "@/lib/auth-cookie";
+import { getAuthUser } from "@/stores/auth-store";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -55,7 +55,7 @@ export default function Home() {
 
   useEffect(() => {
     let cancelled = false;
-    if (!getAccessToken()) {
+    if (!getAuthUser()) {
       setMyRegByEventId(new Map());
       return;
     }

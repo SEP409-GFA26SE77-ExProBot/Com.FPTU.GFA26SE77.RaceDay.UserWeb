@@ -1,5 +1,5 @@
 "use client";
-import { getAccessToken } from "@/lib/auth-cookie";
+import { getAuthUser } from "@/stores/auth-store";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -19,9 +19,9 @@ export default function WalletHubPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = getAccessToken();
-    setLoggedIn(Boolean(token));
-    if (!token) {
+    const authenticatedUser = getAuthUser();
+    setLoggedIn(Boolean(authenticatedUser));
+    if (!authenticatedUser) {
       setBoot(false);
       return;
     }

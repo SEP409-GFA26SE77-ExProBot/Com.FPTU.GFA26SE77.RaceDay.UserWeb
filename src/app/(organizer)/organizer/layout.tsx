@@ -1,11 +1,13 @@
+import { requireServerUser } from "@/lib/require-server-user";
 import { Suspense } from "react";
 import OrganizerShell from "@/components/organizer/OrganizerShell";
 
-export default function OrganizerDetailLayout({
+export default async function OrganizerDetailLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  await requireServerUser(["ORGANIZER"]);
   return (
     <Suspense
       fallback={

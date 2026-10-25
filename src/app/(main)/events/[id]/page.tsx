@@ -1,5 +1,5 @@
 "use client";
-import { getAccessToken } from "@/lib/auth-cookie";
+import { getAuthUser } from "@/stores/auth-store";
 
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
@@ -88,8 +88,8 @@ export default function EventDetailPage() {
   }, [eventId]);
 
   useEffect(() => {
-    const token = getAccessToken();
-    if (!token || !eventId) {
+    const authenticatedUser = getAuthUser();
+    if (!authenticatedUser || !eventId) {
       setMyReg(null);
       return;
     }

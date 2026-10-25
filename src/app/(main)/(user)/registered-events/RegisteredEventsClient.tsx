@@ -1,5 +1,5 @@
 "use client";
-import { getAccessToken } from "@/lib/auth-cookie";
+import { getAuthUser } from "@/stores/auth-store";
 
 import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
@@ -113,9 +113,9 @@ export default function RegisteredEventsClient() {
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
-    const token = getAccessToken();
-    setLoggedIn(Boolean(token));
-    if (!token) {
+    const authenticatedUser = getAuthUser();
+    setLoggedIn(Boolean(authenticatedUser));
+    if (!authenticatedUser) {
       setBoot(false);
       return;
     }

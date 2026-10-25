@@ -1,11 +1,12 @@
 "use client";
+import { getAuthUser } from "@/stores/auth-store";
+import { useOrganizerToastState } from "@/lib/use-organizer-toast-state";
 import { useOrganizerErrorState } from "@/lib/use-organizer-error-state";
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import Cookies from "js-cookie";
 import {
   Calendar,
   ClipboardList,
@@ -22,9 +23,13 @@ import {
 } from "@/api/organizer";
 import type { RaceEventDto } from "@/dto/event.dto";
 import type { ApiRegistration } from "@/dto/organizer.dto";
-import { formatDate, formatPrice } from "@/lib/format";
+import {
+  formatDate,
+  formatPrice,
+  getOrganizerStatusLabel,
+  getStatusColor,
+} from "@/lib/format";
 import { getApiErrorMessage } from "@/lib/error";
-import { toastSuccess } from "@/lib/toast";
 import { mediaDisplayUrl } from "@/lib/media-url";
 import EventFinancePanel from "@/components/organizer/EventFinancePanel";
 import RegistrationApprovalsPanel from "@/components/organizer/RegistrationApprovalsPanel";
@@ -86,11 +91,17 @@ function MyEventDetailContent() {
   const [loading, setLoading] = useState(true);
   const [regsLoading, setRegsLoading] = useState(false);
   const [error, setError] = useOrganizerErrorState();
+  const [toast, setToast] = useOrganizerToastState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [reason, setReason] = useState("");
 
-  const username = Cookies.get("username") || "User";
+  const username = getAuthUser()?.username || "User";
+
+  const notify = (msg: string) => {
+    setToast(msg);
+    window.setTimeout(() => setToast(null), 3200);
+  };
 
   const loadRegs = useCallback(async () => {
     setRegsLoading(true);
@@ -103,7 +114,7 @@ function MyEventDetailContent() {
     } finally {
       setRegsLoading(false);
     }
-  }, [eventId, setError]);
+  }, [eventId]);
 
   useEffect(() => {
     if (!eventId) return;
@@ -117,7 +128,7 @@ function MyEventDetailContent() {
           return;
         }
         setEvent(data);
-
+        setError(null);
       } catch (e) {
         if (!cancelled) {
           setEvent(null);
@@ -146,7 +157,7 @@ function MyEventDetailContent() {
     setBusyId(id);
     try {
       const updated = await approveRegistrationApi(id);
-      toastSuccess(
+      notify(
         updated.bibNumber
           ? `Đã duyệt — BIB ${updated.bibNumber}`
           : "Đã duyệt đăng ký."
@@ -166,7 +177,7 @@ function MyEventDetailContent() {
       await rejectRegistrationApi(rejectId, reason.trim());
       setRejectId(null);
       setReason("");
-      toastSuccess("Đã từ chối đăng ký.");
+      notify("Đã từ chối đăng ký.");
       await loadRegs();
     } catch (e) {
       setError(getApiErrorMessage(e, "Từ chối thất bại."));
@@ -209,6 +220,11 @@ function MyEventDetailContent() {
 
   return (
     <div className="space-y-6">
+      {toast && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900">
+          {toast}
+        </div>
+      )}
 
       {/* Banner + tab strip — chỉ overview / finance; approvals dùng sidebar + bảng */}
       {tab !== "approvals" && (
@@ -231,6 +247,13 @@ function MyEventDetailContent() {
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/30 to-transparent" />
             <div className="absolute bottom-4 left-4 right-4">
+              <span
+                className={`mb-2 inline-flex rounded-md border px-2.5 py-1 text-[11px] font-extrabold ${getStatusColor(
+                  event.status
+                )}`}
+              >
+                {getOrganizerStatusLabel(event.status)}
+              </span>
               <h1 className="text-2xl font-extrabold text-white sm:text-3xl">
                 {event.name}
               </h1>
@@ -307,7 +330,7 @@ function MyEventDetailContent() {
                           {d.distanceKm}K
                         </td>
                         <td className="py-3 pr-3 font-bold text-orange-600">
-                          {formatPrice(d.basePrice ?? d.price)}
+                          {formatPrice(d.price ?? d.basePrice ?? 0)}
                         </td>
                         <td className="py-3 text-muted-foreground">
                           {(d.registeredCount ?? 0).toLocaleString("vi-VN")} /{" "}
@@ -344,21 +367,19 @@ function MyEventDetailContent() {
       {tab === "finance" && <EventFinancePanel eventId={eventId} />}
 
       {tab === "approvals" && (
-        <>
-          <RegistrationApprovalsPanel
-            event={event}
-            regs={regs}
-            loading={regsLoading}
-            busyId={busyId}
-            organizerUsername={username}
-            onReload={() => void loadRegs()}
-            onApprove={(id) => void onApprove(id)}
-            onRejectRequest={(id) => {
-              setRejectId(id);
-              setReason("");
-            }}
-          />
-        </>
+        <RegistrationApprovalsPanel
+          event={event}
+          regs={regs}
+          loading={regsLoading}
+          busyId={busyId}
+          organizerUsername={username}
+          onReload={() => void loadRegs()}
+          onApprove={(id) => void onApprove(id)}
+          onRejectRequest={(id) => {
+            setRejectId(id);
+            setReason("");
+          }}
+        />
       )}
 
       {rejectId && (

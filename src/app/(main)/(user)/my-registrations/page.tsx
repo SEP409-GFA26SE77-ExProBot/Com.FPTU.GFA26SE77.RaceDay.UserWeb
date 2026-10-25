@@ -1,5 +1,5 @@
 "use client";
-import { getAccessToken } from "@/lib/auth-cookie";
+import { getAuthUser } from "@/stores/auth-store";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -22,7 +22,6 @@ import {
   getRegistrationStatusColor,
 } from "@/lib/format";
 import { getApiErrorMessage } from "@/lib/error";
-import { toastError, toastSuccess } from "@/lib/toast";
 import { mediaDisplayUrl } from "@/lib/media-url";
 import { PAGE_SHELL_FORM } from "@/lib/page-shell";
 import PageLoading from "@/components/ui/PageLoading";
@@ -66,9 +65,9 @@ export default function MyRegistrationsPage() {
   };
 
   useEffect(() => {
-    const token = getAccessToken();
-    setLoggedIn(Boolean(token));
-    if (!token) {
+    const authenticatedUser = getAuthUser();
+    setLoggedIn(Boolean(authenticatedUser));
+    if (!authenticatedUser) {
       setReady(true);
       return;
     }
@@ -96,12 +95,12 @@ export default function MyRegistrationsPage() {
   const handleCancel = async (regId: string) => {
     if (!window.confirm("Hủy đơn chờ thanh toán này? Bạn có thể đăng ký lại sau.")) return;
     setCancellingId(regId);
+    setError(null);
     try {
       await cancelRegistration(regId);
-      toastSuccess("Đã hủy đơn chờ thanh toán.");
       await reload();
     } catch (e) {
-      toastError(e, "Hủy đơn thất bại.");
+      setError(getApiErrorMessage(e, "Hủy đơn thất bại."));
     } finally {
       setCancellingId(null);
     }

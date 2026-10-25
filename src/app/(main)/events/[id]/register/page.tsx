@@ -1,9 +1,9 @@
 "use client";
+import { getAuthUser } from "@/stores/auth-store";
 
 import { useState, useEffect, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { isLoggedIn } from "@/lib/auth-cookie";
 import {
   ArrowLeft,
   User,
@@ -131,7 +131,7 @@ function RegisterPageContent() {
   const [resumeHint, setResumeHint] = useState<string | null>(null);
   const [step, setStep] = useState<RegStep>(1);
 
-  const loggedIn = isLoggedIn();
+  const loggedIn = Boolean(getAuthUser());
 
   const [formData, setFormData] = useState<FormData>({
     fullName: "",
@@ -268,7 +268,6 @@ function RegisterPageContent() {
             gender: genderToFormValue(me.gender) || prev.gender,
             dateOfBirth:
               profileDobToDateInput(me.dateOfBirth) || prev.dateOfBirth,
-            idNumber: me.idNumber || prev.idNumber,
           };
         });
       } catch {
@@ -1207,9 +1206,7 @@ function RegisterPageContent() {
                           />
                         ) : selectedDistance ? (
                           <span className="text-lg font-extrabold text-orange-600">
-                            {formatPrice(
-                              selectedDistance.basePrice ?? selectedDistance.price
-                            )}
+                            {formatPrice(selectedDistance.price ?? 0)}
                           </span>
                         ) : (
                           "—"
@@ -1431,9 +1428,7 @@ function RegisterPageContent() {
                           />
                         ) : (
                           <span className="text-xl font-extrabold text-orange-600">
-                            {formatPrice(
-                              selectedDistance.basePrice ?? selectedDistance.price
-                            )}
+                            {formatPrice(selectedDistance.price ?? 0)}
                           </span>
                         )}
                       </div>

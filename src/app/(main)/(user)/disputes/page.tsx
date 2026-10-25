@@ -1,5 +1,5 @@
 "use client";
-import { isLoggedIn } from "@/lib/auth-cookie";
+import { getAuthUser } from "@/stores/auth-store";
 
 import Link from "next/link";
 import { AlertTriangle, LogIn } from "lucide-react";
@@ -7,7 +7,7 @@ import { PAGE_SHELL } from "@/lib/page-shell";
 
 /** BE chưa có dispute API — không dùng mock */
 export default function DisputesPage() {
-  const loggedIn = isLoggedIn();
+  const loggedIn = Boolean(getAuthUser());
 
   if (!loggedIn) {
     return (

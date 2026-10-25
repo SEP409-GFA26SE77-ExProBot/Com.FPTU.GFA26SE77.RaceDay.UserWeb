@@ -1,5 +1,5 @@
 "use client";
-import { isLoggedIn } from "@/lib/auth-cookie";
+import { getAuthUser } from "@/stores/auth-store";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -17,7 +17,7 @@ export default function RaceDayPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const loggedIn = isLoggedIn();
+  const loggedIn = Boolean(getAuthUser());
 
   useEffect(() => {
     if (!loggedIn) {

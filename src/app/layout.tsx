@@ -1,3 +1,4 @@
+import AuthProvider from "@/components/AuthProvider";
 import type { Metadata } from "next";
 import { Inter, Roboto_Mono } from "next/font/google";
 import ToastProvider from "@/components/providers/ToastProvider";
@@ -34,7 +35,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${inter.variable} ${robotoMono.variable} h-full antialiased`}
     >
       <body className={`${inter.className} min-h-full flex flex-col font-sans`}>
-        {children}
+        <AuthProvider>{children}</AuthProvider>
         <ToastProvider />
       </body>
     </html>
