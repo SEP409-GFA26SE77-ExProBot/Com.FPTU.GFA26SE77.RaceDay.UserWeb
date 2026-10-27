@@ -25,6 +25,7 @@ import { getApiErrorMessage } from "@/lib/error";
 import { PAGE_SHELL_FORM } from "@/lib/page-shell";
 import { PayOsEmbedded } from "@/components/payment/PayOsEmbedded";
 import { VietQrCheckout } from "@/components/payment/VietQrCheckout";
+import { BASE_URL } from "@/config/global-config";
 
 type PaymentState = "booting" | "checkout" | "success" | "error";
 
@@ -32,7 +33,7 @@ function toAbsoluteCheckoutUrl(url: string): string {
   if (url.startsWith("http://") || url.startsWith("https://")) return url;
   if (typeof window === "undefined") return url;
   // Mock checkoutUrl thường trỏ API :5080 — không gắn origin FE :3000
-  const apiBase = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
+  const apiBase = (process.env.NEXT_PUBLIC_API_URL || BASE_URL).replace(/\/$/, "");
   if (apiBase && url.startsWith("/")) return `${apiBase}${url}`;
   const base = window.location.origin;
   return `${base}${url.startsWith("/") ? "" : "/"}${url}`;

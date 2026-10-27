@@ -248,14 +248,20 @@ export default function EventPackageCheckout() {
     promoRate > 0 ? Math.round(totalBeforeDiscount * promoRate) : 0;
   const totalPrice = totalBeforeDiscount - discountAmount;
 
-  const canSubmit =
-    orgName.trim().length >= 2 &&
-    orgIntro.trim().length >= 1 &&
-    orgAddress.trim().length >= 1 &&
-    selectedDuration !== null &&
-    selectedCapacity !== null &&
-    termsAccepted &&
-    !submitting;
+  const validationErrors = [
+    orgName.trim().length < 2
+      ? "Tên tổ chức / BTC phải có ít nhất 2 ký tự."
+      : null,
+    !orgIntro.trim() ? "Vui lòng nhập giới thiệu ngắn về tổ chức." : null,
+    !orgAddress.trim() ? "Vui lòng nhập địa chỉ tổ chức." : null,
+    !selectedDuration ? "Vui lòng chọn thời hạn gói." : null,
+    !selectedCapacity ? "Vui lòng chọn quy mô VĐV." : null,
+    !termsAccepted
+      ? "Vui lòng đồng ý với điều khoản dịch vụ và chính sách bảo mật."
+      : null,
+  ].filter((message): message is string => message !== null);
+
+  const canSubmit = validationErrors.length === 0 && !submitting;
 
   const handleSubmit = useCallback(async () => {
     if (!canSubmit || !selectedDuration || !selectedCapacity) return;
@@ -889,9 +895,29 @@ export default function EventPackageCheckout() {
               </span>
             </label>
 
+            {validationErrors.length > 0 && (
+              <div
+                id="package-checkout-validation"
+                role="status"
+                aria-live="polite"
+                className="rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-xs text-red-600"
+              >
+                <p className="flex items-start gap-1.5 font-semibold">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  Vui lòng hoàn tất các thông tin sau để thanh toán:
+                </p>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  {validationErrors.map((message) => (
+                    <li key={message}>{message}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <button
               type="button"
               disabled={!canSubmit}
+              aria-describedby={validationErrors.length > 0 ? "package-checkout-validation" : undefined}
               onClick={() => void handleSubmit()}
               className="flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-orange-500 to-red-600 px-5 py-3 text-sm font-bold text-white shadow-md shadow-orange-500/20 transition-all hover:shadow-orange-500/35 disabled:cursor-not-allowed disabled:opacity-50"
             >

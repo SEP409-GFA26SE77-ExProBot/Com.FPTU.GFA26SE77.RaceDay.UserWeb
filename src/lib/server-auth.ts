@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { AuthUser } from "@/dto/auth.dto";
+import { BASE_URL } from "@/config/global-config";
 
 export const SESSION_COOKIE = "raceday_user_session";
 export const LEGACY_COOKIES = ["jwt", "accessToken", "access_token", "role", "username", "userId", "user_id", "avatar_url", "raceday_role"];
-export const backendOrigin = () => (process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:5080").replace(new RegExp("/$"), "");
+export const backendOrigin = () => (process.env.NEXT_PUBLIC_API_URL || BASE_URL).replace(new RegExp("/$"), "");
 export const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/" };
 
 export function clearSession(response: NextResponse) {
