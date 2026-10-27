@@ -2,38 +2,35 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+/* @custom-variant dark (&:is(.dark *)); */
 
 :root {
   --background: #ffffff;
   --foreground: #171717;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-/* @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-} */
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.Toastify__toast-container--top-right {
+  width: min(420px, calc(100vw - 2rem));
+}
+
+.Toastify__toast.app-toast {
+  width: 100%;
+  min-height: 3.25rem;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 0.9rem;
+  line-height: 1.45;
 }
 
 @theme inline {
-
-    --font-heading: var(--font-sans);
-
-    --font-sans: var(--font-sans);
+  --font-heading: var(--font-inter), system-ui, sans-serif;
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-mono: var(--font-mono), monospace;
 
     --color-sidebar-ring: var(--sidebar-ring);
 
@@ -254,4 +251,129 @@ body {
   html {
     @apply font-sans;
     }
+}
+
+/* Skeleton shimmer animation */
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton-shimmer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.4) 50%,
+    transparent 100%
+  );
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+/* Confetti animation */
+.confetti-piece {
+  position: absolute;
+  top: -10px;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  animation: confetti-fall linear forwards;
+  opacity: 0.9;
+}
+
+.confetti-piece:nth-child(odd) {
+  width: 6px;
+  height: 14px;
+  border-radius: 50%;
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-10px) rotateZ(0deg) rotateX(0deg);
+    opacity: 1;
+  }
+  25% {
+    transform: translateY(25vh) rotateZ(90deg) rotateX(45deg) translateX(20px);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(50vh) rotateZ(180deg) rotateX(90deg) translateX(-15px);
+    opacity: 0.8;
+  }
+  75% {
+    transform: translateY(75vh) rotateZ(270deg) rotateX(135deg) translateX(10px);
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateY(100vh) rotateZ(360deg) rotateX(180deg);
+    opacity: 0;
+  }
+}
+
+/* List page-turn fade */
+.list-fade {
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+.list-fade-out {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.list-fade-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+.list-stagger > * {
+  animation: list-item-in 0.35s ease both;
+}
+.list-stagger > *:nth-child(1) { animation-delay: 0.02s; }
+.list-stagger > *:nth-child(2) { animation-delay: 0.05s; }
+.list-stagger > *:nth-child(3) { animation-delay: 0.08s; }
+.list-stagger > *:nth-child(4) { animation-delay: 0.11s; }
+.list-stagger > *:nth-child(5) { animation-delay: 0.14s; }
+.list-stagger > *:nth-child(6) { animation-delay: 0.17s; }
+.list-stagger > *:nth-child(7) { animation-delay: 0.2s; }
+.list-stagger > *:nth-child(8) { animation-delay: 0.23s; }
+.list-stagger > *:nth-child(9) { animation-delay: 0.26s; }
+
+@keyframes list-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: hsl(0 0% 80%);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(0 0% 65%);
 }

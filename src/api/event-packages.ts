@@ -1,0 +1,174 @@
+import api from "@/config/axios";
+import { getApiErrorMessage } from "@/lib/error";
+import { invalidateEventCache } from "@/api/events";
+import type { OrganizerDistancesDetailDto, ReplaceEventDistancesRequest } from "@/dto/event-distance.dto";
+import type {
+  PackageCatalogDto,
+  CreatePackagePurchaseRequest,
+  PackagePurchaseDto,
+} from "@/dto/event-package.dto";
+
+const EVENT_API = "api/v1/event";
+
+/** GET /packages/catalog — public */
+export async function getPackageCatalog(): Promise<PackageCatalogDto> {
+  try {
+    return (await api.get(`${EVENT_API}/packages/catalog`)) as PackageCatalogDto;
+  } catch (e) {
+    throw new Error(getApiErrorMessage(e, "Không tải được bảng giá gói tổ chức."));
+  }
+}
+
+/** POST /organizer/packages/purchases — tạo purchase (authenticated) */
+export async function createPackagePurchase(
+  data: CreatePackagePurchaseRequest
+): Promise<PackagePurchaseDto> {
+  try {
+    return (await api.post(
+      `${EVENT_API}/organizer/packages/purchases`,
+      data
+    )) as PackagePurchaseDto;
+  } catch (e) {
+    throw new Error(getApiErrorMessage(e, "Tạo đơn mua gói thất bại."));
+  }
+}
+
+/** GET /organizer/packages/purchases/{id} */
+export async function getPackagePurchase(
+  id: string
+): Promise<PackagePurchaseDto> {
+  try {
+    return (await api.get(
+      `${EVENT_API}/organizer/packages/purchases/${id}`
+    )) as PackagePurchaseDto;
+  } catch (e) {
+    throw new Error(getApiErrorMessage(e, "Không tải được đơn mua gói."));
+  }
+}
+
+/** POST /organizer/packages/purchases/{id}/cancel — hủy đơn chờ thanh toán */
+export async function cancelPackagePurchase(
+  id: string
+): Promise<PackagePurchaseDto> {
+  try {
+    return (await api.post(
+      `${EVENT_API}/organizer/packages/purchases/${id}/cancel`
+    )) as PackagePurchaseDto;
+  } catch (e) {
+    throw new Error(getApiErrorMessage(e, "Hủy đơn mua gói thất bại."));
+  }
+}
+
+/** PUT /organizer/{eventId}/profile — update draft event fields */
+export async function updateEventProfile(
+  eventId: string,
+  data: Record<string, unknown>
+): Promise<unknown> {
+  try {
+    const result = await api.put(`${EVENT_API}/organizer/${eventId}/profile`, data);
+    invalidateEventCache(eventId);
+    return result;
+  } catch (e) {
+    throw new Error(getApiErrorMessage(e, "Cập nhật hồ sơ giải thất bại."));
+  }
+}
+
+/** GET /organizer/{eventId}/distances — cự ly, giá vé và cấu hình BIB (organizer setup) */
+export async function getOrganizerDistances(
+  eventId: string
+): Promise<
+  OrganizerDistancesDetailDto & {
+    distances: Array<
+      OrganizerDistancesDetailDto["distances"][number] & {
+        /** Chip BXH: 3KM, HM… */
+        type?: string;
+        /** @deprecated */
+        price?: number;
+        bibPrefix?: string | null;
+        bibRangeStart?: number | null;
+        bibRangeEnd?: number | null;
+      }
+    >;
+    ticketPricing?: OrganizerDistancesDetailDto["ticketPricing"] | unknown;
+  }
+> {
+  try {
+    return (await api.get(
+      `${EVENT_API}/organizer/${eventId}/distances`
+    )) as OrganizerDistancesDetailDto & {
+      distances: Array<
+        OrganizerDistancesDetailDto["distances"][number] & {
+          type?: string;
+          price?: number;
+          bibPrefix?: string | null;
+          bibRangeStart?: number | null;
+          bibRangeEnd?: number | null;
+        }
+      >;
+      ticketPricing?: OrganizerDistancesDetailDto["ticketPricing"] | unknown;
+    };
+  } catch (e) {
+    throw new Error(getApiErrorMessage(e, "Không tải được cự ly và giá vé."));
+  }
+}
+
+/** PUT /organizer/{eventId}/distances — replace distances (+ ticketPricing) */
+export async function replaceEventDistances(
+  eventId: string,
+  data: ReplaceEventDistancesRequest
+): Promise<unknown> {
+  try {
+    const result = await api.put(`${EVENT_API}/organizer/${eventId}/distances`, data);
+    invalidateEventCache(eventId);
+    return result;
+  } catch (e) {
+    throw new Error(getApiErrorMessage(e, "Cập nhật cự ly thất bại."));
+  }
+}
+
+/** PUT /organizer/{eventId}/bib-configs — dải BIB theo từng cự ly */
+export async function replaceEventBibConfigs(
+  eventId: string,
+  distances: Array<{
+    distanceId: string;
+    bibPrefix?: string | null;
+    bibRangeStart: number;
+    bibRangeEnd: number;
+  }>
+): Promise<unknown> {
+  try {
+    const result = await api.put(`${EVENT_API}/organizer/${eventId}/bib-configs`, {
+      distances,
+    });
+    invalidateEventCache(eventId);
+    return result;
+  } catch (e) {
+    throw new Error(getApiErrorMessage(e, "Lưu cấu hình BIB thất bại."));
+  }
+}
+
+/** POST /organizer/{eventId}/open-registration */
+export async function openEventRegistration(eventId: string): Promise<unknown> {
+  try {
+    const result = await api.post(
+      `${EVENT_API}/organizer/${eventId}/open-registration`
+    );
+    invalidateEventCache(eventId);
+    return result;
+  } catch (e) {
+    throw new Error(getApiErrorMessage(e, "Mở đăng ký thất bại."));
+  }
+}
+
+/** POST /organizer/{eventId}/close-registration */
+export async function closeEventRegistration(eventId: string): Promise<unknown> {
+  try {
+    const result = await api.post(
+      `${EVENT_API}/organizer/${eventId}/close-registration`
+    );
+    invalidateEventCache(eventId);
+    return result;
+  } catch (e) {
+    throw new Error(getApiErrorMessage(e, "Đóng đăng ký thất bại."));
+  }
+}
