@@ -38,8 +38,8 @@ export async function searchPhotos(params: {
   });
   if (params.page != null) q.set("page", String(params.page));
   if (params.pageSize != null) q.set("pageSize", String(params.pageSize));
-  const raw = await api.get(`${PHOTO_API}/photos?${q.toString()}`);
-  return normalizePaged(raw as PagedPhotosDto);
+  const raw = await api.get<PagedPhotosDto, PagedPhotosDto>(`${PHOTO_API}/photos?${q.toString()}`);
+  return normalizePaged(raw);
 }
 
 export async function getPhotoDetail(photoId: string): Promise<PhotoDetailDto> {
