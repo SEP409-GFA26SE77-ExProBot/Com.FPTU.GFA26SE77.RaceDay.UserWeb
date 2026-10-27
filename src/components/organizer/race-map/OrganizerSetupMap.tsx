@@ -11,6 +11,7 @@ import {
   MapPin,
   PencilRuler,
   Trash2,
+  Undo2,
   X,
 } from "lucide-react";
 import { useCourse, type SetupTool } from "@/components/organizer/race-map/CourseContext";
@@ -86,6 +87,8 @@ export default function OrganizerSetupMap() {
     renameCheckpoint,
     removeMidCheckpoint,
     clearCourse,
+    undo,
+    canUndo,
     snapping,
     applyCourse,
     startEndPhase,
@@ -252,6 +255,15 @@ export default function OrganizerSetupMap() {
               }`}
             >
               <Eye className="h-3.5 w-3.5" /> View
+            </button>
+            <button
+              type="button"
+              onClick={undo}
+              disabled={!canUndo}
+              title="Hoàn tác thay đổi gần nhất"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-white px-3 py-2 text-xs font-bold text-muted-foreground hover:border-orange-400/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Undo2 className="h-3.5 w-3.5" /> Hoàn tác
             </button>
             <button
               type="button"

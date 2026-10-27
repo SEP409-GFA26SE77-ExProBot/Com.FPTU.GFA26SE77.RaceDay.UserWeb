@@ -25,6 +25,12 @@ import {
   type PriceType,
 } from "./distances-form";
 
+const TIME_OPTIONS = Array.from({ length: 24 * 4 }, (_, index) => {
+  const hour = String(Math.floor(index / 4)).padStart(2, "0");
+  const minute = String((index % 4) * 15).padStart(2, "0");
+  return `${hour}:${minute}`;
+});
+
 export default function ProfileDistancesClient() {
   const params = useParams();
   const eventId = String(params?.id || "");
@@ -170,8 +176,28 @@ export default function ProfileDistancesClient() {
                 <div id={`distance-${row.distanceKm}`} className="grid grid-cols-1 gap-3 border-t border-orange-100 p-4 sm:grid-cols-2 lg:grid-cols-4">
                   <Field label="Tên cự ly"><input value={row.name} maxLength={100} disabled={disabled} onChange={(e) => updateRow(row.distanceKm, { name: e.target.value })} className={inputClass} /></Field>
                   <Field label="Sức chứa (VĐV)"><input type="number" min={Math.max(1, row.registeredCount)} max={500000} step={1} value={row.capacity} disabled={disabled} onChange={(e) => updateRow(row.distanceKm, { capacity: e.target.value })} className={inputClass} /></Field>
-                  <Field label="Giờ xuất phát"><input type="time" step={1} value={row.startAt} disabled={disabled} onChange={(e) => updateRow(row.distanceKm, { startAt: e.target.value })} className={inputClass} /></Field>
-                  <Field label="Giờ kết thúc / cutoff"><input type="time" step={1} min={row.startAt || undefined} value={row.endAt} disabled={disabled} onChange={(e) => updateRow(row.distanceKm, { endAt: e.target.value })} className={inputClass} /></Field>
+                  <Field label="Giờ xuất phát (mỗi 15 phút)">
+                    <select value={row.startAt.slice(0, 5)} disabled={disabled}
+                      onChange={(e) => updateRow(row.distanceKm, { startAt: e.target.value })} className={inputClass}>
+                      <option value="">Chọn giờ xuất phát</option>
+                      {row.startAt && !TIME_OPTIONS.includes(row.startAt.slice(0, 5)) && (
+                        <option value={row.startAt.slice(0, 5)} disabled>{row.startAt.slice(0, 5)} (hiện tại)</option>
+                      )}
+                      {TIME_OPTIONS.map((time) => <option key={time} value={time}>{time}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Giờ kết thúc / cutoff (mỗi 15 phút)">
+                    <select value={row.endAt.slice(0, 5)} disabled={disabled}
+                      onChange={(e) => updateRow(row.distanceKm, { endAt: e.target.value })} className={inputClass}>
+                      <option value="">Chọn giờ kết thúc</option>
+                      {row.endAt && !TIME_OPTIONS.includes(row.endAt.slice(0, 5)) && (
+                        <option value={row.endAt.slice(0, 5)} disabled>{row.endAt.slice(0, 5)} (hiện tại)</option>
+                      )}
+                      {TIME_OPTIONS.map((time) => (
+                        <option key={time} value={time} disabled={!!row.startAt && time < row.startAt.slice(0, 5)}>{time}</option>
+                      ))}
+                    </select>
+                  </Field>
                 </div>
               )}
             </div>
