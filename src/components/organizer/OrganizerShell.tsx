@@ -8,6 +8,7 @@ import { logout } from "@/api/auth";
 import { getEventById } from "@/api/events";
 import { getPackagePurchase } from "@/api/event-packages";
 import { mediaDisplayUrl } from "@/lib/media-url";
+import { isComplaintId } from "@/lib/complaints";
 import {
   ArrowLeft,
   ChevronDown,
@@ -33,6 +34,7 @@ import {
   PackagePlus,
   Boxes,
   Hash,
+  MessageSquareText,
 } from "lucide-react";
 
 function eventIdFromPath(pathname: string): string | null {
@@ -78,6 +80,12 @@ function eventWorkspaceGroups(eventId: string): NavGroup[] {
           href: `${base}?tab=approvals`,
           icon: ClipboardCheck,
           tab: "approvals",
+        },
+        {
+          label: "Khiếu nại",
+          href: `/organizer/disputes?eventId=${eventId}`,
+          icon: MessageSquareText,
+          matchPath: "/organizer/disputes",
         },
         {
           label: "Giả lập đua",
@@ -233,9 +241,24 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
   const userMenuRef = useRef<HTMLDivElement>(null);
   const { username, initial, avatarUrl } = useLoggedInUser();
   const avatarSrc = avatarUrl ? mediaDisplayUrl(avatarUrl) : null;
-  const eventId = useMemo(() => eventIdFromPath(pathname), [pathname]);
+  const eventId = useMemo(() => {
+    const pathEventId = eventIdFromPath(pathname);
+    if (pathEventId) return pathEventId;
+    const complaintEventId = pathname.startsWith("/organizer/disputes")
+      ? searchParams.get("eventId")
+      : null;
+    return complaintEventId && isComplaintId(complaintEventId) ? complaintEventId : null;
+  }, [pathname, searchParams]);
   const groups = useMemo(
-    () => (eventId ? eventWorkspaceGroups(eventId) : []),
+    () => (eventId ? eventWorkspaceGroups(eventId) : [{
+      heading: "Vận hành",
+      items: [{
+        label: "Khiếu nại",
+        href: "/organizer/disputes",
+        icon: MessageSquareText,
+        matchPath: "/organizer/disputes",
+      }],
+    }]),
     [eventId]
   );
   const activeTab = searchParams.get("tab");
