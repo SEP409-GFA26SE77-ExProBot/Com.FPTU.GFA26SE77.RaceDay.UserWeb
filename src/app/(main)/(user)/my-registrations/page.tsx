@@ -333,7 +333,7 @@ export default function MyRegistrationsPage() {
                                 </Link>
                                 {reg.bibNumber && (
                                   <Link
-                                    href={`/photos?bib=${reg.bibNumber}`}
+                                    href={`/photos?eventId=${reg.eventId}&bib=${encodeURIComponent(reg.bibNumber)}`}
                                     className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold hover:bg-muted"
                                   >
                                     <Camera className="h-3.5 w-3.5" />

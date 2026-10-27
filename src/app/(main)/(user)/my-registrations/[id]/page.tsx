@@ -472,7 +472,7 @@ export default function RegistrationDetailPage() {
                   Tải mã QR
                 </button>
                 <Link
-                  href={`/photos?bib=${reg.bibNumber}`}
+                  href={`/photos?eventId=${reg.eventId}&bib=${encodeURIComponent(reg.bibNumber)}`}
                   className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-red-600 py-2.5 text-sm font-bold text-white"
                 >
                   <Camera className="h-4 w-4" />
