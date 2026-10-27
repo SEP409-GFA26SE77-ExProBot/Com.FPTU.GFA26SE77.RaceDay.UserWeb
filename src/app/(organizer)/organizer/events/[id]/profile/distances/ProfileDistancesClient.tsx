@@ -1,746 +1,260 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import {
-  AlertCircle,
-  Loader2,
-  Plus,
-  Save,
-  Settings2,
-  Trash2,
-  X,
-} from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronRight, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { getEventById } from "@/api/events";
-import {
-  getOrganizerDistances,
-  replaceEventDistances,
-} from "@/api/event-packages";
+import { getOrganizerDistances, replaceEventDistances } from "@/api/event-packages";
 import type { RaceEventDto } from "@/dto/event.dto";
 import { getApiErrorMessage } from "@/lib/error";
 import { getOrganizerStatusLabel, getStatusColor } from "@/lib/format";
-import { toastError, toastSuccess } from "@/lib/toast";
+import { useOrganizerToastState } from "@/lib/use-organizer-toast-state";
+import { canEditProfile } from "../_shared";
 import {
-  canEditProfile,
-  inputToTimeOnly,
-  timeOnlyToInput,
-} from "../_shared";
-import {
-  DISTANCE_LEADERBOARD_TYPES,
-  normalizeDistanceType,
-  suggestedKmForType,
-} from "@/lib/distance-types";
-
-type PriceType = {
-  id: string;
-  name: string;
-  dateFrom: string;
-  dateTo: string;
-  price: number;
-};
-
-type DistRow = {
-  key: string;
-  type: string;
-  name: string;
-  distanceKm: string;
-  capacity: number;
-  basePrice: number;
-  startAt: string;
-  endAt: string;
-  types: PriceType[];
-  pricingOpen: boolean;
-};
-
-function parseDistanceKm(raw: string): number {
-  const n = Number(String(raw).trim().replace(",", "."));
-  return Number.isFinite(n) ? n : 0;
-}
-
-/** Guid thật từ BE — phân biệt hàng mới (`new-1`, `d-…`). */
-function isPersistedDistanceId(key: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    key.trim()
-  );
-}
-
-type PricingByDistance = {
-  byDistanceName?: Record<
-    string,
-    {
-      basePrice?: number;
-      types?: Array<Record<string, unknown>>;
-      phases?: Array<Record<string, unknown>>;
-    }
-  >;
-  types?: Array<Record<string, unknown>>;
-  phases?: Array<Record<string, unknown>>;
-};
-
-function loadTypesForDistance(
-  pricing: unknown,
-  distanceName: string,
-  fallbackBase: number
-): { basePrice: number; types: PriceType[] } {
-  const raw = (pricing || {}) as PricingByDistance;
-  const byName = raw.byDistanceName?.[distanceName];
-  if (byName) {
-    const rows = byName.types?.length ? byName.types : byName.phases || [];
-    return {
-      basePrice: Number(byName.basePrice ?? fallbackBase) || 0,
-      types: rows.map((p, i) => ({
-        id: String(p.key || p.id || `type-${i}`),
-        name: String(p.name || "Type"),
-        dateFrom: String(p.dateFrom || ""),
-        dateTo: String(p.dateTo || ""),
-        price: Number(p.price ?? 0) || 0,
-      })),
-    };
-  }
-
-  // Legacy matrix: types|phases[].pricesByDistanceName[name]
-  const legacy = (raw.types?.length ? raw.types : raw.phases) || [];
-  if (legacy.length) {
-    const types: PriceType[] = [];
-    let basePrice = fallbackBase;
-    for (const p of legacy) {
-      const key = String(p.key || "");
-      const prices =
-        (p.pricesByDistanceName as Record<string, number> | undefined) || {};
-      const price = Number(prices[distanceName] ?? 0) || 0;
-      if (key === "base" || key === "regular") {
-        if (price > 0) basePrice = price;
-        continue;
-      }
-      if (price > 0 || p.name) {
-        types.push({
-          id: key || `legacy-${types.length}`,
-          name: String(p.name || key || "Type"),
-          dateFrom: String(p.dateFrom || ""),
-          dateTo: String(p.dateTo || ""),
-          price,
-        });
-      }
-    }
-    return { basePrice, types };
-  }
-
-  return { basePrice: fallbackBase, types: [] };
-}
+  buildDistancesPayload,
+  addSharedPriceType,
+  createDistanceRows,
+  getPriceTypeError,
+  getPriceTypeDateError,
+  requiresRegularDates,
+  removeSharedPriceType,
+  updateSharedPriceType,
+  validateDistanceRows,
+  type DistanceRow,
+  type PriceType,
+} from "./distances-form";
 
 export default function ProfileDistancesClient() {
   const params = useParams();
   const eventId = String(params?.id || "");
   const [event, setEvent] = useState<RaceEventDto | null>(null);
+  const [rows, setRows] = useState<DistanceRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [rows, setRows] = useState<DistRow[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [, notify] = useOrganizerToastState<string | null>(null);
 
-  const load = useCallback(async () => {
-    const [eventData, distData] = await Promise.all([
+  const fetchSetup = useCallback(async () => {
+    const [metadata, detail] = await Promise.all([
       getEventById(eventId),
       getOrganizerDistances(eventId),
     ]);
-    setEvent(eventData);
-    const mapped: DistRow[] = (distData.distances || []).map((d, i) => {
-      const name = d.name || "";
-      const parsed = loadTypesForDistance(
-        distData.ticketPricing,
-        name,
-        d.basePrice ?? d.price ?? 0
-      );
-      return {
-        key: d.id || `d-${i}`,
-        type: normalizeDistanceType(
-          d.type,
-          d.distanceKm != null ? Number(d.distanceKm) : 0
-        ),
-        name,
-        distanceKm:
-          d.distanceKm != null && d.distanceKm > 0 ? String(d.distanceKm) : "",
-        capacity: d.capacity || 0,
-        basePrice: parsed.basePrice,
-        startAt: timeOnlyToInput(d.startAt),
-        endAt: timeOnlyToInput(d.endAt),
-        types: parsed.types,
-        pricingOpen: false,
-      };
-    });
-    setRows(
-      mapped.length
-        ? mapped
-        : [
-            {
-              key: "new-1",
-              type: "5KM",
-              name: "5K",
-              distanceKm: "5",
-              capacity: 100,
-              basePrice: 0,
-              startAt: "",
-              endAt: "",
-              types: [],
-              pricingOpen: false,
-            },
-          ]
-    );
+    return {
+      event: { ...metadata, status: detail.status },
+      rows: createDistanceRows(detail),
+    };
   }, [eventId]);
 
   useEffect(() => {
-    if (!eventId) return;
     let cancelled = false;
-    (async () => {
-      try {
-        await load();
-      } catch (e) {
-        if (!cancelled)
-          setError(getApiErrorMessage(e, "Không tải được cự ly."));
-      } finally {
-        if (!cancelled) setLoading(false);
+    if (!eventId) return;
+    void fetchSetup().then((setup) => {
+      if (!cancelled) {
+        setEvent(setup.event);
+        setRows(setup.rows);
+        setError(null);
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [eventId, load]);
+    }).catch((e: unknown) => {
+      if (!cancelled) setError(getApiErrorMessage(e, "Không tải được cự ly và giá vé."));
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [eventId, fetchSetup]);
 
-  const totalCap = rows.reduce((s, r) => s + (Number(r.capacity) || 0), 0);
-  const packageCap = event?.totalRunners || 0;
-
-  const updateRow = (key: string, patch: Partial<DistRow>) => {
-    setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  const editable = !!event && canEditProfile(event.status);
+  const disabled = !editable || saving;
+  const selected = rows.filter((r) => r.selected);
+  const totalCapacity = selected.reduce((sum, r) => sum + (Number(r.capacity) || 0), 0);
+  const packageCap = event?.packagePurchaseId ? event.totalRunners : undefined;
+  const updateRow = (distanceKm: number, patch: Partial<DistanceRow>) => {
+    setRows((previous) => previous.map((r) => r.distanceKm === distanceKm ? { ...r, ...patch } : r));
   };
-
-  const addRow = () => {
-    setRows((prev) => [
-      ...prev.map((r) => ({ ...r, pricingOpen: false })),
-      {
-        key: `new-${Date.now()}`,
-        type: "10KM",
-        name: "",
-        distanceKm: "10",
-        capacity: 100,
-        basePrice: 0,
-        startAt: "",
-        endAt: "",
-        types: [],
-        pricingOpen: false,
-      },
-    ]);
+  const sharedTypes = rows[0]?.types ?? [];
+  const regularDatesRequired = requiresRegularDates(sharedTypes);
+  const updateType = (index: number, patch: Partial<Omit<PriceType, "price">>) => {
+    setRows((previous) => updateSharedPriceType(previous, index, patch));
   };
-
-  const removeRow = (key: string) => {
-    setRows((prev) => (prev.length <= 1 ? prev : prev.filter((r) => r.key !== key)));
-  };
-
-  /** Accordion: chỉ mở setup giá 1 cự ly — tránh trang dài khi nhiều phase. */
-  const togglePricing = (key: string) => {
-    setRows((prev) =>
-      prev.map((r) => ({
-        ...r,
-        pricingOpen: r.key === key ? !r.pricingOpen : false,
-      }))
-    );
+  const updatePrice = (row: DistanceRow, index: number, price: string) => {
+    updateRow(row.distanceKm, { types: row.types.map((t, i) => i === index ? { ...t, price } : t) });
   };
 
   const handleSave = async () => {
-    if (!event || saving) return;
-    if (
-      rows.some(
-        (r) => !r.name.trim() || parseDistanceKm(r.distanceKm) <= 0 || r.capacity < 1
-      )
-    ) {
-      toastError("Mỗi cự ly cần tên, km > 0 và sức chứa ≥ 1.");
-      return;
-    }
-    if (event.packagePurchaseId && packageCap > 0 && totalCap > packageCap) {
-      toastError(
-        `Tổng slot cự ly (${totalCap}) vượt quy mô gói (${packageCap}).`
-      );
+    if (!editable || saving) return;
+    const validation = validateDistanceRows(rows, packageCap);
+    if (validation) {
+      setError(validation);
       return;
     }
     setSaving(true);
+    setError(null);
     try {
-      const byDistanceName: Record<
-        string,
-        { basePrice: number; types: Array<Record<string, unknown>> }
-      > = {};
-      for (const r of rows) {
-        const n = r.name.trim();
-        byDistanceName[n] = {
-          basePrice: Number(r.basePrice) || 0,
-          types: r.types.map((p) => ({
-            key: p.id,
-            name: p.name,
-            dateFrom: p.dateFrom,
-            dateTo: p.dateTo,
-            price: Number(p.price) || 0,
-          })),
-        };
+      await replaceEventDistances(eventId, buildDistancesPayload(rows));
+      notify("Đã lưu cự ly và giá vé.");
+      try {
+        const setup = await fetchSetup();
+        setEvent(setup.event);
+        setRows(setup.rows);
+      } catch (e) {
+        // Reload before allowing another save, so new rows cannot be recreated without IDs.
+        setEvent(null);
+        setError(getApiErrorMessage(e, "Đã lưu nhưng không tải lại được dữ liệu. Vui lòng tải lại trang."));
       }
-
-      await replaceEventDistances(eventId, {
-        distances: rows.map((r) => ({
-          ...(isPersistedDistanceId(r.key) ? { id: r.key } : {}),
-          name: r.name.trim(),
-          type: normalizeDistanceType(r.type, parseDistanceKm(r.distanceKm)),
-          distanceKm: parseDistanceKm(r.distanceKm),
-          capacity: Number(r.capacity),
-          basePrice: Number(r.basePrice) || 0,
-          startAt: inputToTimeOnly(r.startAt),
-          endAt: inputToTimeOnly(r.endAt),
-        })),
-        ticketPricing: { byDistanceName },
-      });
-      await load();
-      toastSuccess("Đã lưu cự ly và giá vé.");
     } catch (e) {
-      toastError(e, "Lưu thất bại.");
+      setError(getApiErrorMessage(e, "Không lưu được cự ly và giá vé."));
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex min-h-[40vh] flex-col items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="flex min-h-[40vh] flex-col items-center justify-center" role="status">
+      <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+      <p className="mt-3 text-sm text-muted-foreground">Đang tải cự ly và giá vé…</p>
+    </div>
+  );
 
-  if (!event) {
-    return (
-      <div className="py-16 text-center">
-        <AlertCircle className="mx-auto h-10 w-10 text-red-500" />
-        <p className="mt-4 text-sm text-muted-foreground">{error}</p>
-        <Link href="/my-events" className="mt-4 inline-block text-sm font-bold text-orange-600">
-          Về danh sách
-        </Link>
-      </div>
-    );
-  }
-
-  const editable = canEditProfile(event.status);
-
-  const fmtReg = (iso: string | null | undefined) => {
-    if (!iso) return null;
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return null;
-    return d.toLocaleString("vi-VN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-  const opensLabel = fmtReg(event.registrationOpensAtUtc);
-  const closesLabel = fmtReg(event.registrationClosesAtUtc);
-  const regContextParts: string[] = [];
-  if (opensLabel) regContextParts.push(`ĐK mở ${opensLabel}`);
-  if (closesLabel) regContextParts.push(`đóng ${closesLabel}`);
-  const regContext = regContextParts.length
-    ? regContextParts.join(" · ")
-    : null;
+  if (!event) return (
+    <div className="space-y-4 py-16 text-center" role="alert">
+      <AlertCircle className="mx-auto h-10 w-10 text-red-500" />
+      <p className="text-sm text-red-600">{error || "Không tải được dữ liệu."}</p>
+      <button type="button" onClick={() => window.location.reload()} className="mr-4 text-sm font-bold text-orange-600">Tải lại</button>
+      <Link href="/my-events" className="text-sm font-bold text-orange-600">Về danh sách</Link>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-orange-500">
-            Chi tiết giải
-          </p>
-          <h1 className="mt-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-2xl font-extrabold leading-tight">
-            <span>Cự ly &amp; giá vé</span>
-            {regContext ? (
-              <span
-                className="min-w-0 text-[11px] font-medium text-slate-500"
-                title={regContext}
-              >
-                · {regContext}
-              </span>
-            ) : (
-              <Link
-                href={`/organizer/events/${eventId}/profile/basic`}
-                className="text-[11px] font-medium text-slate-500 underline-offset-2 hover:text-orange-600 hover:underline"
-              >
-                · Chưa đặt lịch ĐK — sửa ở Thông tin cơ bản
-              </Link>
-            )}
-          </h1>
-          <span
-            className={`mt-2 inline-flex rounded-md border px-2.5 py-1 text-[11px] font-extrabold ${getStatusColor(event.status)}`}
-          >
+          <p className="text-xs font-bold uppercase tracking-widest text-orange-500">Chi tiết giải</p>
+          <h1 className="mt-1 text-2xl font-extrabold">Cự ly &amp; giá vé</h1>
+          <span className={`mt-2 inline-flex rounded-md border px-2.5 py-1 text-[11px] font-extrabold ${getStatusColor(event.status)}`}>
             {getOrganizerStatusLabel(event.status)}
           </span>
         </div>
         {editable && (
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => void handleSave()}
-            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-orange-500 to-red-600 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
-          >
+          <button type="button" disabled={saving} onClick={() => void handleSave()}
+            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-orange-500 to-red-600 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Lưu cự ly
+            {saving ? "Đang lưu…" : "Lưu cự ly & giá vé"}
           </button>
         )}
       </div>
 
-      <section className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <div className="min-w-0">
-            <h2 className="text-sm font-bold">Danh sách cự ly</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Tổng slot: <strong>{totalCap}</strong>
-              {event.packagePurchaseId ? ` / ${packageCap} (gói)` : null}
-              <span className="text-muted-foreground/80">
-                {" "}
-                · Chỉ mở 1 bảng giá cùng lúc
-              </span>
-            </p>
-          </div>
-          {editable && (
-            <button
-              type="button"
-              onClick={addRow}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-3.5 py-2 text-xs font-bold text-orange-700 hover:bg-orange-100"
-            >
-              <Plus className="h-3.5 w-3.5" /> Thêm cự ly
-            </button>
-          )}
+      {error && <div role="alert" className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{error}
+      </div>}
+      {!editable && <p className="rounded-xl bg-muted p-3 text-sm text-muted-foreground">Chỉ có thể chỉnh sửa khi giải ở trạng thái nháp hoặc bị từ chối.</p>}
+
+      <section aria-labelledby="distances-heading" className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
+        <div className="mb-4">
+          <h2 id="distances-heading" className="text-lg font-bold">Cự ly</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Chọn cự ly để mở thông tin thiết lập. Bỏ chọn để loại cự ly khi lưu.</p>
+          <p className="mt-2 text-xs text-muted-foreground">Tổng sức chứa: <strong>{totalCapacity.toLocaleString("vi-VN")}</strong>{packageCap ? ` / ${packageCap.toLocaleString("vi-VN")} VĐV (gói)` : " VĐV"}</p>
         </div>
-
-        <div className="max-h-[min(70vh,720px)] space-y-3 overflow-y-auto overscroll-contain pr-1 [scrollbar-gutter:stable]">
-          {rows.map((r) => (
-            <div
-              key={r.key}
-              className={`rounded-xl border p-3.5 sm:p-4 ${
-                r.pricingOpen
-                  ? "border-orange-300/80 bg-orange-50/30"
-                  : "border-border/60 bg-background/50"
-              }`}
-            >
-              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-                <LabeledField label="Tên cự ly">
-                  <input
-                    placeholder="VD: 5K Fun Run"
-                    value={r.name}
-                    disabled={!editable}
-                    onChange={(e) => updateRow(r.key, { name: e.target.value })}
-                    className={inputClass}
-                  />
-                </LabeledField>
-                <LabeledField label="Type">
-                  <select
-                    value={normalizeDistanceType(
-                      r.type,
-                      parseDistanceKm(r.distanceKm)
-                    )}
-                    disabled={!editable}
-                    onChange={(e) => {
-                      const type = e.target.value;
-                      const km = suggestedKmForType(type);
-                      updateRow(r.key, {
-                        type,
-                        ...(km != null ? { distanceKm: String(km) } : {}),
-                      });
-                    }}
-                    className={inputClass}
-                  >
-                    {DISTANCE_LEADERBOARD_TYPES.map((t) => (
-                      <option key={t.code} value={t.code}>
-                        {t.code} — {t.label}
-                      </option>
-                    ))}
-                  </select>
-                </LabeledField>
-                <LabeledField
-                  label={
-                    normalizeDistanceType(r.type, parseDistanceKm(r.distanceKm)) ===
-                    "OTHER"
-                      ? "Quãng đường (km)"
-                      : "Quãng đường (km) — theo type"
-                  }
-                >
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    placeholder={
-                      normalizeDistanceType(
-                        r.type,
-                        parseDistanceKm(r.distanceKm)
-                      ) === "OTHER"
-                        ? "VD: 6 hoặc 8.5"
-                        : "Khóa theo type (chọn Khác để sửa)"
-                    }
-                    value={r.distanceKm}
-                    disabled={
-                      !editable ||
-                      normalizeDistanceType(
-                        r.type,
-                        parseDistanceKm(r.distanceKm)
-                      ) !== "OTHER"
-                    }
-                    onChange={(e) => {
-                      const v = e.target.value.replace(",", ".");
-                      if (v !== "" && !/^\d*\.?\d*$/.test(v)) return;
-                      updateRow(r.key, { distanceKm: v });
-                    }}
-                    className={inputClass}
-                  />
-                </LabeledField>
-                <LabeledField label="Sức chứa (slot)">
-                  <input
-                    type="number"
-                    min={1}
-                    value={r.capacity || ""}
-                    disabled={!editable}
-                    onChange={(e) =>
-                      updateRow(r.key, { capacity: Number(e.target.value) || 0 })
-                    }
-                    className={inputClass}
-                  />
-                </LabeledField>
-                <LabeledField label="Giờ xuất phát">
-                  <input
-                    type="time"
-                    value={r.startAt}
-                    disabled={!editable}
-                    onChange={(e) => updateRow(r.key, { startAt: e.target.value })}
-                    className={inputClass}
-                  />
-                </LabeledField>
-                <LabeledField label="Giờ kết thúc / cutoff">
-                  <input
-                    type="time"
-                    value={r.endAt}
-                    disabled={!editable}
-                    onChange={(e) => updateRow(r.key, { endAt: e.target.value })}
-                    className={inputClass}
-                  />
-                </LabeledField>
-              </div>
-
-              <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => togglePricing(r.key)}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-700 hover:bg-orange-100"
-                >
-                  <Settings2 className="h-3.5 w-3.5" />
-                  {r.pricingOpen
-                    ? "Đóng giá"
-                    : editable
-                      ? "Setup giá"
-                      : "Xem giá"}
-                  {r.basePrice > 0
-                    ? ` · ${r.basePrice.toLocaleString("vi-VN")}đ`
-                    : ""}
-                  {r.types.length > 0 ? ` · ${r.types.length} type` : ""}
-                </button>
-                {editable && (
-                  <button
-                    type="button"
-                    onClick={() => removeRow(r.key)}
-                    className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" /> Xóa
-                  </button>
-                )}
-              </div>
-
-              {r.pricingOpen && (
-                <div className="mt-3 rounded-xl border border-orange-200/80 bg-white/80 p-3 sm:p-4">
-                  <div className="mb-2 flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-foreground">
-                        {editable ? "Setup giá" : "Chi tiết giá"} —{" "}
-                        {r.name || "cự ly"}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">
-                        Fallback ngoài type · Early bird ưu tiên khi trùng ngày.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => togglePricing(r.key)}
-                      className="shrink-0 rounded-lg p-1.5 text-slate-500 hover:bg-muted"
-                      aria-label="Đóng"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-
-                  <LabeledField label="Giá fallback (VND)">
-                    <input
-                      type="number"
-                      min={0}
-                      value={r.basePrice || ""}
-                      disabled={!editable}
-                      onChange={(e) =>
-                        updateRow(r.key, {
-                          basePrice: Number(e.target.value) || 0,
-                        })
-                      }
-                      className={`${inputClass} max-w-xs`}
-                    />
-                  </LabeledField>
-
-                  <div className="mt-3">
-                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                        Type theo ngày ({r.types.length})
-                      </p>
-                      {editable && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateRow(r.key, {
-                              types: [
-                                ...r.types,
-                                {
-                                  id: `type-${Date.now()}`,
-                                  name: "Early Bird",
-                                  dateFrom: "",
-                                  dateTo: "",
-                                  price: Math.max(0, r.basePrice - 50000),
-                                },
-                              ],
-                            })
-                          }
-                          className="inline-flex items-center gap-1 rounded-lg border border-dashed border-orange-300 px-2.5 py-1 text-[11px] font-bold text-orange-600 hover:bg-orange-50"
-                        >
-                          <Plus className="h-3 w-3" /> Thêm type
-                        </button>
-                      )}
-                    </div>
-
-                    {r.types.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">
-                        Chưa có type — dùng giá fallback.
-                      </p>
-                    ) : (
-                      <div className="max-h-56 space-y-2 overflow-y-auto overscroll-contain pr-0.5 sm:max-h-64">
-                        {r.types.map((p, pi) => (
-                          <div
-                            key={p.id}
-                            className="grid grid-cols-1 gap-2 rounded-lg border border-border/60 bg-muted/20 p-2.5 sm:grid-cols-5"
-                          >
-                            <LabeledField label="Tên">
-                              <input
-                                value={p.name}
-                                disabled={!editable}
-                                onChange={(e) => {
-                                  const v = e.target.value;
-                                  updateRow(r.key, {
-                                    types: r.types.map((x, i) =>
-                                      i === pi ? { ...x, name: v } : x
-                                    ),
-                                  });
-                                }}
-                                className={inputClass}
-                                placeholder="Early Bird"
-                              />
-                            </LabeledField>
-                            <LabeledField label="Từ">
-                              <input
-                                type="date"
-                                value={p.dateFrom}
-                                disabled={!editable}
-                                onChange={(e) => {
-                                  const v = e.target.value;
-                                  updateRow(r.key, {
-                                    types: r.types.map((x, i) =>
-                                      i === pi ? { ...x, dateFrom: v } : x
-                                    ),
-                                  });
-                                }}
-                                className={inputClass}
-                              />
-                            </LabeledField>
-                            <LabeledField label="Đến">
-                              <input
-                                type="date"
-                                value={p.dateTo}
-                                disabled={!editable}
-                                onChange={(e) => {
-                                  const v = e.target.value;
-                                  updateRow(r.key, {
-                                    types: r.types.map((x, i) =>
-                                      i === pi ? { ...x, dateTo: v } : x
-                                    ),
-                                  });
-                                }}
-                                className={inputClass}
-                              />
-                            </LabeledField>
-                            <LabeledField label="Giá">
-                              <input
-                                type="number"
-                                min={0}
-                                value={p.price || ""}
-                                disabled={!editable}
-                                onChange={(e) => {
-                                  const v = Number(e.target.value) || 0;
-                                  updateRow(r.key, {
-                                    types: r.types.map((x, i) =>
-                                      i === pi ? { ...x, price: v } : x
-                                    ),
-                                  });
-                                }}
-                                className={inputClass}
-                              />
-                            </LabeledField>
-                            {editable && (
-                              <div className="flex items-end">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    updateRow(r.key, {
-                                      types: r.types.filter((_, i) => i !== pi),
-                                    })
-                                  }
-                                  className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-border py-2 text-xs font-semibold text-red-600 hover:bg-red-50"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+        <div className="space-y-3">
+          {rows.map((row) => (
+            <div key={row.distanceKm} className={`overflow-hidden rounded-xl border ${row.selected ? "border-orange-200 bg-orange-50/20" : "border-border bg-muted/30"}`}>
+              <label className="flex cursor-pointer items-center gap-3 px-4 py-3.5">
+                <input type="checkbox" checked={row.selected} disabled={disabled || row.registeredCount > 0}
+                  aria-controls={`distance-${row.distanceKm}`} aria-expanded={row.selected}
+                  onChange={(e) => updateRow(row.distanceKm, { selected: e.target.checked })}
+                  className="h-4 w-4 accent-orange-600" />
+                <span className="font-bold">{row.distanceKm} km</span>
+                <span className="ml-auto text-xs text-muted-foreground">{row.registeredCount > 0 ? `${row.registeredCount} VĐV đã đăng ký · Không thể bỏ chọn` : row.selected ? "Đã chọn" : "Chưa chọn"}</span>
+                {row.selected ? <ChevronDown className="h-4 w-4 text-orange-600" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+              </label>
+              {row.selected && (
+                <div id={`distance-${row.distanceKm}`} className="grid grid-cols-1 gap-3 border-t border-orange-100 p-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <Field label="Tên cự ly"><input value={row.name} maxLength={100} disabled={disabled} onChange={(e) => updateRow(row.distanceKm, { name: e.target.value })} className={inputClass} /></Field>
+                  <Field label="Sức chứa (VĐV)"><input type="number" min={Math.max(1, row.registeredCount)} max={500000} step={1} value={row.capacity} disabled={disabled} onChange={(e) => updateRow(row.distanceKm, { capacity: e.target.value })} className={inputClass} /></Field>
+                  <Field label="Giờ xuất phát"><input type="time" step={1} value={row.startAt} disabled={disabled} onChange={(e) => updateRow(row.distanceKm, { startAt: e.target.value })} className={inputClass} /></Field>
+                  <Field label="Giờ kết thúc / cutoff"><input type="time" step={1} min={row.startAt || undefined} value={row.endAt} disabled={disabled} onChange={(e) => updateRow(row.distanceKm, { endAt: e.target.value })} className={inputClass} /></Field>
                 </div>
               )}
             </div>
           ))}
         </div>
       </section>
+
+      <section aria-labelledby="prices-heading" className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 id="prices-heading" className="text-lg font-bold">Giá vé</h2>
+          {editable && <button type="button" disabled={saving || !selected.length}
+            onClick={() => setRows((previous) => addSharedPriceType(previous))}
+            className="inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-bold text-orange-700 disabled:opacity-50">
+            <Plus className="h-3.5 w-3.5" />Thêm loại giá
+          </button>}
+        </div>
+        <p className="mt-1 text-sm text-muted-foreground">Tạo loại giá một lần để áp dụng cho tất cả cự ly đã chọn. Tên, key và khoảng ngày dùng chung; nhập giá tiền cho từng cự ly.</p>
+        <p className="mt-1 text-xs text-muted-foreground">Key chứa “early”: giá thấp hơn và kết thúc trước Regular. Key chứa “late”: giá cao hơn và bắt đầu sau Regular (không phân biệt hoa/thường). Các đợt này không được trùng ngày với Regular.</p>
+        {!selected.length ? (
+          <p className="mt-5 rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">Chọn cự ly ở trên để thiết lập giá vé.</p>
+        ) : (
+          <div className="mt-5 space-y-4">
+            {sharedTypes.map((type, index) => {
+              const regular = index === 0;
+              const dateError = getPriceTypeDateError(type, sharedTypes[0], regularDatesRequired);
+              const dateDescription = dateError ? `price-date-error-${index}` : undefined;
+              return (
+                <div key={index} className={`rounded-xl border p-4 ${regular ? "border-orange-200 bg-orange-50/40" : "border-border bg-muted/20"}`}>
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-bold">{regular ? "Regular · Giá gốc bắt buộc" : type.name || `Loại giá ${index + 1}`}</h3>
+                    {!regular && editable && <button type="button" disabled={saving}
+                      aria-label={`Xóa loại giá ${type.name || index + 1} khỏi tất cả cự ly`}
+                      onClick={() => setRows((previous) => removeSharedPriceType(previous, index))}
+                      className="rounded-lg p-1.5 text-red-600 hover:bg-red-50 disabled:opacity-50">
+                      <Trash2 className="h-4 w-4" />
+                    </button>}
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <Field label="Tên loại giá"><input value={type.name} disabled={disabled || regular} placeholder="VD: Early Bird" onChange={(e) => updateType(index, { name: e.target.value })} className={inputClass} /></Field>
+                    <Field label="Key"><input value={type.key} disabled={disabled || regular} placeholder="VD: early_bird" onChange={(e) => updateType(index, { key: e.target.value })} className={inputClass} /></Field>
+                    <Field label={regular && !regularDatesRequired ? "Từ ngày (tùy chọn)" : "Từ ngày"}><input type="date" value={type.dateFrom} disabled={disabled} required={!regular || regularDatesRequired} aria-invalid={!!dateError} aria-describedby={dateDescription} onChange={(e) => updateType(index, { dateFrom: e.target.value })} className={inputClass} /></Field>
+                    <Field label={regular && !regularDatesRequired ? "Đến ngày (tùy chọn)" : "Đến ngày"}><input type="date" min={type.dateFrom || undefined} value={type.dateTo} disabled={disabled} required={!regular || regularDatesRequired} aria-invalid={!!dateError} aria-describedby={dateDescription} onChange={(e) => updateType(index, { dateTo: e.target.value })} className={inputClass} /></Field>
+                  </div>
+                  {dateError && <p id={`price-date-error-${index}`} className="mt-2 text-xs text-red-600" role="status">{dateError}</p>}
+                  <div className="mt-4 border-t border-border/60 pt-3">
+                    <p className="mb-3 text-xs font-semibold text-muted-foreground">Giá áp dụng cho {selected.length} cự ly đã chọn (VND)</p>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      {selected.map((row) => {
+                        const priceType = row.types[index];
+                        const typeError = getPriceTypeError(priceType, row.types[0].price);
+                        return (
+                          <div key={row.distanceKm} className="min-w-0">
+                            <Field label={`${row.distanceKm} km · ${row.name || "Chưa đặt tên"}`}>
+                              <input type="number" min={0} max={100000000} step="any"
+                                value={priceType.price} disabled={disabled} placeholder="Nhập giá vé"
+                                aria-invalid={!!typeError}
+                                aria-describedby={typeError ? `price-error-${index}-${row.distanceKm}` : undefined}
+                                onChange={(e) => updatePrice(row, index, e.target.value)} className={inputClass} />
+                            </Field>
+                            {typeError && <p id={`price-error-${index}-${row.distanceKm}`} className="mt-2 text-xs text-red-600" role="status">{typeError}</p>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  {regular && <p className="mt-3 text-xs text-muted-foreground">Giá Regular được dùng làm giá gốc ngoài các đợt giá. {regularDatesRequired ? "Phải nhập khoảng ngày khi có loại giá early hoặc late." : "Có thể để trống cả hai ngày nếu không có loại giá early hoặc late."}</p>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
 
-function LabeledField({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div>
-      <label className="mb-1 block text-[11px] font-semibold text-muted-foreground">
-        {label}
-      </label>
+    <label className="block min-w-0">
+      <span className="mb-1 block text-xs font-semibold text-muted-foreground">{label}</span>
       {children}
-    </div>
+    </label>
   );
 }
 
-const inputClass =
-  "w-full rounded-lg border border-border bg-background px-2.5 py-2 text-sm disabled:opacity-60 focus:border-orange-500/50 focus:outline-none focus:ring-2 focus:ring-orange-500/20";
+const inputClass = "w-full min-w-0 rounded-lg border border-border bg-background px-2.5 py-2 text-sm disabled:opacity-60 focus:border-orange-500/50 focus:outline-none focus:ring-2 focus:ring-orange-500/20";
