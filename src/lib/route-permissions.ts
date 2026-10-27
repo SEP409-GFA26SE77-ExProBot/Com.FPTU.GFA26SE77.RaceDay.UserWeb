@@ -8,6 +8,7 @@ const authenticated = [
   "/wallet",
   "/certificates",
   "/disputes",
+  "/photos",
   "/race-day",
   "/events/create",
   "/register-event",
