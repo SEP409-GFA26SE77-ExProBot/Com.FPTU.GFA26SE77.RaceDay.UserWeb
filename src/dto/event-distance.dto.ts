@@ -50,6 +50,8 @@ export interface ReplaceEventDistancesRequest {
     distanceKm: number;
     capacity: number;
     basePrice: number;
+    /** Chip BXH / gợi ý prefix BIB: 5KM | 10KM | HM | M | … */
+    type?: string | null;
     startAt?: string | null;
     endAt?: string | null;
   }[];

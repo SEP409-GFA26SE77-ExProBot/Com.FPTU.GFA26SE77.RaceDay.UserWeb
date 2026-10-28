@@ -254,7 +254,7 @@ function PhotosInner() {
         <LogIn className="h-10 w-10 text-orange-500" />
         <h1 className="text-2xl font-bold">Đăng nhập để tìm ảnh theo BIB</h1>
         <p className="max-w-md text-sm text-muted-foreground">
-          Ảnh đã gắn BIB (sau OCR / sửa tay) chỉ xem khi đã đăng nhập.
+          Đăng nhập để xem ảnh sự kiện đã gắn số BIB của bạn.
         </p>
         <Link
           href="/login?from=/photos"
@@ -270,7 +270,7 @@ function PhotosInner() {
     return (
       <PageLoading
         title="Đang tải…"
-        description="Chuẩn bị tìm ảnh theo BIB."
+        description="Đang tải danh sách giải và BIB của bạn…"
         icon={Camera}
       />
     );
@@ -286,8 +286,8 @@ function PhotosInner() {
           Tìm ảnh theo BIB
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Tra cứu ảnh đã gắn BIB qua Photo API (OCR từ Photo service). Chỉ hiện
-          ảnh đã duyệt / sửa tay — không gọi OCR trực tiếp từ trình duyệt.
+          Nhập số BIB để xem ảnh sự kiện đã được gắn với bạn. Chỉ hiển thị ảnh
+          đã sẵn sàng xem — ảnh đang xử lý sẽ xuất hiện sau khi BTC hoàn tất.
         </p>
       </div>
 
@@ -387,8 +387,8 @@ function PhotosInner() {
           <Camera className="mx-auto h-10 w-10 text-muted-foreground" />
           <h2 className="text-lg font-bold">Chưa có ảnh cho BIB này</h2>
           <p className="mx-auto max-w-md text-sm text-muted-foreground">
-            Photographer cần upload + OCR (Photo service) xong thì ảnh mới hiện
-            ở đây. Chỉ status matched / manual_corrected.
+            Có thể ảnh chưa được tải lên hoặc đang xử lý. Thử lại sau, hoặc kiểm
+            tra lại số BIB và giải bạn đã chọn.
           </p>
         </div>
       )}

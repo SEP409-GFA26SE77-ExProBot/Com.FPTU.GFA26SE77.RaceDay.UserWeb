@@ -180,7 +180,7 @@ export default function ProfileBasicClient() {
       const text = await file.text();
       const raw = JSON.parse(text) as Record<string, unknown>;
       if (!raw || typeof raw !== "object") {
-        toastError("File JSON không hợp lệ.");
+        toastError("File không hợp lệ.");
         return;
       }
       if (typeof raw.name === "string") setName(raw.name);
@@ -205,11 +205,11 @@ export default function ProfileBasicClient() {
         if (typeof org.phone === "string") setOrgPhone(org.phone);
         setShowAdvanced(true);
       }
-      toastSuccess("Đã import thông tin cơ bản từ JSON.");
+      toastSuccess("Đã điền thông tin cơ bản từ file.");
     } catch (e) {
       toastError(
-        e instanceof SyntaxError ? "JSON không đọc được." : e,
-        "Import thất bại."
+        e instanceof SyntaxError ? "Không đọc được nội dung file." : e,
+        "Nhập từ file thất bại."
       );
     }
   }, []);
@@ -462,7 +462,7 @@ export default function ProfileBasicClient() {
                   className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2.5 text-sm font-bold hover:border-orange-300 hover:text-orange-600"
                 >
                   <Upload className="h-4 w-4" />
-                  Import JSON
+                  Nhập từ file
                 </button>
               </>
             ) : null}

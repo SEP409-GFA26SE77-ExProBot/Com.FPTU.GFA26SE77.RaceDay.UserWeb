@@ -121,10 +121,15 @@ export default function EventCard({
 
   const totalCapacity =
     distances.reduce((s, d) => s + d.capacity, 0) || event.totalRunners || 0;
-  const totalRegistered = distances.reduce(
+  // List API không trả distances[].registeredCount — dùng activeRunners.
+  const registeredFromDistances = distances.reduce(
     (s, d) => s + (d.registeredCount ?? 0),
     0
   );
+  const totalRegistered =
+    distances.length > 0
+      ? registeredFromDistances
+      : (event.activeRunners ?? 0);
   const progressPercent = totalCapacity
     ? Math.round((totalRegistered / totalCapacity) * 100)
     : 0;
