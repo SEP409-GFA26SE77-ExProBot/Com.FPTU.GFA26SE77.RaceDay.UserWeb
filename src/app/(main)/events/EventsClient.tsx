@@ -6,6 +6,10 @@ import { RaceEventListItemDto } from "@/dto/event.dto";
 import { getEvents } from "@/api/events";
 import EventCard from "@/components/events/EventCard";
 import EventCardSkeleton from "@/components/events/EventCardSkeleton";
+import FilterChip from "@/components/events/FilterChip";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Search,
   X,
@@ -116,30 +120,6 @@ function minEventPrice(event: RaceEventListItemDto): number | null {
   return null;
 }
 
-function FilterChip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all border ${
-        active
-          ? "bg-orange-500 text-white border-orange-600 shadow-sm shadow-orange-500/25"
-          : "bg-white text-foreground/70 border-border hover:border-orange-400/50 hover:text-foreground"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
 function EventsClientInner() {
   const searchParams = useSearchParams();
   const tagFromUrl = searchParams.get("tag") || "";
@@ -153,6 +133,7 @@ function EventsClientInner() {
   const [provinceFilter, setProvinceFilter] = useState<string>("all");
   const [priceFilter, setPriceFilter] = useState<PriceKey>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -175,7 +156,7 @@ function EventsClientInner() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadAttempt]);
 
   useEffect(() => {
     if (!tagFromUrl) return;
@@ -285,43 +266,48 @@ function EventsClientInner() {
 
   return (
     <div className={`${PAGE_SHELL} py-7 sm:py-8`}>
-      <div className="mb-6 rounded-2xl border border-orange-500/15 bg-gradient-to-br from-orange-50/80 via-white to-amber-50/40 p-5 sm:p-6">
+      <div className="mb-6 rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-8">
+        <p className="mb-2 text-xs font-bold uppercase tracking-widest text-orange-700">Tìm vạch xuất phát tiếp theo</p>
         <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
           Khám phá giải chạy
         </h1>
         <p className="mt-1.5 text-muted-foreground max-w-3xl text-sm sm:text-base">
-          Tìm theo tên / địa điểm, lọc theo trạng thái giải (đang mở, sắp mở,
-          đã đóng), cự ly (theo km), thành phố và mức giá.
+          Chọn giải chạy phù hợp với bạn. Tìm theo địa điểm, cự ly và mức giá để bắt đầu hành trình mới.
         </p>
 
-        <div className="mt-4 flex items-center gap-3">
+        <Label htmlFor="event-search" className="mt-6 mb-2 block text-sm font-semibold">Bạn muốn chạy ở đâu?</Label>
+        <div className="flex items-center gap-2 sm:gap-3">
           <div className="relative min-w-0 flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <input
-              type="text"
+            <Input
+              id="event-search"
+              type="search"
               placeholder="Tìm giải, địa điểm..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-xl border border-border bg-white py-2.5 pl-10 pr-10 text-sm outline-none transition-all focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20"
+              className="h-12 rounded-xl bg-background pl-10 pr-12 text-base focus-visible:border-orange-500 focus-visible:ring-orange-500/20 [&::-webkit-search-cancel-button]:hidden"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-muted text-muted-foreground"
+                className="absolute right-1 top-1/2 flex size-11 -translate-y-1/2 items-center justify-center rounded-xl hover:bg-muted text-muted-foreground focus-visible:outline-2 focus-visible:outline-orange-600"
                 aria-label="Xóa tìm kiếm"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
-          <button
+          <Button
             type="button"
+            variant="outline"
             onClick={() => setFiltersOpen((o) => !o)}
             aria-expanded={filtersOpen}
-            className={`shrink-0 inline-flex h-[42px] items-center justify-center gap-2 rounded-xl border px-4 text-sm font-semibold transition-colors ${
+            aria-controls="event-filters"
+            aria-label={`Bộ lọc giải chạy${activeFilterCount ? `, ${activeFilterCount} đang áp dụng` : ""}`}
+            className={`shrink-0 inline-flex h-12 items-center justify-center gap-2 rounded-xl border px-3 sm:px-4 text-sm font-semibold transition-colors ${
               filtersOpen || activeFilterCount > 0
-                ? "border-orange-500 bg-orange-500 text-white shadow-sm shadow-orange-500/25"
+                ? "border-orange-300 bg-orange-50 text-orange-800"
                 : "border-border bg-white text-foreground hover:border-orange-400/60"
             }`}
           >
@@ -341,17 +327,17 @@ function EventsClientInner() {
             ) : (
               <ChevronDown className="h-4 w-4 opacity-90" />
             )}
-          </button>
+          </Button>
         </div>
       </div>
 
       {error && (
-        <div className="mb-6 rounded-xl border border-red-500/20 bg-red-500/5 p-5 text-center">
+        <div role="alert" className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
           <p className="text-sm text-red-600 font-medium">{error}</p>
           <button
             type="button"
-            onClick={() => window.location.reload()}
-            className="mt-3 rounded-full bg-orange-500 px-5 py-2 text-sm font-semibold text-white"
+            onClick={() => { setBoot(true); setLoadAttempt((attempt) => attempt + 1); }}
+            className="mt-3 min-h-11 rounded-xl bg-orange-600 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-700"
           >
             Thử lại
           </button>
@@ -359,7 +345,7 @@ function EventsClientInner() {
       )}
 
       {filtersOpen && (
-        <div className="mb-6 rounded-2xl border border-border bg-card p-4 sm:p-5 space-y-4 shadow-sm animate-in fade-in slide-in-from-top-1">
+        <div id="event-filters" className="mb-6 rounded-2xl border border-border bg-card p-4 sm:p-6 space-y-5 shadow-sm animate-in fade-in slide-in-from-top-1">
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-bold">Bộ lọc giải chạy</p>
             <div className="flex items-center gap-2">
@@ -467,11 +453,11 @@ function EventsClientInner() {
         </div>
       )}
 
-      <p className="mb-4 text-xs text-muted-foreground">
+      {!error && <p role="status" className="mb-4 text-sm text-muted-foreground">
         Hiển thị {filtered.length} / {discoverable.length} giải
-      </p>
+      </p>}
 
-      <div
+      {!error && <><div
         className={`list-fade ${pager.visible ? "list-fade-in" : "list-fade-out"} relative min-h-[280px]`}
       >
         {pager.turning ? (
@@ -481,19 +467,19 @@ function EventsClientInner() {
             ))}
           </div>
         ) : pager.pageItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card px-5 py-16 text-center">
             <Search className="h-8 w-8 text-muted-foreground mb-3" />
-            <h3 className="text-lg font-semibold mb-1">Không tìm thấy giải</h3>
+            <h2 className="text-lg font-semibold mb-1">{discoverable.length ? "Không tìm thấy giải phù hợp" : "Chưa có giải chạy để khám phá"}</h2>
             <p className="text-sm text-muted-foreground max-w-sm">
-              Thử đổi từ khóa hoặc bộ lọc.
+              {discoverable.length ? "Thử đổi từ khóa hoặc xóa bộ lọc để xem thêm giải chạy." : "Các giải chạy mới sẽ được cập nhật tại đây. Bạn hãy quay lại sau nhé."}
             </p>
-            <button
+            {(searchQuery || activeFilterCount > 0) && <button
               type="button"
               onClick={clearFilters}
-              className="mt-4 rounded-full bg-orange-500 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-600"
+              className="mt-4 min-h-11 rounded-xl bg-orange-600 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-700"
             >
               Xóa bộ lọc
-            </button>
+            </button>}
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3 list-stagger">
@@ -514,6 +500,7 @@ function EventsClientInner() {
           disabled={pager.turning}
         />
       </div>
+      </>}
     </div>
   );
 }
