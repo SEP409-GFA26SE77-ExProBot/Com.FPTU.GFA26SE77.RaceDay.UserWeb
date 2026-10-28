@@ -141,7 +141,7 @@ export default function Header() {
             <Flag className="h-5 w-5" />
           </div>
           <div className="flex flex-col">
-            <span className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
+            <span className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-orange-700 to-red-700 bg-clip-text text-transparent">
               RaceDay
             </span>
           </div>
@@ -168,7 +168,7 @@ export default function Header() {
                 onClick={closeMenus}
                 className={`flex min-h-11 items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600 ${
                   isActive
-                    ? "bg-orange-500/10 text-orange-600 dark:text-orange-400 font-semibold"
+                    ? "bg-orange-500/10 text-orange-700 dark:text-orange-400 font-semibold"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
                 }`}
               >
@@ -325,7 +325,7 @@ export default function Header() {
               <Link
                 href="/register"
                 onClick={closeMenus}
-                className="inline-flex min-h-11 items-center justify-center rounded-xl bg-gradient-to-r from-orange-600 to-red-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600"
+                className="inline-flex min-h-11 items-center justify-center rounded-xl bg-gradient-to-r from-orange-700 to-red-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600"
               >
                 Đăng ký ngay
               </Link>
@@ -402,7 +402,7 @@ export default function Header() {
                   onClick={closeMenus}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                     isActive
-                      ? "bg-orange-500/10 text-orange-600 dark:text-orange-400 font-semibold"
+                      ? "bg-orange-500/10 text-orange-700 dark:text-orange-400 font-semibold"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
                   }`}
                 >
@@ -419,7 +419,7 @@ export default function Header() {
                   onClick={closeMenus}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                     pathname === "/profile"
-                      ? "bg-orange-500/10 text-orange-600 font-semibold"
+                      ? "bg-orange-500/10 text-orange-700 font-semibold"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
                   }`}
                 >
@@ -432,7 +432,7 @@ export default function Header() {
                     onClick={closeMenus}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                       pathname.startsWith("/my-registrations")
-                        ? "bg-orange-500/10 text-orange-600 font-semibold"
+                        ? "bg-orange-500/10 text-orange-700 font-semibold"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
                     }`}
                   >
@@ -444,7 +444,7 @@ export default function Header() {
                     onClick={closeMenus}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                       pathname.startsWith("/payments")
-                        ? "bg-orange-500/10 text-orange-600 font-semibold"
+                        ? "bg-orange-500/10 text-orange-700 font-semibold"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
                     }`}
                   >
@@ -456,7 +456,7 @@ export default function Header() {
                     onClick={closeMenus}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                       pathname.startsWith("/certificates")
-                        ? "bg-orange-500/10 text-orange-600 font-semibold"
+                        ? "bg-orange-500/10 text-orange-700 font-semibold"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
                     }`}
                   >
@@ -468,7 +468,7 @@ export default function Header() {
                     onClick={closeMenus}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                       pathname.startsWith("/disputes")
-                        ? "bg-orange-500/10 text-orange-600 font-semibold"
+                        ? "bg-orange-500/10 text-orange-700 font-semibold"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
                     }`}
                   >
@@ -480,7 +480,7 @@ export default function Header() {
                     onClick={closeMenus}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                       pathname.startsWith("/registered-events")
-                        ? "bg-orange-500/10 text-orange-600 font-semibold"
+                        ? "bg-orange-500/10 text-orange-700 font-semibold"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
                     }`}
                   >
@@ -495,7 +495,7 @@ export default function Header() {
                       onClick={closeMenus}
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                       pathname.startsWith("/my-events")
-                        ? "bg-orange-500/10 text-orange-600 font-semibold"
+                        ? "bg-orange-500/10 text-orange-700 font-semibold"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
                     }`}
                     >
@@ -506,7 +506,7 @@ export default function Header() {
                       href="/wallet"
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                       pathname.startsWith("/wallet")
-                        ? "bg-orange-500/10 text-orange-600 font-semibold"
+                        ? "bg-orange-500/10 text-orange-700 font-semibold"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
                     }`}
                       onClick={closeMenus}

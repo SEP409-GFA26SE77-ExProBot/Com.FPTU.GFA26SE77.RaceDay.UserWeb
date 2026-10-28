@@ -1,42 +1,48 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Award, Printer } from "lucide-react";
-import { getRegistrationById, getEventById } from "@/api/events";
-import { RegistrationDto, RaceEventDto } from "@/dto/event.dto";
-import { formatDate, formatPrice, getRegistrationStatusLabel } from "@/lib/format";
+import { ArrowLeft, Award, Info } from "lucide-react";
+import { getRegistrationCertificate } from "@/api/events";
+import type { RunnerCertificateDto } from "@/dto/certificate.dto";
+import { formatDate, getRegistrationStatusLabel } from "@/lib/format";
 import { getApiErrorMessage } from "@/lib/error";
 import { PAGE_SHELL_FORM } from "@/lib/page-shell";
 import PageLoading from "@/components/ui/PageLoading";
+import { Button } from "@/components/ui/button";
+import ParticipationCertificate from "@/components/certificates/ParticipationCertificate";
+import type { CertificateDetails } from "@/lib/certificate-canvas";
 
 export default function CertificateDetailPage() {
   const params = useParams();
   const regId = String(params.regId);
-  const [reg, setReg] = useState<RegistrationDto | null>(null);
-  const [event, setEvent] = useState<RaceEventDto | null>(null);
+  return <CertificateContent key={regId} regId={regId} />;
+}
+
+function CertificateContent({ regId }: { regId: string }) {
+  const [certificate, setCertificate] = useState<RunnerCertificateDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const r = await getRegistrationById(regId);
+        const result = await getRegistrationCertificate(regId);
         if (cancelled) return;
-        setReg(r);
-        try {
-          const ev = await getEventById(r.eventId);
-          if (!cancelled) setEvent(ev);
-        } catch {
-          /* optional */
+        if (result === false) {
+          setCertificate(null);
+          setError("Bạn chưa hoàn thành giải hoặc kết quả hoàn thành chưa được ghi nhận.");
+          return;
         }
+        setCertificate(result);
         setError(null);
       } catch (e) {
         if (!cancelled) {
-          setError(getApiErrorMessage(e, "Không tải được đăng ký."));
-          setReg(null);
+          setError(getApiErrorMessage(e, "Không tải được chứng nhận. Vui lòng thử lại."));
+          setCertificate(null);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -45,103 +51,74 @@ export default function CertificateDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [regId]);
+  }, [regId, loadAttempt]);
+
+  const details = useMemo<CertificateDetails | null>(() => certificate ? {
+    runnerName: certificate.runnerName,
+    eventName: certificate.eventName,
+    bib: certificate.bib || "Chưa cấp",
+    distance: certificate.distance,
+    raceDate: formatDate(`${certificate.raceDate}T00:00:00`),
+    status: getRegistrationStatusLabel(certificate.status),
+    registrationId: certificate.registrationId,
+    finishTime: certificate.finishTime,
+    pace: certificate.pace,
+  } : null, [certificate]);
 
   if (loading) {
     return (
       <PageLoading
         title="Đang tải chứng nhận…"
-        description="Lấy dữ liệu đăng ký từ API."
+        description="Đang kiểm tra kết quả hoàn thành giải của bạn."
         icon={Award}
       />
     );
   }
 
-  if (error || !reg) {
+  if (error || !certificate || !details) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4 gap-4">
-        <h1 className="text-2xl font-bold">Không tìm thấy</h1>
-        <p className="text-sm text-muted-foreground">{error}</p>
-        <Link
-          href="/certificates"
-          className="rounded-full bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white"
-        >
-          Về danh sách
-        </Link>
+        <Award aria-hidden="true" className="size-12 text-orange-700" />
+        <h1 className="text-2xl font-bold">Chưa thể tải chứng nhận</h1>
+        <p role="alert" className="max-w-md text-sm text-muted-foreground">{error || "Không tìm thấy chứng nhận của bạn."}</p>
+        <div className="flex flex-wrap justify-center gap-2">
+          <Button type="button" onClick={() => { setLoading(true); setLoadAttempt((attempt) => attempt + 1); }} className="min-h-11 rounded-xl bg-orange-700 px-5 text-white hover:bg-orange-800">Thử lại</Button>
+          <Button asChild variant="outline" className="min-h-11 rounded-xl px-5"><Link href="/certificates">Về danh sách</Link></Button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className={`${PAGE_SHELL_FORM} max-w-2xl py-7 space-y-6`}>
+    <div className={`${PAGE_SHELL_FORM} py-6 sm:py-8 space-y-6`}>
       <Link
         href="/certificates"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+        className="inline-flex min-h-11 items-center gap-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-600"
       >
-        <ArrowLeft className="h-3.5 w-3.5" />
-        Về chứng nhận
+        <ArrowLeft aria-hidden="true" className="size-4" />
+        Tất cả chứng nhận
       </Link>
 
-      <div className="rounded-2xl border-2 border-orange-500/30 bg-white shadow-lg overflow-hidden print:shadow-none">
-        <div className="bg-gradient-to-r from-orange-500 to-red-600 px-6 py-4 text-white text-center">
-          <p className="text-xs uppercase tracking-widest font-semibold opacity-90">
-            Chứng nhận RaceDay
-          </p>
-          <h1 className="text-xl font-extrabold mt-1">Chứng nhận tham gia</h1>
-        </div>
-        <div className="p-8 space-y-4 text-center">
-          <p className="text-sm text-muted-foreground">Chứng nhận rằng</p>
-          <p className="text-2xl font-extrabold text-foreground">{reg.fullName}</p>
-          <p className="text-sm text-muted-foreground">đã đăng ký tham gia</p>
-          <p className="text-lg font-bold">
-            {reg.eventName || event?.name || "Giải chạy RaceDay"}
-          </p>
-          <div className="grid grid-cols-2 gap-3 text-sm text-left max-w-sm mx-auto pt-2">
-            <div className="rounded-xl bg-muted/40 p-3">
-              <p className="text-[10px] uppercase text-muted-foreground font-semibold">BIB</p>
-              <p className="font-bold">{reg.bibNumber || "—"}</p>
-            </div>
-            <div className="rounded-xl bg-muted/40 p-3">
-              <p className="text-[10px] uppercase text-muted-foreground font-semibold">
-                Cự ly
-              </p>
-              <p className="font-bold">{reg.distanceName || "—"}</p>
-            </div>
-            <div className="rounded-xl bg-muted/40 p-3">
-              <p className="text-[10px] uppercase text-muted-foreground font-semibold">
-                Ngày giải
-              </p>
-              <p className="font-bold">{event ? formatDate(event.date) : "—"}</p>
-            </div>
-            <div className="rounded-xl bg-muted/40 p-3">
-              <p className="text-[10px] uppercase text-muted-foreground font-semibold">
-                Trạng thái
-              </p>
-              <p className="font-bold">{getRegistrationStatusLabel(reg.status)}</p>
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground pt-2">
-            Thanh toán: {formatPrice(reg.distancePrice ?? 0)} · Mã ĐK: {reg.id}
-          </p>
-        </div>
+      <div>
+        <p className="mb-2 text-xs font-bold uppercase tracking-widest text-orange-700">Dấu ấn trên đường chạy</p>
+        <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">Chứng nhận tham gia</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">Lưu lại cột mốc của bạn cùng {details.eventName}. Tải chứng nhận dưới dạng PDF để lưu giữ hoặc chia sẻ.</p>
       </div>
 
-      <div className="flex flex-wrap gap-2 print:hidden">
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-semibold hover:bg-muted"
-        >
-          <Printer className="h-4 w-4" />
-          In / PDF
-        </button>
-        <Link
-          href={`/my-registrations/${reg.id}`}
-          className="inline-flex rounded-full bg-orange-500 px-4 py-2 text-sm font-semibold text-white"
-        >
-          Xem vé & QR
-        </Link>
-      </div>
+      <ParticipationCertificate key={`${certificate.registrationId}-${certificate.finishedAtUtc}`} details={details} />
+
+      <section aria-labelledby="certificate-details-title" className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+        <h2 id="certificate-details-title" className="text-base font-bold">Thông tin đăng ký</h2>
+        <dl className="mt-4 grid gap-x-6 gap-y-5 text-sm sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            ["Vận động viên", details.runnerName], ["Giải chạy", details.eventName], ["Số BIB", details.bib],
+            ["Cự ly", details.distance], ["Ngày thi đấu", details.raceDate], ["Trạng thái", details.status],
+            ["Thời gian hoàn thành", details.finishTime],
+            ["Pace trung bình", `${details.pace} phút/km`],
+          ].map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-muted-foreground">{label}</dt><dd className="mt-1 break-words font-semibold">{value}</dd></div>)}
+        </dl>
+        <p className="mt-5 flex items-start gap-2 border-t border-border pt-4 text-xs leading-relaxed text-muted-foreground"><Info aria-hidden="true" className="mt-0.5 size-4 shrink-0" />Chứng nhận được tạo từ kết quả hoàn thành đã ghi nhận trên RaceDay, không thay thế chứng nhận thành tích chính thức của BTC.</p>
+      </section>
     </div>
   );
 }

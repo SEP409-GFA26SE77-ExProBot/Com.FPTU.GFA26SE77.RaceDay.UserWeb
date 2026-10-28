@@ -263,10 +263,10 @@ export default function PaymentsHistoryPage() {
 
       {!error && (items.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">
-          <Receipt aria-hidden="true" className="mx-auto mb-3 size-10 text-orange-600" />
+          <Receipt aria-hidden="true" className="mx-auto mb-3 size-10 text-orange-700" />
           <h2 className="text-lg font-bold text-foreground">Bạn chưa có giao dịch nào</h2>
           <p className="mt-2">Các khoản thanh toán cho giải chạy sẽ xuất hiện tại đây.</p>
-          <Button asChild className="mt-5 min-h-11 rounded-xl bg-orange-600 px-5 text-white hover:bg-orange-700"><Link href="/events">Khám phá giải chạy</Link></Button>
+          <Button asChild className="mt-5 min-h-11 rounded-xl bg-orange-700 px-5 text-white hover:bg-orange-800"><Link href="/events">Khám phá giải chạy</Link></Button>
         </div>
       ) : (
         <>
@@ -310,7 +310,7 @@ export default function PaymentsHistoryPage() {
                       </div>
                       <div className="flex flex-wrap items-end justify-between gap-2 pt-1">
                         <div>
-                          <p className="text-lg font-extrabold text-orange-600">
+                          <p className="text-lg font-extrabold text-orange-700">
                             {formatPrice(Number(p.amount || 0))}
                           </p>
                           {Number(p.discountAmount || 0) > 0 ? (
@@ -338,7 +338,7 @@ export default function PaymentsHistoryPage() {
                           {["pending", "cancelled", "failed", "expired"].includes(p.status) && (
                             <Link
                               href={`/payments/${encodeURIComponent(p.id)}/continue`}
-                              className="inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white hover:bg-orange-600 transition-colors"
+                              className="inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white hover:bg-orange-800 transition-colors"
                             >
                               {p.status === "pending" ? "Tiếp tục thanh toán" : "Thanh toán lại"}
                               <ExternalLink className="h-3 w-3" />
@@ -350,7 +350,7 @@ export default function PaymentsHistoryPage() {
                             p.registrationId && (
                               <Link
                                 href={`/my-registrations/${p.registrationId}`}
-                                className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 hover:underline"
+                                className="inline-flex items-center gap-1 text-xs font-semibold text-orange-700 hover:underline"
                               >
                                 {p.status === "refunded" ? "Chi tiết" : "Xem vé"}{" "}
                                 <ExternalLink className="h-3 w-3" />
@@ -360,7 +360,7 @@ export default function PaymentsHistoryPage() {
                           {p.status === "paid" && isPackage && (
                             <Link
                               href="/organizer"
-                              className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 hover:underline"
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-orange-700 hover:underline"
                             >
                               Xem giải của tôi <ExternalLink className="h-3 w-3" />
                             </Link>
@@ -447,7 +447,7 @@ export default function PaymentsHistoryPage() {
                   <tbody className="divide-y divide-border/60">
                     {refundPager.pageItems.map((r) => (
                       <tr key={r.id} className="hover:bg-orange-50/40">
-                        <td className="px-4 py-3 font-extrabold text-orange-600">
+                        <td className="px-4 py-3 font-extrabold text-orange-700">
                           {formatPrice(Number(r.amount || 0))}
                         </td>
                         <td className="px-4 py-3">
@@ -505,7 +505,7 @@ export default function PaymentsHistoryPage() {
           {refundError && <p id="refund-error" role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{refundError}</p>}
           <div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end">
             <Button type="button" variant="outline" disabled={Boolean(refundBusyId)} onClick={() => setRefundTarget(null)} className="min-h-11 rounded-xl px-4">Quay lại</Button>
-            <Button type="button" disabled={refundReason.trim().length < 10 || Boolean(refundBusyId)} onClick={() => void submitRefund()} className="min-h-11 rounded-xl bg-orange-600 px-4 text-white hover:bg-orange-700">
+            <Button type="button" disabled={refundReason.trim().length < 10 || Boolean(refundBusyId)} onClick={() => void submitRefund()} className="min-h-11 rounded-xl bg-orange-700 px-4 text-white hover:bg-orange-800">
               {refundBusyId ? "Đang gửi…" : "Gửi yêu cầu hoàn tiền"}
             </Button>
           </div>
