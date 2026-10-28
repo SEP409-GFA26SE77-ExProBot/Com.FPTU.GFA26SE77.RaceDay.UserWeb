@@ -8,18 +8,20 @@ import { getMyRegistrations } from "@/api/events";
 import { RegistrationDto } from "@/dto/event.dto";
 import { getRegistrationStatusLabel, formatPrice } from "@/lib/format";
 import { getApiErrorMessage } from "@/lib/error";
-import { PAGE_SHELL } from "@/lib/page-shell";
+import { PAGE_SHELL_FORM } from "@/lib/page-shell";
 import PageLoading from "@/components/ui/PageLoading";
+import RunnerPageHeader from "@/components/runner/RunnerPageHeader";
+import { Button } from "@/components/ui/button";
 
 export default function CertificatesPage() {
   const [regs, setRegs] = useState<RegistrationDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const loggedIn = Boolean(getAuthUser());
 
   useEffect(() => {
     if (!loggedIn) {
-      setLoading(false);
       return;
     }
     let cancelled = false;
@@ -29,7 +31,7 @@ export default function CertificatesPage() {
         if (!cancelled) {
           setRegs(
             (Array.isArray(list) ? list : []).filter(
-              (r) => r.status === "confirmed" || Boolean(r.bibNumber)
+              (r) => r.status === "confirmed" || r.status === "finished" || Boolean(r.bibNumber)
             )
           );
           setError(null);
@@ -46,13 +48,13 @@ export default function CertificatesPage() {
     return () => {
       cancelled = true;
     };
-  }, [loggedIn]);
+  }, [loggedIn, loadAttempt]);
 
-  if (loading) {
+  if (loggedIn && loading) {
     return (
       <PageLoading
         title="Đang tải chứng nhận…"
-        description="Lấy đăng ký confirmed từ API."
+        description="Đang tìm đăng ký và kết quả hoàn thành của bạn."
         icon={Award}
       />
     );
@@ -74,29 +76,21 @@ export default function CertificatesPage() {
   }
 
   return (
-    <div className={`${PAGE_SHELL} py-7 space-y-6 max-w-3xl`}>
-      <div>
-        <p className="text-xs font-bold text-orange-500 uppercase tracking-widest mb-1">
-          Chứng nhận
-        </p>
-        <h1 className="text-3xl font-extrabold tracking-tight">Chứng nhận của tôi</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Hiển thị đăng ký đã xác nhận từ API. Template chứng nhận chính thức chưa có endpoint
-          riêng — dùng dữ liệu vé thật.
-        </p>
-      </div>
+    <div className={`${PAGE_SHELL_FORM} py-7 sm:py-8 space-y-6`}>
+      <RunnerPageHeader title="Chứng nhận của tôi" description="Chứng nhận chỉ khả dụng sau khi bạn hoàn thành giải và kết quả đã được ghi nhận. Đây chưa phải chứng nhận thành tích chính thức của BTC." />
 
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          {error}
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <p>{error}</p>
+          <Button type="button" variant="outline" className="mt-3 min-h-11 bg-card" onClick={() => { setLoading(true); setLoadAttempt((attempt) => attempt + 1); }}>Thử lại</Button>
         </div>
       )}
 
-      {regs.length === 0 ? (
-        <div className="rounded-2xl border border-dashed p-10 text-center text-sm text-muted-foreground space-y-3">
+      {!error && (regs.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground space-y-3">
           <Award className="mx-auto h-10 w-10 opacity-50" />
           <p>Chưa có đăng ký đã xác nhận để tạo chứng nhận.</p>
-          <Link href="/my-registrations" className="text-orange-600 font-semibold">
+          <Link href="/my-registrations" className="inline-flex min-h-11 items-center rounded-xl border border-border px-4 py-2 text-orange-700 font-semibold hover:bg-muted">
             Xem vé của tôi
           </Link>
         </div>
@@ -105,27 +99,27 @@ export default function CertificatesPage() {
           {regs.map((r) => (
             <li
               key={r.id}
-              className="rounded-2xl border bg-card p-4 flex flex-wrap items-center justify-between gap-3"
+              className="rounded-2xl border border-border bg-card p-5 flex flex-wrap items-center justify-between gap-4 shadow-sm sm:p-6"
             >
-              <div>
+              <div className="min-w-0 [overflow-wrap:anywhere]">
                 <p className="font-bold text-sm">{r.eventName || "Giải chạy"}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {r.distanceName || "—"}
                   {r.bibNumber ? ` · BIB ${r.bibNumber}` : ""} ·{" "}
                   {getRegistrationStatusLabel(r.status)} ·{" "}
-                  {formatPrice(r.distancePrice ?? 0)}
+                  {r.distancePrice == null ? "Chưa có giá" : formatPrice(r.distancePrice)}
                 </p>
               </div>
               <Link
                 href={`/certificates/${r.id}`}
-                className="rounded-full bg-orange-500 px-4 py-2 text-xs font-semibold text-white"
+                className="inline-flex min-h-11 items-center rounded-xl bg-orange-700 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-800"
               >
                 Xem chứng nhận
               </Link>
             </li>
           ))}
         </ul>
-      )}
+      ))}
     </div>
   );
 }

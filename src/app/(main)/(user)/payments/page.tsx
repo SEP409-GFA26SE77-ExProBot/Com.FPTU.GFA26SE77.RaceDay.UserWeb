@@ -2,7 +2,7 @@
 import { getAuthUser } from "@/stores/auth-store";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Receipt, ExternalLink, LogIn, Undo2, X } from "lucide-react";
 import { getMyPayments, getPaymentStatus } from "@/api/payments";
 import { getMyRegistrations } from "@/api/events";
@@ -20,10 +20,15 @@ import {
   getRefundStatusLabel,
 } from "@/lib/format";
 import { getApiErrorMessage } from "@/lib/error";
-import { PAGE_SHELL } from "@/lib/page-shell";
+import { PAGE_SHELL_FORM } from "@/lib/page-shell";
 import PageLoading from "@/components/ui/PageLoading";
 import Pagination from "@/components/ui/Pagination";
 import { usePagedList } from "@/hooks/usePagedList";
+import RunnerPageHeader from "@/components/runner/RunnerPageHeader";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const PAGE_SIZE = 5;
 
@@ -67,6 +72,9 @@ export default function PaymentsHistoryPage() {
   const [refundMsg, setRefundMsg] = useState<string | null>(null);
   const [refundTarget, setRefundTarget] = useState<Row | null>(null);
   const [refundReason, setRefundReason] = useState("");
+  const [refundError, setRefundError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const refundTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [payOsMode, setPayOsMode] = useState<PaymentStatusDto["payOsMode"] | null>(
     null
   );
@@ -138,7 +146,7 @@ export default function PaymentsHistoryPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadAttempt]);
 
   const refundByPayment = new Map(
     refunds.map((r) => [r.paymentId, r] as const)
@@ -148,6 +156,7 @@ export default function PaymentsHistoryPage() {
     setRefundTarget(row);
     setRefundReason("");
     setRefundMsg(null);
+    setRefundError(null);
   };
 
   const submitRefund = async () => {
@@ -155,6 +164,7 @@ export default function PaymentsHistoryPage() {
     const paymentId = refundTarget.id;
     setRefundBusyId(paymentId);
     setRefundMsg(null);
+    setRefundError(null);
     try {
       const row = await createRefundRequest({
         paymentId,
@@ -188,7 +198,7 @@ export default function PaymentsHistoryPage() {
           : "Đã gửi yêu cầu hoàn tiền — theo dõi bảng bên dưới."
       );
     } catch (e) {
-      setRefundMsg(getApiErrorMessage(e, "Gửi yêu cầu hoàn tiền thất bại."));
+      setRefundError(getApiErrorMessage(e, "Gửi yêu cầu hoàn tiền thất bại. Vui lòng thử lại."));
     } finally {
       setRefundBusyId(null);
     }
@@ -228,13 +238,8 @@ export default function PaymentsHistoryPage() {
   }
 
   return (
-    <div className={`${PAGE_SHELL} py-7 max-w-3xl`}>
-      <div className="mb-6">
-        <p className="text-xs font-bold text-orange-500 uppercase tracking-widest mb-1">
-          Vận động viên
-        </p>
-        <h1 className="text-3xl font-extrabold tracking-tight">Lịch sử thanh toán</h1>
-      </div>
+    <div className={`${PAGE_SHELL_FORM} py-7 sm:py-8`}>
+      <RunnerPageHeader title="Lịch sử thanh toán" description="Theo dõi giao dịch, tiếp tục thanh toán và quản lý yêu cầu hoàn tiền của bạn." />
 
       {payOsMode === "mock" && (
         <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -245,19 +250,23 @@ export default function PaymentsHistoryPage() {
       )}
 
       {error && (
-        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          {error}
+        <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <p>{error}</p>
+          <Button type="button" variant="outline" className="mt-3 min-h-11 bg-card" onClick={() => { setBoot(true); setLoadAttempt((attempt) => attempt + 1); }}>Thử lại</Button>
         </div>
       )}
       {refundMsg && (
-        <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+        <div role="status" className="mb-4 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
           {refundMsg}
         </div>
       )}
 
-      {items.length === 0 ? (
-        <div className="rounded-2xl border border-dashed p-10 text-center text-sm text-muted-foreground">
-          Chưa có giao dịch. Đăng ký giải và thanh toán để xuất hiện tại đây.
+      {!error && (items.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">
+          <Receipt aria-hidden="true" className="mx-auto mb-3 size-10 text-orange-700" />
+          <h2 className="text-lg font-bold text-foreground">Bạn chưa có giao dịch nào</h2>
+          <p className="mt-2">Các khoản thanh toán cho giải chạy sẽ xuất hiện tại đây.</p>
+          <Button asChild className="mt-5 min-h-11 rounded-xl bg-orange-700 px-5 text-white hover:bg-orange-800"><Link href="/events">Khám phá giải chạy</Link></Button>
         </div>
       ) : (
         <>
@@ -280,10 +289,10 @@ export default function PaymentsHistoryPage() {
                   const isPackage =
                     (p.purpose || "").toLowerCase() === "event_package";
                   return (
-                    <li key={p.id} className="rounded-2xl border bg-card p-4 sm:p-5 space-y-2">
+                    <li key={p.id} className="rounded-2xl border border-border bg-card p-5 sm:p-6 space-y-3 shadow-sm [&_a]:min-h-11 [&_button]:min-h-11 [&_a]:rounded-xl">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="font-bold text-sm sm:text-base truncate">
+                          <p className="font-bold text-base break-words [overflow-wrap:anywhere]">
                             {p.eventName}
                           </p>
                           <p className="text-xs text-muted-foreground mt-0.5">
@@ -301,7 +310,7 @@ export default function PaymentsHistoryPage() {
                       </div>
                       <div className="flex flex-wrap items-end justify-between gap-2 pt-1">
                         <div>
-                          <p className="text-lg font-extrabold text-orange-600">
+                          <p className="text-lg font-extrabold text-orange-700">
                             {formatPrice(Number(p.amount || 0))}
                           </p>
                           {Number(p.discountAmount || 0) > 0 ? (
@@ -329,7 +338,7 @@ export default function PaymentsHistoryPage() {
                           {["pending", "cancelled", "failed", "expired"].includes(p.status) && (
                             <Link
                               href={`/payments/${encodeURIComponent(p.id)}/continue`}
-                              className="inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white hover:bg-orange-600 transition-colors"
+                              className="inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white hover:bg-orange-800 transition-colors"
                             >
                               {p.status === "pending" ? "Tiếp tục thanh toán" : "Thanh toán lại"}
                               <ExternalLink className="h-3 w-3" />
@@ -341,7 +350,7 @@ export default function PaymentsHistoryPage() {
                             p.registrationId && (
                               <Link
                                 href={`/my-registrations/${p.registrationId}`}
-                                className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 hover:underline"
+                                className="inline-flex items-center gap-1 text-xs font-semibold text-orange-700 hover:underline"
                               >
                                 {p.status === "refunded" ? "Chi tiết" : "Xem vé"}{" "}
                                 <ExternalLink className="h-3 w-3" />
@@ -351,7 +360,7 @@ export default function PaymentsHistoryPage() {
                           {p.status === "paid" && isPackage && (
                             <Link
                               href="/organizer"
-                              className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 hover:underline"
+                              className="inline-flex items-center gap-1 text-xs font-semibold text-orange-700 hover:underline"
                             >
                               Xem giải của tôi <ExternalLink className="h-3 w-3" />
                             </Link>
@@ -370,7 +379,7 @@ export default function PaymentsHistoryPage() {
                             <button
                               type="button"
                               disabled={refundBusyId === p.id}
-                              onClick={() => openRefund(p)}
+                              onClick={(event) => { refundTriggerRef.current = event.currentTarget; openRefund(p); }}
                               className="inline-flex items-center gap-1 text-xs font-semibold text-sky-700 hover:underline disabled:opacity-50"
                             >
                               <Undo2 className="h-3 w-3" />
@@ -407,17 +416,15 @@ export default function PaymentsHistoryPage() {
             />
           </div>
         </>
-      )}
+      ))}
 
-      <section className="mt-10 space-y-3">
+      {!error && <section className="mt-10 space-y-3">
         <div>
           <h2 className="text-lg font-extrabold tracking-tight">
             Bảng yêu cầu hoàn tiền
           </h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Mỗi lần gửi hoàn tiền xuất hiện tại đây. BE hoàn ngay theo chính
-            sách (không chờ Admin duyệt riêng) — payment → refunded, ledger
-            cộng cột Hoàn tiền VĐV.
+            Theo dõi số tiền, lý do và trạng thái xử lý. Số tiền hoàn được xác định theo chính sách của giải và khoản bạn đã thanh toán.
           </p>
         </div>
         {refunds.length === 0 ? (
@@ -440,7 +447,7 @@ export default function PaymentsHistoryPage() {
                   <tbody className="divide-y divide-border/60">
                     {refundPager.pageItems.map((r) => (
                       <tr key={r.id} className="hover:bg-orange-50/40">
-                        <td className="px-4 py-3 font-extrabold text-orange-600">
+                        <td className="px-4 py-3 font-extrabold text-orange-700">
                           {formatPrice(Number(r.amount || 0))}
                         </td>
                         <td className="px-4 py-3">
@@ -477,64 +484,33 @@ export default function PaymentsHistoryPage() {
             />
           </>
         )}
-      </section>
+      </section>}
 
-      {refundTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md space-y-3 rounded-2xl bg-card p-5 shadow-xl">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <h2 className="text-lg font-bold">Yêu cầu hoàn tiền</h2>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {refundTarget.eventName} ·{" "}
-                  {formatPrice(Number(refundTarget.amount || 0))}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setRefundTarget(null)}
-                className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted"
-                aria-label="Đóng"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Số hoàn = % chính sách × số đã thanh toán trên payment (không lấy
-              giá vé hiện tại). Ghi rõ lý do (tối thiểu 10 ký tự).
-            </p>
-            <textarea
-              value={refundReason}
-              onChange={(e) => setRefundReason(e.target.value)}
-              rows={4}
-              className="w-full rounded-xl border border-border p-3 text-sm outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20"
-              placeholder="VD: Không tham gia được / giải hủy / lý do sức khỏe…"
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setRefundTarget(null)}
-                className="rounded-xl border border-border px-4 py-2 text-sm font-semibold"
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                disabled={
-                  refundReason.trim().length < 10 ||
-                  refundBusyId === refundTarget.id
-                }
-                onClick={() => void submitRefund()}
-                className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
-              >
-                {refundBusyId === refundTarget.id
-                  ? "Đang gửi…"
-                  : "Gửi yêu cầu hoàn"}
-              </button>
-            </div>
+      <Dialog open={Boolean(refundTarget)} onOpenChange={(open) => { if (!open && !refundBusyId) setRefundTarget(null); }}>
+        <DialogContent showCloseButton={false} className="max-h-[85dvh] overflow-y-auto rounded-2xl p-5 sm:max-w-md sm:p-6"
+          onCloseAutoFocus={(event) => { event.preventDefault(); refundTriggerRef.current?.focus(); }}>
+          <DialogHeader className="pr-10">
+            <DialogTitle className="text-xl font-bold">Yêu cầu hoàn tiền</DialogTitle>
+            <DialogDescription className="break-words leading-relaxed">{refundTarget?.eventName} · {formatPrice(Number(refundTarget?.amount || 0))}</DialogDescription>
+          </DialogHeader>
+          <Button type="button" variant="ghost" disabled={Boolean(refundBusyId)} onClick={() => setRefundTarget(null)} aria-label="Đóng yêu cầu hoàn tiền" className="absolute right-2 top-2 size-11 rounded-xl"><X aria-hidden="true" className="size-4" /></Button>
+          <p className="text-sm leading-relaxed text-muted-foreground">Số tiền hoàn được tính theo chính sách của giải dựa trên số tiền bạn đã thanh toán.</p>
+          <div className="space-y-2">
+            <Label htmlFor="refund-reason">Lý do hoàn tiền <span className="text-destructive">*</span></Label>
+            <Textarea id="refund-reason" value={refundReason} disabled={Boolean(refundBusyId)} onChange={(e) => setRefundReason(e.target.value)} rows={4}
+              aria-describedby={`refund-reason-help${refundError ? " refund-error" : ""}`} required minLength={10}
+              className="min-h-28 rounded-xl text-base" placeholder="Ví dụ: Tôi không thể tham gia giải vì…" />
+            <p id="refund-reason-help" className="text-xs text-muted-foreground">Vui lòng nhập ít nhất 10 ký tự để giải thích lý do.</p>
           </div>
-        </div>
-      )}
+          {refundError && <p id="refund-error" role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{refundError}</p>}
+          <div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end">
+            <Button type="button" variant="outline" disabled={Boolean(refundBusyId)} onClick={() => setRefundTarget(null)} className="min-h-11 rounded-xl px-4">Quay lại</Button>
+            <Button type="button" disabled={refundReason.trim().length < 10 || Boolean(refundBusyId)} onClick={() => void submitRefund()} className="min-h-11 rounded-xl bg-orange-700 px-4 text-white hover:bg-orange-800">
+              {refundBusyId ? "Đang gửi…" : "Gửi yêu cầu hoàn tiền"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

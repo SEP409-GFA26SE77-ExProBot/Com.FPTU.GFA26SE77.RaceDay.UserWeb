@@ -61,7 +61,7 @@ const INVITE_ROLE_LABELS: Record<EventStaffRole, string> = {
   volunteer: "Tình nguyện viên",
 };
 
-/** Mẫu điền form mời — không gọi API cho đến khi bấm gửi. */
+/** Mẫu điền form tạo tài khoản — không gọi API cho đến khi bấm gửi. */
 const STAFF_FORM_PRESETS: Record<
   EventStaffRole,
   { fullName: string; email: string; phone: string; label: string }[]
@@ -383,11 +383,11 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
       });
       setInviteOpen(false);
       resetForm();
-      toastSuccess("Đã gửi lời mời nhân sự.");
+      toastSuccess("Đã gửi tài khoản cho nhân sự.");
       await load();
-      setToast("Đã mời nhân sự vào giải.");
+      setToast("Đã thêm nhân sự vào giải.");
     } catch (e) {
-      const message = getApiErrorMessage(e, "Mời thất bại.");
+      const message = getApiErrorMessage(e, "Tạo tài khoản thất bại.");
       setError(message);
     } finally {
       setBusy(false);
@@ -441,7 +441,7 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
             Quản lý nhân sự
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Mời tài khoản theo role — mật khẩu mặc định chỉ gửi qua email. Sau
+            Tạo tài khoản theo role — mật khẩu mặc định chỉ gửi qua email. Sau
             khi họ đăng nhập lần đầu sẽ chuyển sang Đã hoạt động.
           </p>
         </div>
@@ -461,7 +461,7 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
             }}
             className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-red-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-colors duration-150 hover:from-orange-400 hover:to-red-500 active:scale-95"
           >
-            <Plus className="h-3.5 w-3.5" /> Mời / thêm
+            <Plus className="h-3.5 w-3.5" /> Tạo tài khoản
           </button>
         </div>
       </div>
@@ -486,7 +486,7 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
       <div className="rounded-2xl border border-border/60 bg-card p-3 shadow-sm">
         <p className="text-xs font-bold text-foreground">Mẫu sẵn có (điền form)</p>
         <p className="mt-0.5 text-[11px] text-muted-foreground">
-          Chọn mẫu để mở form mời — chỉnh email thật trước khi gửi.
+          Chọn mẫu để mở form tạo tài khoản — chỉnh email thật trước khi gửi.
         </p>
         <div className="mt-2 flex flex-wrap gap-2">
           {STAFF_FORM_PRESETS[role].map((p) => (
@@ -536,7 +536,7 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
         ) : members.length === 0 ? (
           <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">
             Chưa có {INVITE_ROLE_LABELS[role].toLowerCase()} cho giải này. Bấm{" "}
-            <span className="font-semibold text-foreground">Mời / thêm</span> để
+            <span className="font-semibold text-foreground">Tạo tài khoản</span> để
             cấp tài khoản.
           </div>
         ) : (
@@ -605,7 +605,7 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
                   id="invite-staff-title"
                   className="mt-1 text-lg font-extrabold tracking-tight"
                 >
-                  Mời / thêm nhân sự
+                  Tạo tài khoản
                 </h2>
                 <p className="mt-1.5 text-sm text-muted-foreground">
                   Tài khoản đăng nhập và mật khẩu mặc định sẽ được gửi qua email
