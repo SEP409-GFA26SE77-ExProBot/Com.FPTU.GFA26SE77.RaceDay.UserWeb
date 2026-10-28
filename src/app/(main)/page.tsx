@@ -10,9 +10,9 @@ import {
   Search,
   CreditCard,
   Trophy,
-  MapPin,
-  Users,
-  TrendingUp,
+  Camera,
+  Ticket,
+  User,
   ChevronRight,
   Sparkles,
 } from "lucide-react";
@@ -123,7 +123,7 @@ export default function Home() {
 
             {/* CTA buttons */}
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Button asChild className="h-12 rounded-xl bg-gradient-to-r from-orange-600 to-red-600 px-6 text-base font-semibold text-white shadow-lg hover:opacity-90">
+              <Button asChild className="h-12 rounded-xl bg-gradient-to-r from-orange-700 to-red-700 px-6 text-base font-semibold text-white shadow-lg hover:opacity-90">
               <Link
                 href="/events"
               >
@@ -216,7 +216,7 @@ export default function Home() {
           <div className="mt-8 flex justify-center sm:hidden">
             <Link
               href="/events"
-              className="inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-orange-600 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-orange-800 transition-colors"
             >
               Xem tất cả giải chạy
               <ArrowRight className="h-4 w-4" />
@@ -295,40 +295,38 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Stats Section */}
+      {/* Runner shortcuts */}
       <section className="py-16 sm:py-20 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(249,115,22,0.08),transparent_60%)]" />
 
         <div className={`relative ${PAGE_SHELL}`}>
           <div className="text-center mb-14">
             <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Đồng Hành Cùng Cộng Đồng VĐV
+              Mọi thứ cho hành trình của bạn
             </h2>
             <p className="mt-3 text-gray-400 max-w-md mx-auto">
-              Hàng ngàn chân chạy phong trào và chuyên nghiệp tin tưởng lựa chọn RaceDay.
+              Chuẩn bị trước ngày đua và lưu giữ những cột mốc đáng nhớ sau vạch đích.
             </p>
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { value: "50+", label: "Giải chạy chất lượng", icon: Flag, suffix: "" },
-              { value: "20,000", label: "VĐV đăng ký", icon: Users, suffix: "+" },
-              { value: "25", label: "Tỉnh thành", icon: MapPin, suffix: "" },
-              { value: "99.8", label: "Giao dịch thành công", icon: TrendingUp, suffix: "%" },
-            ].map(({ value, label, icon: Icon, suffix }) => (
-              <div
+              { label: "Vé & mã QR", description: "Sẵn sàng cho ngày thi đấu", href: "/my-registrations", icon: Ticket },
+              { label: "Kết quả thi đấu", description: "Theo dõi thành tích của bạn", href: "/results", icon: Trophy },
+              { label: "Ảnh trên đường chạy", description: "Tìm khoảnh khắc theo BIB", href: "/photos", icon: Camera },
+              { label: "Hồ sơ cá nhân", description: "Cập nhật thông tin của bạn", href: "/profile", icon: User },
+            ].map(({ label, description, href, icon: Icon }) => (
+              <Link
                 key={label}
-                className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-6 text-center transition-all hover:bg-white/8 hover:border-white/15"
+                href={href}
+                className="rounded-2xl border border-white/15 bg-white/5 p-5 text-center transition-colors hover:bg-white/10 hover:border-orange-400/60 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 sm:p-6"
               >
                 <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-orange-500/15 mb-4">
                   <Icon className="h-5 w-5 text-orange-400" />
                 </div>
-                <p className="text-3xl sm:text-4xl font-extrabold text-white">
-                  {value}
-                  <span className="text-orange-400">{suffix}</span>
-                </p>
-                <p className="mt-1 text-sm text-gray-500 font-medium">{label}</p>
-              </div>
+                <h3 className="text-base font-bold text-white">{label}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-gray-300">{description}</p>
+              </Link>
             ))}
           </div>
         </div>
@@ -349,7 +347,7 @@ export default function Home() {
               <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
                 <Link
                   href="/events"
-                  className="inline-flex items-center gap-2 rounded-full bg-white px-7 py-3.5 text-sm font-bold text-orange-600 shadow-lg transition-all hover:shadow-xl hover:scale-[1.03] active:scale-[0.98]"
+                  className="inline-flex items-center gap-2 rounded-full bg-white px-7 py-3.5 text-sm font-bold text-orange-700 shadow-lg transition-all hover:shadow-xl hover:scale-[1.03] active:scale-[0.98]"
                 >
                   Tìm giải chạy ngay
                   <ArrowRight className="h-4 w-4" />

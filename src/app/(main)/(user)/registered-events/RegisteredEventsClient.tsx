@@ -300,7 +300,7 @@ export default function RegisteredEventsClient() {
           <button
             type="button"
             onClick={() => { setBoot(true); setLoadAttempt((attempt) => attempt + 1); }}
-            className="mt-3 min-h-11 rounded-xl bg-orange-600 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-700"
+            className="mt-3 min-h-11 rounded-xl bg-orange-700 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-800"
           >
             Thử lại
           </button>
@@ -316,7 +316,7 @@ export default function RegisteredEventsClient() {
                 <button
                   type="button"
                   onClick={clearFilters}
-                  className="text-xs font-semibold text-orange-600 hover:underline"
+                  className="min-h-11 px-2 text-sm font-semibold text-orange-700 hover:underline"
                 >
                   Xóa hết
                 </button>
@@ -324,7 +324,7 @@ export default function RegisteredEventsClient() {
               <button
                 type="button"
                 onClick={() => setFiltersOpen(false)}
-                className="inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold hover:bg-muted"
+                className="inline-flex min-h-11 items-center gap-1 rounded-xl border px-3 py-2 text-sm font-semibold hover:bg-muted"
               >
                 <ChevronUp className="h-3.5 w-3.5" />
                 Đóng
@@ -357,7 +357,7 @@ export default function RegisteredEventsClient() {
         </p>
         <Link
           href="/events"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-orange-600 hover:underline"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-orange-700 hover:underline"
         >
           <Flag className="h-3.5 w-3.5" />
           Khám phá thêm giải

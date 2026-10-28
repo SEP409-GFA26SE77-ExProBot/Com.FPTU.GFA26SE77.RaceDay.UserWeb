@@ -22,7 +22,6 @@ export default function CertificatesPage() {
 
   useEffect(() => {
     if (!loggedIn) {
-      setLoading(false);
       return;
     }
     let cancelled = false;
@@ -32,7 +31,7 @@ export default function CertificatesPage() {
         if (!cancelled) {
           setRegs(
             (Array.isArray(list) ? list : []).filter(
-              (r) => r.status === "confirmed" || Boolean(r.bibNumber)
+              (r) => r.status === "confirmed" || r.status === "finished" || Boolean(r.bibNumber)
             )
           );
           setError(null);
@@ -51,11 +50,11 @@ export default function CertificatesPage() {
     };
   }, [loggedIn, loadAttempt]);
 
-  if (loading) {
+  if (loggedIn && loading) {
     return (
       <PageLoading
         title="Đang tải chứng nhận…"
-        description="Đang tìm các đăng ký đã xác nhận của bạn."
+        description="Đang tìm đăng ký và kết quả hoàn thành của bạn."
         icon={Award}
       />
     );
@@ -78,7 +77,7 @@ export default function CertificatesPage() {
 
   return (
     <div className={`${PAGE_SHELL_FORM} py-7 sm:py-8 space-y-6`}>
-      <RunnerPageHeader title="Chứng nhận của tôi" description="Xem bản chứng nhận tham gia từ thông tin đăng ký đã xác nhận. Đây chưa phải chứng nhận thành tích chính thức của BTC." />
+      <RunnerPageHeader title="Chứng nhận của tôi" description="Chứng nhận chỉ khả dụng sau khi bạn hoàn thành giải và kết quả đã được ghi nhận. Đây chưa phải chứng nhận thành tích chính thức của BTC." />
 
       {error && (
         <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -113,7 +112,7 @@ export default function CertificatesPage() {
               </div>
               <Link
                 href={`/certificates/${r.id}`}
-                className="inline-flex min-h-11 items-center rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
+                className="inline-flex min-h-11 items-center rounded-xl bg-orange-700 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-800"
               >
                 Xem chứng nhận
               </Link>

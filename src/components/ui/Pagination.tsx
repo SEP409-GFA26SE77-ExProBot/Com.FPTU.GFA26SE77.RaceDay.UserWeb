@@ -83,7 +83,7 @@ export default function Pagination({
               aria-label={`Trang ${p}`}
               className={`hidden h-11 min-w-11 px-2 items-center justify-center rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600 sm:inline-flex ${
                 p === page
-                  ? "bg-orange-600 text-white shadow-sm"
+                  ? "bg-orange-700 text-white shadow-sm"
                   : "border border-border bg-card text-foreground/80 hover:border-orange-400 hover:text-orange-700"
               }`}
               aria-current={p === page ? "page" : undefined}

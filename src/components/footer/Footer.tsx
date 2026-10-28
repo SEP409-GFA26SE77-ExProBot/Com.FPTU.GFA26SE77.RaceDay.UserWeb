@@ -47,7 +47,7 @@ export default function Footer() {
             <h2 className="text-sm font-bold text-foreground uppercase tracking-wider mb-4">
               Khám phá
             </h2>
-            <ul className="space-y-2.5">
+            <ul className="space-y-1">
               {[
                 { label: "Tất cả sự kiện", href: "/events" },
                 { label: "Kết quả thi đấu", href: "/results" },
@@ -57,7 +57,7 @@ export default function Footer() {
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="text-sm text-muted-foreground transition-colors hover:text-orange-600"
+                    className="inline-flex min-h-11 items-center text-sm text-muted-foreground transition-colors hover:text-orange-700"
                   >
                     {link.label}
                   </Link>
@@ -71,7 +71,7 @@ export default function Footer() {
             <h2 className="text-sm font-bold text-foreground uppercase tracking-wider mb-4">
               Hỗ trợ
             </h2>
-            <ul className="space-y-2.5">
+            <ul className="space-y-1">
               {[
                 { label: "Câu hỏi thường gặp (FAQ)", href: "/#how-it-works" },
                 { label: "Liên hệ chúng tôi", href: "mailto:support@raceday.vn" },
@@ -81,7 +81,7 @@ export default function Footer() {
                 <li key={link.label}>
                   <Link
                     href={link.href}
-                    className="text-sm text-muted-foreground transition-colors hover:text-orange-600"
+                    className="inline-flex min-h-11 items-center text-sm text-muted-foreground transition-colors hover:text-orange-700"
                   >
                     {link.label}
                   </Link>

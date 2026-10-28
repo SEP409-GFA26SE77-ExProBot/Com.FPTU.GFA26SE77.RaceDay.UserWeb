@@ -121,7 +121,7 @@ export default function ProfilePage() {
           { label: "Đã xác nhận", value: regs.filter((reg) => reg.status === "confirmed" || reg.status === "finished").length, href: "/registered-events" },
         ].map(({ label, value, href }) => <Link key={label} href={href} className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm transition-colors hover:border-orange-300 focus-visible:outline-2 focus-visible:outline-orange-600">
           <div><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 text-3xl font-extrabold tabular-nums">{value}</p></div>
-          <ArrowRight aria-hidden="true" className="size-4 text-orange-600" />
+          <ArrowRight aria-hidden="true" className="size-4 text-orange-700" />
         </Link>)}
       </div>}
 
@@ -223,7 +223,7 @@ export default function ProfilePage() {
             <p>Hành trình mới đang chờ bạn. Khám phá và đăng ký giải chạy đầu tiên.</p>
             <Link
               href="/events"
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-orange-600 px-4 py-2 text-white font-semibold hover:bg-orange-700"
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-orange-700 px-4 py-2 text-white font-semibold hover:bg-orange-800"
             >
               <Flag aria-hidden="true" className="size-4" />
               Xem giải đang mở
