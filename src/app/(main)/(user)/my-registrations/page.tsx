@@ -27,6 +27,9 @@ import { PAGE_SHELL_FORM } from "@/lib/page-shell";
 import PageLoading from "@/components/ui/PageLoading";
 import Pagination from "@/components/ui/Pagination";
 import { usePagedList } from "@/hooks/usePagedList";
+import RunnerPageHeader from "@/components/runner/RunnerPageHeader";
+import FilterChip from "@/components/events/FilterChip";
+import { Button } from "@/components/ui/button";
 
 const PAGE_SIZE = 4;
 
@@ -46,6 +49,7 @@ export default function MyRegistrationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterKey>("all");
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   const reload = async () => {
     const apiList = await getMyRegistrations();
@@ -90,7 +94,7 @@ export default function MyRegistrationsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadAttempt]);
 
   const handleCancel = async (regId: string) => {
     if (!window.confirm("Hủy đơn chờ thanh toán này? Bạn có thể đăng ký lại sau.")) return;
@@ -140,23 +144,18 @@ export default function MyRegistrationsPage() {
 
   return (
     <div className={`${PAGE_SHELL_FORM} py-7 space-y-5`}>
-      <div className="rounded-2xl border border-orange-500/15 bg-gradient-to-br from-orange-50/80 via-white to-amber-50/40 p-5 sm:p-6">
-        <p className="text-xs font-bold text-orange-500 uppercase tracking-widest mb-1.5">
-          Vé của tôi
-        </p>
-        <h1 className="text-3xl font-extrabold tracking-tight">Vé / đăng ký của tôi</h1>
-        <p className="mt-1 text-muted-foreground text-sm">
-          Theo dõi chờ duyệt BTC, BIB/QR khi đã duyệt, hoặc lý do từ chối.
-        </p>
-      </div>
+      <RunnerPageHeader title="Vé của tôi" description="Xem mã QR, theo dõi duyệt hồ sơ và tiếp tục các đăng ký đang chờ thanh toán." actions={
+        <Button asChild className="min-h-11 rounded-xl bg-orange-600 px-4 text-white hover:bg-orange-700"><Link href="/events">Khám phá giải chạy</Link></Button>
+      } />
 
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          {error}
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <p>{error}</p>
+          <Button type="button" variant="outline" onClick={() => { setReady(false); setLoadAttempt((attempt) => attempt + 1); }} className="mt-3 min-h-11 bg-card">Thử lại</Button>
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2">
+      <div role="group" aria-label="Lọc vé theo trạng thái" className="flex flex-wrap gap-2">
         {(
           [
             { key: "all", label: "Tất cả" },
@@ -167,32 +166,27 @@ export default function MyRegistrationsPage() {
             { key: "cancelled", label: "Đã hủy" },
           ] as const
         ).map((f) => (
-          <button
+          <FilterChip
             key={f.key}
-            type="button"
+            active={filter === f.key}
             onClick={() => setFilter(f.key)}
-            className={`rounded-full px-3.5 py-1.5 text-xs font-semibold border transition-all ${
-              filter === f.key
-                ? "bg-orange-500 text-white border-orange-600"
-                : "bg-white text-muted-foreground border-border hover:text-foreground"
-            }`}
           >
             {f.label}
-          </button>
+          </FilterChip>
         ))}
       </div>
 
-      {filtered.length === 0 ? (
+      {!(error && list.length === 0) && (filtered.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-white p-10 text-center space-y-3">
           <Ticket className="mx-auto h-10 w-10 text-muted-foreground" />
-          <h2 className="font-bold text-lg">Chưa có vé nào</h2>
-          <p className="text-sm text-muted-foreground">Đăng ký một giải để nhận BIB và mã QR.</p>
-          <Link
+          <h2 className="font-bold text-lg">{list.length ? "Không có vé ở trạng thái này" : "Bạn chưa có vé nào"}</h2>
+          <p className="text-sm text-muted-foreground">{list.length ? "Chọn trạng thái khác hoặc xem tất cả vé của bạn." : "Tìm giải chạy phù hợp và đăng ký để bắt đầu hành trình."}</p>
+          {list.length ? <Button type="button" variant="outline" className="min-h-11" onClick={() => setFilter("all")}>Xem tất cả vé</Button> : <Link
             href="/events"
-            className="inline-flex rounded-full bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white"
+            className="inline-flex min-h-11 items-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-700"
           >
             Xem giải đang mở
-          </Link>
+          </Link>}
         </div>
       ) : (
         <>
@@ -222,7 +216,7 @@ export default function MyRegistrationsPage() {
                   return (
                     <article
                       key={reg.id}
-                      className="rounded-2xl border border-border bg-white overflow-hidden shadow-sm hover:border-orange-500/30 transition-colors"
+                      className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm hover:border-orange-500/30 transition-colors [&_a]:min-h-11 [&_button]:min-h-11 [&_a]:rounded-xl [&_button]:rounded-xl"
                     >
                       <div className="flex flex-col sm:flex-row">
                         <div className="relative sm:w-40 h-28 sm:min-h-[8.5rem] shrink-0 bg-muted">
@@ -368,7 +362,7 @@ export default function MyRegistrationsPage() {
             />
           </div>
         </>
-      )}
+      ))}
     </div>
   );
 }

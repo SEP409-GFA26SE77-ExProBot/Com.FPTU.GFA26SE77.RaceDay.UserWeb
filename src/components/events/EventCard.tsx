@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useState } from "react";
 import {
   Calendar,
   MapPin,
   Users,
   TrendingUp,
+  ArrowUpRight,
 } from "lucide-react";
 import { RaceEventListItemDto } from "@/dto/event.dto";
 import {
@@ -109,6 +111,7 @@ export default function EventCard({
   myRegistrationStatus = null,
   registrationId = null,
 }: EventCardProps) {
+  const [failedBanner, setFailedBanner] = useState<string | null>(null);
   const distances = event.distances || [];
   const fromList =
     typeof event.minPrice === "number" && Number.isFinite(event.minPrice)
@@ -155,26 +158,27 @@ export default function EventCard({
   return (
     <Link
       href={href}
-      className={`group block rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-0.5 ${
+      className={`group flex min-w-0 h-full flex-col rounded-2xl overflow-hidden transition-shadow duration-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-600 ${
         publicLabel === "Đang diễn ra" || eventStatusKey === "in-progress"
-          ? "border-[3px] border-rose-500 bg-gradient-to-br from-rose-50 via-orange-50/80 to-white shadow-lg shadow-rose-500/20 ring-2 ring-rose-400/30 hover:shadow-xl hover:shadow-rose-500/30"
+          ? "border border-rose-300 bg-card shadow-sm ring-1 ring-rose-200 hover:shadow-lg"
           : showRegBadge
-            ? "border-2 border-orange-500/50 bg-card shadow-sm hover:shadow-lg hover:shadow-orange-500/15 hover:border-orange-500"
+            ? "border border-orange-300 bg-card shadow-sm hover:shadow-lg hover:border-orange-500"
             : "border border-border/60 bg-card shadow-sm hover:shadow-xl hover:shadow-orange-500/8 hover:border-orange-500/30"
       }`}
     >
       <div className="relative h-48 overflow-hidden">
-        {event.bannerImage ? (
+        {event.bannerImage && failedBanner !== event.bannerImage ? (
           <Image
             src={mediaDisplayUrl(event.bannerImage)}
             alt={event.name}
             fill
-            className="object-cover transition-transform duration-500 group-hover:scale-110"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            className="object-cover transition-transform duration-500 motion-safe:group-hover:scale-105"
+            sizes="(max-width: 639px) 100vw, (max-width: 1279px) 50vw, 33vw"
+            onError={() => setFailedBanner(event.bannerImage!)}
           />
         ) : (
           <div
-            className="absolute inset-0 transition-transform duration-500 group-hover:scale-110"
+            className="absolute inset-0"
             style={{ background: DEFAULT_GRADIENT }}
           />
         )}
@@ -225,19 +229,19 @@ export default function EventCard({
         </div>
       </div>
 
-      <div className="p-4 space-y-3">
-        <h3 className="text-base font-bold text-foreground leading-snug line-clamp-2 group-hover:text-orange-600 transition-colors duration-200">
+      <div className="flex flex-1 flex-col gap-4 p-5">
+        <h3 className="min-h-12 text-lg font-bold text-foreground leading-snug break-words group-hover:text-orange-700 transition-colors duration-200">
           {event.name}
         </h3>
 
         <div className="space-y-1.5">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Calendar className="h-3.5 w-3.5 text-orange-500 shrink-0" />
-            <span className="truncate">{formatDate(event.date)}</span>
+            <span className="min-w-0">{event.date ? formatDate(event.date) : "Ngày thi đấu đang cập nhật"}</span>
           </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-start gap-2 text-sm text-muted-foreground">
             <MapPin className="h-3.5 w-3.5 text-orange-500 shrink-0" />
-            <span className="truncate">{event.location}</span>
+            <span className="min-w-0 break-words">{event.location || "Địa điểm đang cập nhật"}</span>
           </div>
         </div>
 
@@ -258,7 +262,7 @@ export default function EventCard({
             <div
               className="h-full rounded-full transition-all duration-700 ease-out"
               style={{
-                width: `${progressPercent}%`,
+                width: `${Math.min(100, Math.max(0, progressPercent))}%`,
                 background:
                   progressPercent >= 90
                     ? "linear-gradient(90deg, #ef4444, #dc2626)"
@@ -270,18 +274,22 @@ export default function EventCard({
           </div>
         </div>
 
-        <div className="flex items-center justify-between pt-1">
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-4">
           <div className="flex items-center gap-1">
             <TrendingUp className="h-3.5 w-3.5 text-orange-500" />
-            <span className="text-sm font-bold text-orange-600">
+            <span className="text-base font-bold text-orange-700 tabular-nums">
               {lowestPrice > 0 ? `từ ${formatPrice(lowestPrice)}` : "Xem chi tiết"}
             </span>
           </div>
           {(event.organizer?.name || event.organizerName) && (
-            <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground truncate max-w-[120px]">
+            <span className="max-w-full break-words rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
               {event.organizer?.name || event.organizerName}
             </span>
           )}
+        </div>
+        <div className="flex min-h-11 items-center justify-between gap-2 rounded-xl bg-orange-50 px-3 text-sm font-semibold text-orange-800 transition-colors group-hover:bg-orange-100">
+          <span>{showRegBadge && regStatus === "pending_payment" ? "Tiếp tục thanh toán" : showRegBadge && regStatus === "pending_approval" ? "Theo dõi hồ sơ" : showRegBadge && (regStatus === "confirmed" || regStatus === "finished") ? "Xem vé của bạn" : publicLabel === "Đang diễn ra" || eventStatusKey === "in-progress" ? "Vào ngày thi đấu" : "Khám phá giải chạy"}</span>
+          <ArrowUpRight aria-hidden="true" className="size-4 shrink-0" />
         </div>
       </div>
     </Link>

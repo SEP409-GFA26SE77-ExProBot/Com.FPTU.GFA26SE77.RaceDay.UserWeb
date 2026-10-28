@@ -8,6 +8,8 @@ import { logout } from "@/api/auth";
 import { Role } from "@/interfaces/role";
 import { mapAppRole } from "@/lib/role";
 import { mediaDisplayUrl } from "@/lib/media-url";
+import { DropdownMenu } from "radix-ui";
+import { PAGE_SHELL } from "@/lib/page-shell";
 import {
   Flag,
   User,
@@ -92,31 +94,24 @@ export default function Header() {
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const userMenuRef = useRef<HTMLDivElement>(null);
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
 
   const closeMenus = () => {
     setUserMenuOpen(false);
     setMobileMenuOpen(false);
   };
 
-  // Handle clicking outside user dropdown
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        userMenuRef.current &&
-        !userMenuRef.current.contains(event.target as Node)
-      ) {
-        setUserMenuOpen(false);
+    if (!mobileMenuOpen) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMobileMenuOpen(false);
+        mobileMenuButtonRef.current?.focus();
       }
     };
-
-    if (userMenuOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [userMenuOpen]);
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [mobileMenuOpen]);
 
   const handleLogout = async () => {
     await logout();
@@ -135,11 +130,12 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/85 backdrop-blur-md transition-all">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+      <div className={`${PAGE_SHELL} flex h-18 items-center justify-between gap-4`}>
         {/* Brand / Logo */}
         <Link
           href="/"
-          className="group flex items-center gap-2.5 transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98]"
+          aria-label="RaceDay — Trang chủ"
+          className="group flex shrink-0 items-center gap-2.5 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-600"
         >
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 via-orange-600 to-red-600 text-white shadow-md shadow-orange-500/25 transition-shadow group-hover:shadow-lg group-hover:shadow-orange-500/40">
             <Flag className="h-5 w-5" />
@@ -152,7 +148,7 @@ export default function Header() {
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-1">
+        <nav aria-label="Điều hướng chính" className="hidden lg:flex items-center gap-1">
           {visibleNavLinks.map((link) => {
             const isActive =
               link.href === "/"
@@ -168,8 +164,9 @@ export default function Header() {
               <Link
                 key={link.href}
                 href={link.href}
+                aria-current={isActive ? "page" : undefined}
                 onClick={closeMenus}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium transition-all ${
+                className={`flex min-h-11 items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600 ${
                   isActive
                     ? "bg-orange-500/10 text-orange-600 dark:text-orange-400 font-semibold"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
@@ -183,14 +180,16 @@ export default function Header() {
         </nav>
 
         {/* Auth / Profile Actions (Desktop) */}
-        <div className="hidden md:flex items-center gap-3">
+        <div className="hidden lg:flex items-center gap-3">
           {isLoggedIn ? (
-            <div className="relative" ref={userMenuRef}>
+            <DropdownMenu.Root open={userMenuOpen} onOpenChange={setUserMenuOpen}>
+            <div className="relative">
+              <DropdownMenu.Trigger asChild>
               <button
                 type="button"
-                onClick={() => setUserMenuOpen((prev) => !prev)}
-                className="flex items-center gap-2.5 rounded-full border border-border/80 bg-background/80 py-1.5 pl-2 pr-3 text-sm shadow-xs transition-all hover:bg-muted/60 hover:border-border focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
+                className="flex min-h-11 items-center gap-2.5 rounded-full border border-border/80 bg-background/80 py-1.5 pl-2 pr-3 text-sm shadow-xs transition-colors hover:bg-muted/60 hover:border-border focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
                 aria-expanded={userMenuOpen}
+                aria-label={`Tài khoản ${username || "của tôi"}`}
               >
                 <UserAvatarMark username={username} avatarUrl={avatarUrl} />
                 <div className="flex flex-col items-start leading-tight">
@@ -204,10 +203,12 @@ export default function Header() {
                   }`}
                 />
               </button>
+              </DropdownMenu.Trigger>
 
               {/* User Dropdown Menu */}
-              {userMenuOpen && (
-                <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-xl border border-border bg-card p-1.5 shadow-xl ring-1 ring-black/5 animate-in fade-in-0 zoom-in-95">
+              <DropdownMenu.Portal>
+              <DropdownMenu.Content align="end" sideOffset={10} asChild>
+                <div className="z-[60] max-h-[var(--radix-dropdown-menu-content-available-height)] w-64 overflow-y-auto rounded-2xl border border-border bg-card p-2 shadow-xl ring-1 ring-black/5 [&_a]:min-h-11 [&_a]:outline-none [&_a:focus]:bg-muted [&_button]:min-h-11">
                   <div className="px-3 py-2 border-b border-border/60">
                     <p className="text-xs text-muted-foreground">
                       Đã đăng nhập với
@@ -218,84 +219,84 @@ export default function Header() {
                   </div>
 
                   <div className="py-1">
-                    <Link
+                    <DropdownMenu.Item asChild><Link
                       href="/profile"
                       className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
                       onClick={closeMenus}
                     >
                       <User className="h-4 w-4 text-muted-foreground" />
                       Hồ sơ của tôi
-                    </Link>
+                    </Link></DropdownMenu.Item>
 
                     {isLoggedIn && (
                       <>
-                        <Link
+                        <DropdownMenu.Item asChild><Link
                           href="/my-registrations"
                           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
                           onClick={closeMenus}
                         >
                           <Ticket className="h-4 w-4 text-muted-foreground" />
                           Vé của tôi
-                        </Link>
-                        <Link
+                        </Link></DropdownMenu.Item>
+                        <DropdownMenu.Item asChild><Link
                           href="/payments"
                           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
                           onClick={closeMenus}
                         >
                           <CreditCard className="h-4 w-4 text-muted-foreground" />
                           Thanh toán
-                        </Link>
-                        <Link
+                        </Link></DropdownMenu.Item>
+                        <DropdownMenu.Item asChild><Link
                           href="/certificates"
                           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
                           onClick={closeMenus}
                         >
                           <Award className="h-4 w-4 text-muted-foreground" />
                           Chứng nhận
-                        </Link>
-                        <Link
+                        </Link></DropdownMenu.Item>
+                        <DropdownMenu.Item asChild><Link
                           href="/disputes"
                           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
                           onClick={closeMenus}
                         >
                           <AlertTriangle className="h-4 w-4 text-muted-foreground" />
                           Khiếu nại
-                        </Link>
-                        <Link
+                        </Link></DropdownMenu.Item>
+                        <DropdownMenu.Item asChild><Link
                           href="/registered-events"
                           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
                           onClick={closeMenus}
                         >
                           <Flag className="h-4 w-4 text-muted-foreground" />
                           Giải đã đăng ký
-                        </Link>
+                        </Link></DropdownMenu.Item>
                       </>
                     )}
 
                     {isLoggedIn && role === Role.ORGANIZER && (
                       <>
-                        <Link
+                        <DropdownMenu.Item asChild><Link
                           href="/my-events"
                           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
                           onClick={closeMenus}
                         >
                           <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
                           Quản lý giải của tôi
-                        </Link>
-                        <Link
+                        </Link></DropdownMenu.Item>
+                        <DropdownMenu.Item asChild><Link
                           href="/wallet"
                           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
                           onClick={closeMenus}
                         >
                           <Wallet className="h-4 w-4 text-muted-foreground" />
                           Ví & giải ngân
-                        </Link>
+                        </Link></DropdownMenu.Item>
                       </>
                     )}
                   </div>
 
                   <div className="pt-1 border-t border-border/60">
-                    <button
+                    <DropdownMenu.Item asChild><button
                       type="button"
                       onClick={() => {
                         closeMenus();
@@ -305,24 +306,26 @@ export default function Header() {
                     >
                       <LogOut className="h-4 w-4" />
                       Đăng xuất
-                    </button>
+                    </button></DropdownMenu.Item>
                   </div>
                 </div>
-              )}
+              </DropdownMenu.Content>
+              </DropdownMenu.Portal>
             </div>
+            </DropdownMenu.Root>
           ) : (
             <div className="flex items-center gap-2.5">
               <Link
                 href="/login"
                 onClick={closeMenus}
-                className="rounded-full px-4 py-1.5 text-sm font-medium text-foreground/80 transition-colors hover:text-foreground hover:bg-muted/70"
+                className="inline-flex min-h-11 items-center rounded-xl px-4 py-2 text-sm font-medium text-foreground/80 transition-colors hover:text-foreground hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-orange-600"
               >
                 Đăng nhập
               </Link>
               <Link
                 href="/register"
                 onClick={closeMenus}
-                className="group relative inline-flex items-center justify-center overflow-hidden rounded-full bg-gradient-to-r from-orange-500 to-red-600 px-4 py-1.5 text-sm font-semibold text-white shadow-md shadow-orange-500/20 transition-all duration-200 hover:shadow-orange-500/35 hover:scale-[1.02] active:scale-[0.98]"
+                className="inline-flex min-h-11 items-center justify-center rounded-xl bg-gradient-to-r from-orange-600 to-red-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600"
               >
                 Đăng ký ngay
               </Link>
@@ -331,7 +334,7 @@ export default function Header() {
         </div>
 
         {/* Mobile Hamburger Button */}
-        <div className="flex md:hidden items-center gap-2">
+        <div className="flex lg:hidden items-center gap-2">
           {isLoggedIn && (
             <UserAvatarMark
               username={username}
@@ -340,11 +343,13 @@ export default function Header() {
             />
           )}
           <button
+            ref={mobileMenuButtonRef}
             type="button"
             onClick={() => setMobileMenuOpen((prev) => !prev)}
-            className="inline-flex items-center justify-center rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-orange-500"
+            className="inline-flex size-11 items-center justify-center rounded-xl border border-border text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-orange-600"
             aria-expanded={mobileMenuOpen}
-            aria-label="Mở danh mục điều hướng"
+            aria-controls="mobile-navigation"
+            aria-label={mobileMenuOpen ? "Đóng danh mục điều hướng" : "Mở danh mục điều hướng"}
           >
             {mobileMenuOpen ? (
               <X className="h-6 w-6" />
@@ -357,18 +362,18 @@ export default function Header() {
 
       {/* Mobile Drawer Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t border-border/60 bg-background/95 px-4 pt-3 pb-6 backdrop-blur-xl space-y-4 animate-in slide-in-from-top-4 duration-200">
+        <div id="mobile-navigation" className="lg:hidden max-h-[calc(100dvh-4.5rem)] overflow-y-auto overscroll-contain border-t border-border/60 bg-background/95 px-4 pt-3 pb-6 backdrop-blur-xl space-y-4 animate-in slide-in-from-top-4 duration-200 [&_a]:min-h-11 [&_button]:min-h-11">
           {isLoggedIn && (
             <div className="flex items-center justify-between rounded-xl bg-muted/60 p-3">
-              <div className="flex items-center gap-3">
+              <div className="flex min-w-0 items-center gap-3">
                 <UserAvatarMark
                   username={username}
                   avatarUrl={avatarUrl}
                   sizeClass="h-9 w-9"
                   textClass="text-sm"
                 />
-                <div>
-                  <p className="text-sm font-semibold text-foreground">
+                <div className="min-w-0">
+                  <p className="break-words text-sm font-semibold text-foreground">
                     {username}
                   </p>
                   <p className="text-xs text-muted-foreground">Đã đăng nhập</p>
@@ -377,7 +382,7 @@ export default function Header() {
             </div>
           )}
 
-          <nav className="flex flex-col gap-1">
+          <nav aria-label="Điều hướng trên di động" className="flex flex-col gap-1">
             {visibleNavLinks.map((link) => {
               const isActive =
                 link.href === "/"
@@ -393,6 +398,7 @@ export default function Header() {
                 <Link
                   key={link.href}
                   href={link.href}
+                  aria-current={isActive ? "page" : undefined}
                   onClick={closeMenus}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                     isActive
@@ -486,6 +492,7 @@ export default function Header() {
                   <>
                     <Link
                       href="/my-events"
+                      onClick={closeMenus}
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                       pathname.startsWith("/my-events")
                         ? "bg-orange-500/10 text-orange-600 font-semibold"

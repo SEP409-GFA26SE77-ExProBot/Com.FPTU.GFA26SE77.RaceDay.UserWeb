@@ -41,7 +41,7 @@ export default function Pagination({
 
   return (
     <nav
-      className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2 ${className}`}
+      className={`flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3 pt-2 ${className}`}
       aria-label="Phân trang"
     >
       <p className="text-xs text-muted-foreground order-2 sm:order-1">
@@ -57,17 +57,20 @@ export default function Pagination({
           type="button"
           disabled={disabled || page <= 1}
           onClick={() => onChange(page - 1)}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-white text-foreground transition-all hover:border-orange-400 hover:text-orange-600 disabled:opacity-40 disabled:pointer-events-none active:scale-95"
+          className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-foreground transition-colors hover:border-orange-400 hover:text-orange-700 disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600"
           aria-label="Trang trước"
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
 
+        <span aria-current="page" className="min-w-24 text-center text-sm font-semibold tabular-nums sm:hidden">Trang {page} / {totalPages}</span>
+
         {pages.map((p, idx) =>
           p === "…" ? (
             <span
               key={`e-${idx}`}
-              className="inline-flex h-9 w-9 items-center justify-center text-muted-foreground"
+              aria-hidden="true"
+              className="hidden size-9 items-center justify-center text-muted-foreground sm:inline-flex"
             >
               <MoreHorizontal className="h-4 w-4" />
             </span>
@@ -77,10 +80,11 @@ export default function Pagination({
               type="button"
               disabled={disabled}
               onClick={() => onChange(p)}
-              className={`inline-flex h-9 min-w-9 px-2 items-center justify-center rounded-full text-sm font-semibold transition-all active:scale-95 ${
+              aria-label={`Trang ${p}`}
+              className={`hidden h-11 min-w-11 px-2 items-center justify-center rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600 sm:inline-flex ${
                 p === page
-                  ? "bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-md shadow-orange-500/25 scale-105"
-                  : "border border-border bg-white text-foreground/80 hover:border-orange-400 hover:text-orange-600"
+                  ? "bg-orange-600 text-white shadow-sm"
+                  : "border border-border bg-card text-foreground/80 hover:border-orange-400 hover:text-orange-700"
               }`}
               aria-current={p === page ? "page" : undefined}
             >
@@ -93,7 +97,7 @@ export default function Pagination({
           type="button"
           disabled={disabled || page >= totalPages}
           onClick={() => onChange(page + 1)}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-white text-foreground transition-all hover:border-orange-400 hover:text-orange-600 disabled:opacity-40 disabled:pointer-events-none active:scale-95"
+          className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-foreground transition-colors hover:border-orange-400 hover:text-orange-700 disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600"
           aria-label="Trang sau"
         >
           <ChevronRight className="h-4 w-4" />

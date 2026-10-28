@@ -26,6 +26,10 @@ import PageLoading from "@/components/ui/PageLoading";
 import Pagination from "@/components/ui/Pagination";
 import { usePagedList } from "@/hooks/usePagedList";
 import { getApiErrorMessage } from "@/lib/error";
+import FilterChip from "@/components/events/FilterChip";
+import RunnerPageHeader from "@/components/runner/RunnerPageHeader";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 const PAGE_SIZE = 6;
 
@@ -74,30 +78,6 @@ function rankRegStatus(s: string): number {
   return 0;
 }
 
-function FilterChip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all border ${
-        active
-          ? "bg-orange-500 text-white border-orange-600 shadow-sm shadow-orange-500/25"
-          : "bg-white text-foreground/70 border-border hover:border-orange-400/50 hover:text-foreground"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
 function eventCity(event: RaceEventListItemDto): string {
   const parts = (event.location || "").split(",").map((s) => s.trim());
   return parts[parts.length - 1] || event.location || "Khác";
@@ -111,6 +91,7 @@ export default function RegisteredEventsClient() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<RegStatusKey>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
     const authenticatedUser = getAuthUser();
@@ -201,7 +182,7 @@ export default function RegisteredEventsClient() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadAttempt]);
 
   const filtered = useMemo(() => {
     return rows.filter((row) => {
@@ -256,30 +237,25 @@ export default function RegisteredEventsClient() {
 
   return (
     <div className={`${PAGE_SHELL} py-7 sm:py-8`}>
-      <div className="mb-6 rounded-2xl border border-orange-500/15 bg-gradient-to-br from-orange-50/80 via-white to-amber-50/40 p-5 sm:p-6">
-        <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
-          Giải đã đăng ký
-        </h1>
-        <p className="mt-1.5 text-muted-foreground max-w-3xl text-sm sm:text-base">
-          Các giải bạn đã đăng ký. Lọc theo trạng thái đăng ký (chờ thanh toán,
-          chờ duyệt, đã xác nhận…).
-        </p>
-
-        <div className="mt-4 flex items-center gap-3">
+      <RunnerPageHeader title="Giải đã đăng ký" description="Các cột mốc trên hành trình của bạn. Theo dõi giải chạy và trạng thái đăng ký tại đây." />
+      <div className="mb-6 rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+        <Label htmlFor="registered-event-search" className="mb-2 block text-sm font-semibold">Tìm trong các giải của bạn</Label>
+        <div className="flex items-center gap-2 sm:gap-3">
           <div className="relative min-w-0 flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <input
-              type="text"
+            <Input
+              id="registered-event-search"
+              type="search"
               placeholder="Tìm giải đã đăng ký..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-xl border border-border bg-white py-2.5 pl-10 pr-10 text-sm outline-none transition-all focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20"
+              className="h-12 rounded-xl bg-background pl-10 pr-12 text-base focus-visible:border-orange-500 focus-visible:ring-orange-500/20 [&::-webkit-search-cancel-button]:hidden"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-muted text-muted-foreground"
+                className="absolute right-1 top-1/2 flex size-11 -translate-y-1/2 items-center justify-center rounded-xl hover:bg-muted text-muted-foreground focus-visible:outline-2 focus-visible:outline-orange-600"
                 aria-label="Xóa tìm kiếm"
               >
                 <X className="h-3.5 w-3.5" />
@@ -290,9 +266,11 @@ export default function RegisteredEventsClient() {
             type="button"
             onClick={() => setFiltersOpen((o) => !o)}
             aria-expanded={filtersOpen}
-            className={`shrink-0 inline-flex h-[42px] items-center justify-center gap-2 rounded-xl border px-4 text-sm font-semibold transition-colors ${
+            aria-controls="registration-filters"
+            aria-label={`Bộ lọc đăng ký${activeFilterCount ? `, ${activeFilterCount} đang áp dụng` : ""}`}
+            className={`shrink-0 inline-flex h-12 items-center justify-center gap-2 rounded-xl border px-3 sm:px-4 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-orange-600 ${
               filtersOpen || activeFilterCount > 0
-                ? "border-orange-500 bg-orange-500 text-white shadow-sm shadow-orange-500/25"
+                ? "border-orange-300 bg-orange-50 text-orange-800"
                 : "border-border bg-white text-foreground hover:border-orange-400/60"
             }`}
           >
@@ -317,12 +295,12 @@ export default function RegisteredEventsClient() {
       </div>
 
       {error && (
-        <div className="mb-6 rounded-xl border border-red-500/20 bg-red-500/5 p-5 text-center">
+        <div role="alert" className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
           <p className="text-sm text-red-600 font-medium">{error}</p>
           <button
             type="button"
-            onClick={() => window.location.reload()}
-            className="mt-3 rounded-full bg-orange-500 px-5 py-2 text-sm font-semibold text-white"
+            onClick={() => { setBoot(true); setLoadAttempt((attempt) => attempt + 1); }}
+            className="mt-3 min-h-11 rounded-xl bg-orange-600 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-700"
           >
             Thử lại
           </button>
@@ -330,7 +308,7 @@ export default function RegisteredEventsClient() {
       )}
 
       {filtersOpen && (
-        <div className="mb-6 rounded-2xl border border-border bg-card p-4 sm:p-5 space-y-4 shadow-sm animate-in fade-in slide-in-from-top-1">
+        <div id="registration-filters" className="mb-6 rounded-2xl border border-border bg-card p-4 sm:p-5 space-y-4 shadow-sm animate-in fade-in slide-in-from-top-1">
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-bold">Bộ lọc đăng ký</p>
             <div className="flex items-center gap-2">
@@ -373,8 +351,8 @@ export default function RegisteredEventsClient() {
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">
+      {!error && <><div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <p role="status" className="text-sm text-muted-foreground">
           Hiển thị {filtered.length} / {rows.length} giải
         </p>
         <Link
@@ -396,7 +374,7 @@ export default function RegisteredEventsClient() {
             ))}
           </div>
         ) : pager.pageItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card px-5 py-16 text-center">
             <Ticket className="h-8 w-8 text-muted-foreground mb-3" />
             <h3 className="text-lg font-semibold mb-1">
               {rows.length === 0
@@ -450,6 +428,7 @@ export default function RegisteredEventsClient() {
           disabled={pager.turning}
         />
       </div>
+      </>}
     </div>
   );
 }
