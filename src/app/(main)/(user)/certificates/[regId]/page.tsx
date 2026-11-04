@@ -34,7 +34,7 @@ function CertificateContent({ regId }: { regId: string }) {
         if (cancelled) return;
         if (result === false) {
           setCertificate(null);
-          setError("Bạn chưa hoàn thành giải hoặc kết quả hoàn thành chưa được ghi nhận.");
+          setError("Đăng ký này chưa đủ điều kiện cấp chứng nhận. Vui lòng kiểm tra kết quả và trạng thái thi đấu của bạn.");
           return;
         }
         setCertificate(result);

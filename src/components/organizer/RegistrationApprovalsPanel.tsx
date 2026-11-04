@@ -366,10 +366,10 @@ export default function RegistrationApprovalsPanel({
                       <td className="px-4 py-3">
                         <span
                           className={`inline-flex rounded-md border px-2 py-0.5 text-[11px] font-extrabold ${getRegistrationStatusColor(
-                            r.status
+                            r.status, r.raceStatus
                           )}`}
                         >
-                          {getRegistrationStatusLabel(r.status)}
+                          {getRegistrationStatusLabel(r.status, r.raceStatus)}
                         </span>
                         {r.status === "rejected" ? (
                           <button
@@ -521,7 +521,7 @@ function RejectionReasonCard({
           <Row label="Đăng ký lúc" value={formatDateTime(reg.createdAtUtc)} />
           <Row
             label="Trạng thái"
-            value={getRegistrationStatusLabel(reg.status)}
+            value={getRegistrationStatusLabel(reg.status, reg.raceStatus)}
           />
           <Row label="Người duyệt" value={reviewer} />
           <Row

@@ -8,6 +8,7 @@ import { getMyRegistrations } from "@/api/events";
 import { RegistrationDto } from "@/dto/event.dto";
 import { getRegistrationStatusLabel, formatPrice } from "@/lib/format";
 import { getApiErrorMessage } from "@/lib/error";
+import { hasFinishedRace } from "@/lib/race-status";
 import { PAGE_SHELL_FORM } from "@/lib/page-shell";
 import PageLoading from "@/components/ui/PageLoading";
 import RunnerPageHeader from "@/components/runner/RunnerPageHeader";
@@ -30,9 +31,7 @@ export default function CertificatesPage() {
         const list = await getMyRegistrations();
         if (!cancelled) {
           setRegs(
-            (Array.isArray(list) ? list : []).filter(
-              (r) => r.status === "confirmed" || r.status === "finished" || Boolean(r.bibNumber)
-            )
+            (Array.isArray(list) ? list : []).filter(hasFinishedRace)
           );
           setError(null);
         }
@@ -89,7 +88,7 @@ export default function CertificatesPage() {
       {!error && (regs.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground space-y-3">
           <Award className="mx-auto h-10 w-10 opacity-50" />
-          <p>Chưa có đăng ký đã xác nhận để tạo chứng nhận.</p>
+          <p>Chưa có kết quả hoàn thành đủ điều kiện cấp chứng nhận.</p>
           <Link href="/my-registrations" className="inline-flex min-h-11 items-center rounded-xl border border-border px-4 py-2 text-orange-700 font-semibold hover:bg-muted">
             Xem vé của tôi
           </Link>
