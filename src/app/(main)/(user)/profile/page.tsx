@@ -245,9 +245,9 @@ export default function ProfilePage() {
                     {reg.distanceName || "—"} · {reg.distancePrice == null ? "Chưa có giá" : formatPrice(reg.distancePrice)}
                   </p>
                   <span
-                    className={`mt-1.5 inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${getRegistrationStatusColor(reg.status)}`}
+                    className={`mt-1.5 inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${getRegistrationStatusColor(reg.status, reg.raceStatus)}`}
                   >
-                    {getRegistrationStatusLabel(reg.status)}
+                    {getRegistrationStatusLabel(reg.status, reg.raceStatus)}
                   </span>
                 </div>
                 <Link

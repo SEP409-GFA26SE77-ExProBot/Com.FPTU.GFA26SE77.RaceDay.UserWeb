@@ -256,7 +256,7 @@ export default function RegistrationDetailPage() {
           <div className="flex justify-between gap-3">
             <span className="text-muted-foreground">Trạng thái</span>
             <span className="font-semibold text-red-700">
-              {getRegistrationStatusLabel(reg.status)}
+              {getRegistrationStatusLabel(reg.status, reg.raceStatus)}
             </span>
           </div>
           <div className="flex justify-between gap-3">
@@ -366,7 +366,7 @@ export default function RegistrationDetailPage() {
           )}
           <div className="relative">
             <p className="text-white/80 text-xs uppercase tracking-wider font-medium">
-              Vé đăng ký · {getRegistrationStatusLabel(reg.status)}
+              Vé đăng ký · {getRegistrationStatusLabel(reg.status, reg.raceStatus)}
             </p>
             <h1 className="text-xl font-bold text-white mt-0.5">
               {reg.eventName || event?.name || "RaceDay"}

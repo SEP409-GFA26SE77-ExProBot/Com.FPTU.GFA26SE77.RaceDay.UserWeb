@@ -1,4 +1,5 @@
 // DTOs matching the RaceDay Event API response shapes
+import type { RaceStatus } from "@/dto/race-status.dto";
 
 export interface CoordinatesDto {
   lat: number;
@@ -191,7 +192,8 @@ export interface RegistrationDto {
   userId: string;
   eventId: string;
   distanceId: string;
-  status: string; // pending_payment | pending_approval | confirmed | rejected | cancelled
+  status: string; // pending_payment | pending_approval | confirmed | finished | rejected | cancelled
+  raceStatus?: RaceStatus | null;
   fullName: string;
   email: string;
   phone: string;

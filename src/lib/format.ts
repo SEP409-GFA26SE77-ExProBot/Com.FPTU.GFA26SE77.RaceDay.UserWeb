@@ -1,3 +1,6 @@
+import type { RaceStatus } from "@/dto/race-status.dto";
+import { getRegistrationDisplayStatus } from "@/lib/race-status";
+
 /** Format VND price: 199000 → "199.000đ" */
 export function formatPrice(price: number): string {
   return new Intl.NumberFormat("vi-VN").format(price) + "đ";
@@ -121,8 +124,8 @@ export function getStatusColor(status: string): string {
 }
 
 /** Map BE registration status to UI label */
-export function getRegistrationStatusLabel(status: string): string {
-  switch (status) {
+export function getRegistrationStatusLabel(status: string, raceStatus?: RaceStatus | null): string {
+  switch (getRegistrationDisplayStatus({ status, raceStatus })) {
     case "pending_payment":
       return "Chờ thanh toán";
     case "pending_approval":
@@ -131,6 +134,14 @@ export function getRegistrationStatusLabel(status: string): string {
       return "Đã đăng ký";
     case "finished":
       return "Đã hoàn thành";
+    case "running":
+      return "Đang chạy";
+    case "dns":
+      return "DNS · Không xuất phát";
+    case "dnf":
+      return "DNF · Không hoàn thành";
+    case "dq":
+      return "DQ · Truất quyền thi đấu";
     case "rejected":
       return "Bị từ chối";
     case "cancelled":
@@ -141,8 +152,8 @@ export function getRegistrationStatusLabel(status: string): string {
 }
 
 /** Map BE registration status to CSS class tokens */
-export function getRegistrationStatusColor(status: string): string {
-  switch (status) {
+export function getRegistrationStatusColor(status: string, raceStatus?: RaceStatus | null): string {
+  switch (getRegistrationDisplayStatus({ status, raceStatus })) {
     case "pending_payment":
       return "bg-amber-500/15 text-amber-700 border-amber-500/25";
     case "pending_approval":
@@ -150,6 +161,12 @@ export function getRegistrationStatusColor(status: string): string {
     case "confirmed":
     case "finished":
       return "bg-emerald-500/15 text-emerald-700 border-emerald-500/25";
+    case "running":
+      return "bg-blue-500/15 text-blue-700 border-blue-500/25";
+    case "dns":
+    case "dnf":
+      return "bg-gray-500/15 text-gray-600 border-gray-500/25";
+    case "dq":
     case "rejected":
       return "bg-red-500/15 text-red-700 border-red-500/25";
     case "cancelled":

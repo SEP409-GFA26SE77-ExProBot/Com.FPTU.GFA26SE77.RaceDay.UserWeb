@@ -22,6 +22,8 @@ import {
   isPublicRegistrationLive,
 } from "@/lib/event-lifecycle";
 import { mediaDisplayUrl } from "@/lib/media-url";
+import type { RaceStatus } from "@/dto/race-status.dto";
+import { getRegistrationDisplayStatus } from "@/lib/race-status";
 
 interface EventCardProps {
   event: RaceEventListItemDto;
@@ -32,6 +34,7 @@ interface EventCardProps {
   statusMode?: "event" | "registration";
   /** Status đăng ký của user trên giải này (dùng khi statusMode = registration) */
   myRegistrationStatus?: string | null;
+  myRaceStatus?: RaceStatus | null;
   /** Id đơn ĐK — dùng để deep-link tiếp tục thanh toán / chờ duyệt */
   registrationId?: string | null;
 }
@@ -83,8 +86,8 @@ function listDistanceChipLabels(event: RaceEventListItemDto): string[] {
     .map((km) => `${km}K`);
 }
 
-function myRegPrimaryLabel(status: string): string {
-  return getRegistrationStatusLabel(status);
+function myRegPrimaryLabel(status: string, raceStatus?: RaceStatus | null): string {
+  return getRegistrationStatusLabel(status, raceStatus);
 }
 
 function overlayRegStatusClass(status: string): string {
@@ -95,7 +98,12 @@ function overlayRegStatusClass(status: string): string {
       return "bg-sky-600 text-white";
     case "confirmed":
     case "finished":
+    case "running":
       return "bg-orange-600 text-white";
+    case "dns":
+    case "dnf":
+      return "bg-zinc-600 text-white";
+    case "dq":
     case "rejected":
       return "bg-red-600 text-white";
     case "cancelled":
@@ -109,6 +117,7 @@ export default function EventCard({
   event,
   statusMode = "event",
   myRegistrationStatus = null,
+  myRaceStatus = null,
   registrationId = null,
 }: EventCardProps) {
   const [failedBanner, setFailedBanner] = useState<string | null>(null);
@@ -188,10 +197,10 @@ export default function EventCard({
           {showRegBadge ? (
             <span
               className={`${BADGE_BASE} ${overlayRegStatusClass(
-                myRegistrationStatus!
+                getRegistrationDisplayStatus({ status: myRegistrationStatus!, raceStatus: myRaceStatus })
               )}`}
             >
-              {myRegPrimaryLabel(myRegistrationStatus!)}
+              {myRegPrimaryLabel(myRegistrationStatus!, myRaceStatus)}
             </span>
           ) : (
             <span
