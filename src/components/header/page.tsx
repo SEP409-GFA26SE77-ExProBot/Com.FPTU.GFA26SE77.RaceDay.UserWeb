@@ -244,7 +244,7 @@ export default function Header() {
                           onClick={closeMenus}
                         >
                           <CreditCard className="h-4 w-4 text-muted-foreground" />
-                          Thanh toán
+                          Lịch sử thanh toán
                         </Link></DropdownMenu.Item>
                         <DropdownMenu.Item asChild><Link
                           href="/certificates"
@@ -449,7 +449,7 @@ export default function Header() {
                     }`}
                   >
                     <CreditCard className="h-4 w-4 text-muted-foreground" />
-                    Thanh toán
+                    Lịch sử thanh toán
                   </Link>
                   <Link
                     href="/certificates"

@@ -101,7 +101,7 @@ export default function OrganizerEventWallet({ eventId }: { eventId: string }) {
       });
       setAmount("");
       setNote("");
-      toastSuccess("Đã gửi yêu cầu rút từ túi giải này — chờ Admin duyệt.");
+      toastSuccess("Đã gửi yêu cầu rút từ túi giải này — chờ Manager duyệt.");
       await load();
     } catch (e) {
       toastError(e, "Tạo yêu cầu rút thất bại.");
@@ -180,7 +180,7 @@ export default function OrganizerEventWallet({ eventId }: { eventId: string }) {
           </li>
           <li>
             <strong className="text-foreground">Rút tiền BTC:</strong> chỉ từ túi
-            escrow của <em>giải đang mở</em>; cần TK nhận hợp lệ và chờ Admin
+            escrow của <em>giải đang mở</em>; cần TK nhận hợp lệ và chờ Manager
             duyệt yêu cầu rút.
             {ledger?.withdrawPolicyNote
               ? ` ${ledger.withdrawPolicyNote}`
@@ -196,6 +196,20 @@ export default function OrganizerEventWallet({ eventId }: { eventId: string }) {
             Túi giải đang mở
           </div>
           <p className="text-xs text-muted-foreground">{ledger.withdrawPolicyNote}</p>
+          {ledger.withdrawPhase ? (
+            <p className="text-xs font-semibold text-orange-800">
+              Phase: {ledger.withdrawPhase}
+              {typeof ledger.daysUntilEvent === "number"
+                ? ` · còn ${ledger.daysUntilEvent} ngày tới giải`
+                : ""}
+              {ledger.withdrawPhase === "advance" && ledger.advanceCapAmount
+                ? ` · trần tạm ứng ${formatPrice(ledger.advanceCapAmount)}`
+                : ""}
+              {ledger.withdrawPhase === "final" && ledger.finalCapAmount
+                ? ` · trần sau giải ${formatPrice(ledger.finalCapAmount)}`
+                : ""}
+            </p>
+          ) : null}
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {(
               [

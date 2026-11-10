@@ -12,6 +12,7 @@ import type {
   EventLedgerDto,
   OrganizerWalletDto,
   PayoutRequestDto,
+  RefundQuoteDto,
   RefundRequestDto,
 } from "@/dto/finance.dto";
 
@@ -96,4 +97,17 @@ export async function createRefundRequest(
     return m.createRefundRequestMock(body);
   }
   return api.post(`${FINANCE_API}/runner/refunds`, body);
+}
+
+export async function getRefundQuote(
+  paymentId: string,
+  opts?: { systemErrorClaim?: boolean }
+): Promise<RefundQuoteDto> {
+  if (FINANCE_USE_MOCK) {
+    const m = await import("./finance.mock");
+    return m.getRefundQuoteMock(paymentId, opts);
+  }
+  const q = new URLSearchParams({ paymentId });
+  if (opts?.systemErrorClaim) q.set("systemErrorClaim", "true");
+  return api.get(`${FINANCE_API}/runner/refunds/quote?${q.toString()}`);
 }

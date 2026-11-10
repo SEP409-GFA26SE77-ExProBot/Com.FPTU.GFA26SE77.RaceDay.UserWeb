@@ -6,6 +6,7 @@ import type {
   EventLedgerDto,
   OrganizerWalletDto,
   PayoutRequestDto,
+  RefundQuoteDto,
   RefundRequestDto,
 } from "@/dto/finance.dto";
 
@@ -38,7 +39,7 @@ const DEFAULT_BANK: BankAccountDto = {
   transferNote: "Giai ngan BTC RaceDay",
 };
 
-/** Hai giải demo: A gần end (rút nhiều), B chưa bắt đầu (cap 50%) */
+/** Hai giải demo: A gần end (advance/final), B còn sớm (too_early) */
 const SEED_LEDGERS: EventLedgerDto[] = [
   {
     eventId: "evt-a-ending",
@@ -54,7 +55,11 @@ const SEED_LEDGERS: EventLedgerDto[] = [
     withdrawnTotal: 5_000_000,
     payoutPending: 2_500_000,
     availableToWithdraw: 18_000_000,
-    withdrawPolicyNote: "Gần race day — có thể rút tới phần khả dụng còn lại.",
+    withdrawPolicyNote: "Phase final — có thể rút phần khả dụng còn lại sau giải.",
+    withdrawPhase: "final",
+    advanceCapAmount: 13_672_500,
+    finalCapAmount: 45_575_000,
+    daysUntilEvent: 0,
     currency: "VND",
   },
   {
@@ -71,7 +76,11 @@ const SEED_LEDGERS: EventLedgerDto[] = [
     withdrawnTotal: 0,
     payoutPending: 0,
     availableToWithdraw: 5_985_000,
-    withdrawPolicyNote: "Trước sự kiện — tối đa ~50% net sau phí & hoàn tiền.",
+    withdrawPolicyNote: "Tạm ứng 30% từ T-4 tuần; 70% còn lại sau giải.",
+    withdrawPhase: "advance",
+    advanceCapAmount: 5_985_000,
+    finalCapAmount: 13_965_000,
+    daysUntilEvent: 20,
     currency: "VND",
   },
 ];
@@ -92,7 +101,7 @@ const SEED_PAYOUTS: PayoutRequestDto[] = [
     eventId: "evt-a-ending",
     eventName: "Fun Run 5K Mỹ Khê 2027 (sắp kết thúc)",
     amount: 2_500_000,
-    note: "Đợt 2 — chờ Admin",
+    note: "Đợt 2 — chờ Manager",
     status: "pending",
     createdAt: "2026-10-08T04:00:00.000Z",
   },
@@ -268,4 +277,37 @@ export async function createRefundRequestMock(
   };
   writeJson(LS_REFUNDS, [row, ...list]);
   return row;
+}
+
+export async function getRefundQuoteMock(
+  paymentId: string,
+  opts?: { systemErrorClaim?: boolean }
+): Promise<RefundQuoteDto> {
+  const paidAmount = 500_000;
+  if (opts?.systemErrorClaim) {
+    return {
+      paymentId,
+      registrationId: "",
+      eventId: "",
+      paidAmount,
+      refundPercent: 100,
+      refundAmount: paidAmount,
+      nonRefundableFee: 0,
+      policyNote:
+        "Mock: yêu cầu hoàn lỗi hệ thống — đề xuất 100%, chờ Manager/Admin duyệt.",
+      daysUntilEvent: 30,
+    };
+  }
+  return {
+    paymentId,
+    registrationId: "",
+    eventId: "",
+    paidAmount,
+    refundPercent: 0,
+    refundAmount: 0,
+    nonRefundableFee: paidAmount,
+    policyNote:
+      "Mock: không hoàn lý do cá nhân. Chỉ yêu cầu hoàn khi lỗi hệ thống.",
+    daysUntilEvent: 120,
+  };
 }

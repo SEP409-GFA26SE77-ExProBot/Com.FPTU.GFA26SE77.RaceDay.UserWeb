@@ -31,10 +31,10 @@ import {
   ScrollText,
   ClipboardList,
   Building2,
-  PackagePlus,
   Boxes,
   Hash,
   MessageSquareText,
+  Trophy,
 } from "lucide-react";
 
 function eventIdFromPath(pathname: string): string | null {
@@ -92,6 +92,12 @@ function eventWorkspaceGroups(eventId: string): NavGroup[] {
           href: `${base}/race-simulation`,
           icon: Flag,
           matchPath: `${base}/race-simulation`,
+        },
+        {
+          label: "Kết quả giải",
+          href: `${base}/results`,
+          icon: Trophy,
+          matchPath: `${base}/results`,
         },
         {
           label: "Quản lý nhân sự",
@@ -168,12 +174,6 @@ function eventWorkspaceGroups(eventId: string): NavGroup[] {
           href: `${base}/profile/supplies`,
           icon: Boxes,
           matchPath: `${base}/profile/supplies`,
-        },
-        {
-          label: "Bổ sung",
-          href: `${base}/profile/addition`,
-          icon: PackagePlus,
-          matchPath: `${base}/profile/addition`,
         },
       ],
     },
