@@ -15,7 +15,7 @@ import { buildStaffStationsForEvent } from "@/lib/event-staff-stations";
 
 const STAFF_API = "api/v1/event";
 
-/** Checkpoint (coord/photo) / điểm tiếp tế (volunteer) từ map + nhiệm vụ không gán map */
+/** Checkpoint từ map, điểm tiếp tế cho race-staff và nhiệm vụ không gắn map. */
 export async function listStaffStations(
   eventId: string,
   role: EventStaffRole

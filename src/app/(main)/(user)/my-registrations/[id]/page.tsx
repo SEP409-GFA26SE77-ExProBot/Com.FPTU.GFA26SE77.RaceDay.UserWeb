@@ -75,6 +75,15 @@ export default function RegistrationDetailPage() {
     };
   }, [id]);
 
+  useEffect(() => {
+    if (!showQrFullscreen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowQrFullscreen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [showQrFullscreen]);
+
   if (reg === undefined) {
     return (
       <PageLoading
@@ -510,6 +519,7 @@ export default function RegistrationDetailPage() {
           <button
             type="button"
             onClick={() => setShowQrFullscreen(false)}
+            aria-keyshortcuts="Escape"
             className="rounded-full bg-zinc-900 px-6 py-2.5 text-sm font-bold text-white"
           >
             Đóng
