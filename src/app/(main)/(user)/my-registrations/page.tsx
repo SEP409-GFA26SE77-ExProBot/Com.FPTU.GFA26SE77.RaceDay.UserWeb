@@ -211,8 +211,8 @@ export default function MyRegistrationsPage() {
                       ? reg.distancePrice
                       : null);
                   const statusLine = reg.bibNumber
-                    ? `BIB ${reg.bibNumber} · ${getRegistrationStatusLabel(reg.status)}`
-                    : getRegistrationStatusLabel(reg.status);
+                    ? `BIB ${reg.bibNumber} · ${getRegistrationStatusLabel(reg.status, reg.raceStatus)}`
+                    : getRegistrationStatusLabel(reg.status, reg.raceStatus);
                   return (
                     <article
                       key={reg.id}
@@ -241,7 +241,7 @@ export default function MyRegistrationsPage() {
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
                               <span
-                                className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${getRegistrationStatusColor(reg.status)}`}
+                                className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${getRegistrationStatusColor(reg.status, reg.raceStatus)}`}
                               >
                                 {statusLine}
                               </span>

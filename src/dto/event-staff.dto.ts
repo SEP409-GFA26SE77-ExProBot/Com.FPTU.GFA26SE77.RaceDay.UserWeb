@@ -1,6 +1,6 @@
-/** Nhân sự theo event — coordinator / photographer / volunteer */
+/** Nhân sự theo event — race-staff / photographer */
 
-export type EventStaffRole = "coordinator" | "photographer" | "volunteer";
+export type EventStaffRole = "race-staff" | "photographer";
 
 export type EventStaffStatus = "invited" | "active" | "revoked";
 

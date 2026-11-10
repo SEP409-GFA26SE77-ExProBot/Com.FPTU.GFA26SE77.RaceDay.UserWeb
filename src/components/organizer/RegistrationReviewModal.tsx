@@ -106,10 +106,10 @@ export default function RegistrationReviewModal({
           <div className="min-w-0">
             <span
               className={`inline-flex rounded-md border px-2 py-0.5 text-[11px] font-extrabold ${getRegistrationStatusColor(
-                r.status
+                r.status, r.raceStatus
               )}`}
             >
-              {getRegistrationStatusLabel(r.status)}
+              {getRegistrationStatusLabel(r.status, r.raceStatus)}
             </span>
             <h2
               id="reg-review-modal-title"
@@ -260,7 +260,7 @@ export default function RegistrationReviewModal({
                 />
                 <ReviewRow
                   label="Trạng thái"
-                  value={getRegistrationStatusLabel(r.status)}
+                  value={getRegistrationStatusLabel(r.status, r.raceStatus)}
                 />
                 <ReviewRow
                   label="Cự ly"

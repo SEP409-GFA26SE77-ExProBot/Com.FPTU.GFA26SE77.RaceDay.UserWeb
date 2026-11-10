@@ -1,5 +1,6 @@
 import api from "@/config/axios";
 import { getApiErrorMessage } from "@/lib/error";
+import type { RaceStatus } from "@/dto/race-status.dto";
 
 const EVENT_API = "api/v1/event";
 
@@ -57,6 +58,7 @@ export type CheckInListItem = {
   bibNumber: string;
   fullName: string;
   status: string;
+  raceStatus?: RaceStatus | null;
   checkedIn: boolean;
   checkedInAtUtc?: string | null;
   distanceLabel?: string | null;

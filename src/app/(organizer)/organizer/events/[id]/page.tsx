@@ -10,6 +10,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   Calendar,
   ClipboardList,
+  Download,
   ExternalLink,
   Loader2,
   MapPin,
@@ -18,10 +19,11 @@ import {
 import { getEventById } from "@/api/events";
 import {
   approveRegistrationApi,
+  getOrganizerLeaderboardPdf,
   listEventRegistrations,
   rejectRegistrationApi,
 } from "@/api/organizer";
-import type { RaceEventDto } from "@/dto/event.dto";
+import type { EventDistanceDto, RaceEventDto } from "@/dto/event.dto";
 import type { ApiRegistration } from "@/dto/organizer.dto";
 import {
   formatDate,
@@ -30,9 +32,12 @@ import {
   getStatusColor,
 } from "@/lib/format";
 import { getApiErrorMessage } from "@/lib/error";
+import { hasEventFinished } from "@/lib/event-lifecycle";
 import { mediaDisplayUrl } from "@/lib/media-url";
+import { toastError } from "@/lib/toast";
 import EventFinancePanel from "@/components/organizer/EventFinancePanel";
 import RegistrationApprovalsPanel from "@/components/organizer/RegistrationApprovalsPanel";
+import { Button } from "@/components/ui/button";
 
 const DEFAULT_GRADIENT =
   "linear-gradient(135deg, #f97316 0%, #ea580c 40%, #dc2626 100%)";
@@ -93,6 +98,7 @@ function MyEventDetailContent() {
   const [error, setError] = useOrganizerErrorState();
   const [toast, setToast] = useOrganizerToastState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [downloadingDistanceId, setDownloadingDistanceId] = useState<string | null>(null);
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [reason, setReason] = useState("");
 
@@ -211,6 +217,27 @@ function MyEventDetailContent() {
   }
 
   const distances = event.distances || [];
+  const showLeaderboardDownload =
+    event.id.toLowerCase() === eventId.toLowerCase() && hasEventFinished(event);
+  const downloadLeaderboard = async (distance: EventDistanceDto) => {
+    setDownloadingDistanceId(distance.id);
+    try {
+      const pdf = await getOrganizerLeaderboardPdf(event.id, distance.id);
+      const url = URL.createObjectURL(pdf);
+      const link = document.createElement("a");
+      const name = `${event.name}-${distance.name}`.replace(/[<>:"/\\|?*]/g, "-");
+      link.href = url;
+      link.download = `bang-xep-hang-${name}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      toastError("Không tải được bảng xếp hạng. Vui lòng thử lại.");
+    } finally {
+      setDownloadingDistanceId(null);
+    }
+  };
   const totalCap =
     distances.reduce((s, d) => s + d.capacity, 0) || event.totalRunners || 0;
   const totalReg = distances.reduce(
@@ -325,7 +352,26 @@ function MyEventDetailContent() {
                   <tbody className="divide-y divide-border/60">
                     {distances.map((d) => (
                       <tr key={d.id}>
-                        <td className="py-3 pr-3 font-semibold">{d.name}</td>
+                        <td className="py-3 pr-3 font-semibold">
+                          {d.name}
+                          {showLeaderboardDownload && (
+                            <div className="mt-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="min-h-11 cursor-pointer"
+                                disabled={downloadingDistanceId !== null}
+                                aria-label={downloadingDistanceId === d.id
+                                  ? `Đang tải bảng xếp hạng PDF cự ly ${d.name}`
+                                  : `Tải bảng xếp hạng PDF cự ly ${d.name}`}
+                                onClick={() => void downloadLeaderboard(d)}
+                              >
+                                <Download aria-hidden="true" />
+                                {downloadingDistanceId === d.id ? "Đang tải PDF…" : "Tải bảng xếp hạng PDF"}
+                              </Button>
+                            </div>
+                          )}
+                        </td>
                         <td className="py-3 pr-3 text-muted-foreground">
                           {d.distanceKm}K
                         </td>

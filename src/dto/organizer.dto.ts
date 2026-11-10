@@ -1,4 +1,5 @@
 // DTOs for organizer registration management (approve / reject)
+import type { RaceStatus } from "@/dto/race-status.dto";
 
 export interface ApiRegistration {
   id: string;
@@ -6,6 +7,7 @@ export interface ApiRegistration {
   distanceId: string;
   userId: string;
   status: string;
+  raceStatus?: RaceStatus | null;
   fullName: string;
   email: string;
   phone: string;

@@ -30,6 +30,8 @@ import FilterChip from "@/components/events/FilterChip";
 import RunnerPageHeader from "@/components/runner/RunnerPageHeader";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { RaceStatus } from "@/dto/race-status.dto";
+import { hasFinishedRace } from "@/lib/race-status";
 
 const PAGE_SIZE = 6;
 
@@ -49,6 +51,7 @@ type RegStatusKey = (typeof REG_STATUS_FILTERS)[number]["key"];
 type RegisteredRow = {
   event: RaceEventListItemDto;
   regStatus: string;
+  raceStatus?: RaceStatus | null;
   regId: string;
 };
 
@@ -153,6 +156,7 @@ export default function RegisteredEventsClient() {
                 status: "registration-open",
               },
               regStatus: reg.status,
+              raceStatus: reg.raceStatus,
               regId: reg.id,
             });
             continue;
@@ -160,6 +164,7 @@ export default function RegisteredEventsClient() {
           next.push({
             event,
             regStatus: reg.status,
+            raceStatus: reg.raceStatus,
             regId: reg.id,
           });
         }
@@ -193,7 +198,9 @@ export default function RegisteredEventsClient() {
         (row.event.location || "").toLowerCase().includes(q) ||
         eventCity(row.event).toLowerCase().includes(q);
       const matchesStatus =
-        statusFilter === "all" || row.regStatus === statusFilter;
+        statusFilter === "all" || (statusFilter === "finished"
+          ? hasFinishedRace({ status: row.regStatus, raceStatus: row.raceStatus })
+          : row.regStatus === statusFilter);
       return matchesSearch && matchesStatus;
     });
   }, [rows, searchQuery, statusFilter]);
@@ -411,6 +418,7 @@ export default function RegisteredEventsClient() {
                 event={row.event}
                 statusMode="registration"
                 myRegistrationStatus={row.regStatus}
+                myRaceStatus={row.raceStatus}
                 registrationId={row.regId}
               />
             ))}

@@ -75,6 +75,15 @@ export default function RegistrationDetailPage() {
     };
   }, [id]);
 
+  useEffect(() => {
+    if (!showQrFullscreen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowQrFullscreen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [showQrFullscreen]);
+
   if (reg === undefined) {
     return (
       <PageLoading
@@ -256,7 +265,7 @@ export default function RegistrationDetailPage() {
           <div className="flex justify-between gap-3">
             <span className="text-muted-foreground">Trạng thái</span>
             <span className="font-semibold text-red-700">
-              {getRegistrationStatusLabel(reg.status)}
+              {getRegistrationStatusLabel(reg.status, reg.raceStatus)}
             </span>
           </div>
           <div className="flex justify-between gap-3">
@@ -366,7 +375,7 @@ export default function RegistrationDetailPage() {
           )}
           <div className="relative">
             <p className="text-white/80 text-xs uppercase tracking-wider font-medium">
-              Vé đăng ký · {getRegistrationStatusLabel(reg.status)}
+              Vé đăng ký · {getRegistrationStatusLabel(reg.status, reg.raceStatus)}
             </p>
             <h1 className="text-xl font-bold text-white mt-0.5">
               {reg.eventName || event?.name || "RaceDay"}
@@ -510,6 +519,7 @@ export default function RegistrationDetailPage() {
           <button
             type="button"
             onClick={() => setShowQrFullscreen(false)}
+            aria-keyshortcuts="Escape"
             className="rounded-full bg-zinc-900 px-6 py-2.5 text-sm font-bold text-white"
           >
             Đóng
