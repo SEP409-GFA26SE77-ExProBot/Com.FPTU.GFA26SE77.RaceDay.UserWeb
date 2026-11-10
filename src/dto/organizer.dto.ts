@@ -118,13 +118,6 @@ export interface CreateRaceEventRequest {
   submitForApproval: boolean;
 }
 
-/** Lựa chọn vật phẩm bổ sung (bib/áo/chip…) — lưu local / hồ sơ */
-export interface ProfileAdditionDto {
-  selectedItems?: string[];
-  notes?: string;
-  [key: string]: unknown;
-}
-
 /** Vật phẩm tiếp tế theo thùng */
 export interface EventSupplyItemDto {
   id: string;

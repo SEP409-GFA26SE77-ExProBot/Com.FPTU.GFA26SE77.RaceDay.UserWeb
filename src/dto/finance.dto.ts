@@ -14,13 +14,16 @@ export type RefundRequestStatus =
   | "refunded"
   | "rejected";
 
+/** too_early | advance | final */
+export type WithdrawPhase = "too_early" | "advance" | "final" | string;
+
 export interface BankAccountDto {
   bankName: string;
   accountNumber: string;
   accountHolderName: string;
   /** Chi nhánh NH — optional, khớp BeneficiaryAccount.branch */
   branch?: string;
-  /** Gợi ý nội dung CK khi Admin giải ngân — optional, khớp transferNote */
+  /** Gợi ý nội dung CK khi Manager giải ngân — optional */
   transferNote?: string;
   bin?: string;
 }
@@ -40,13 +43,18 @@ export interface EventLedgerDto {
   escrowHeld: number;
   /** Đã chuyển thành công cho BTC */
   withdrawnTotal: number;
-  /** Lệnh rút đang chờ Admin */
+  /** Lệnh rút đang chờ Manager */
   payoutPending: number;
   /** Có thể xin rút theo policy giai đoạn giải */
   availableToWithdraw: number;
-  /** vd: "Tối đa 50% trước race day" */
+  /** vd: "Tạm ứng 30% từ T-4 tuần" */
   withdrawPolicyNote: string;
   currency: string;
+  /** too_early | advance | final */
+  withdrawPhase?: WithdrawPhase;
+  advanceCapAmount?: number;
+  finalCapAmount?: number;
+  daysUntilEvent?: number | null;
 }
 
 export interface OrganizerWalletDto {
@@ -98,6 +106,10 @@ export interface RefundRequestDto {
   createdAt: string;
   updatedAt?: string;
   rejectReason?: string;
+  isSystemErrorClaim?: boolean;
+  paidAmount?: number;
+  refundPercent?: number;
+  userId?: string;
 }
 
 export interface CreateRefundRequestDto {
@@ -105,4 +117,18 @@ export interface CreateRefundRequestDto {
   reason: string;
   eventId?: string;
   amount?: number;
+  /** Khiếu nại lỗi hệ thống → chờ Manager/Admin duyệt rồi hoàn 100%. */
+  systemErrorClaim?: boolean;
+}
+
+export interface RefundQuoteDto {
+  paymentId: string;
+  registrationId: string;
+  eventId: string;
+  paidAmount: number;
+  refundPercent: number;
+  refundAmount: number;
+  nonRefundableFee: number;
+  policyNote: string;
+  daysUntilEvent?: number | null;
 }

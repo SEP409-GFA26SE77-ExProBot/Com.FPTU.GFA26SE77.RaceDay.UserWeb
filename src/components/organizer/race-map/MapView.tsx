@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   MapContainer,
-  TileLayer,
   Polyline,
   CircleMarker,
   Marker,
@@ -16,6 +15,7 @@ import { DEMO_EVENT, type Checkpoint, type LatLng } from "@/api/race-map.mock-da
 import { positionAtCourseKm } from "@/lib/race-map/geo";
 import { MAP_COLORS, checkpointMapColor } from "@/lib/race-map/map-colors";
 import type { RunnerLive } from "@/lib/race-map/timing";
+import { BasemapTileLayer } from "@/components/maps/BasemapTileLayer";
 
 function FitBounds({ points, token }: { points: LatLng[]; token: string }) {
   const map = useMap();
@@ -120,10 +120,7 @@ export default function MapView({
       className="h-full w-full rounded-xl z-0"
       scrollWheelZoom
     >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+      <BasemapTileLayer />
       <FitBounds points={polyline} token={fitToken} />
       <Polyline
         positions={polyline.map((p) => [p.lat, p.lng] as [number, number])}

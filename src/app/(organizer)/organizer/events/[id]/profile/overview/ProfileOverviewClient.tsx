@@ -13,7 +13,6 @@ import {
   Hash,
   Loader2,
   Map,
-  PackagePlus,
   Route,
   ScrollText,
 } from "lucide-react";
@@ -175,14 +174,6 @@ export default function ProfileOverviewClient() {
         ok: true,
         hint: "Tùy chọn — cấu hình điểm / vật phẩm tiếp tế",
       },
-      {
-        id: "addition",
-        label: "Bổ sung",
-        href: `${base}/addition`,
-        icon: PackagePlus,
-        ok: true,
-        hint: "Vật phẩm / thiết bị bổ sung",
-      },
     ];
   }, [event, eventId]);
 
@@ -210,11 +201,7 @@ export default function ProfileOverviewClient() {
   }
 
   const coreItems = items.filter(
-    (i) =>
-      i.id !== "supplies" &&
-      i.id !== "addition" &&
-      i.id !== "bib" &&
-      i.id !== "map"
+    (i) => i.id !== "supplies" && i.id !== "bib" && i.id !== "map"
   );
   const done = coreItems.filter((i) => i.ok).length;
 

@@ -221,7 +221,7 @@ export function getRefundStatusLabel(status: string): string {
     case "eligible":
       return "Có thể hoàn";
     case "requested":
-      return "Đã gửi yêu cầu";
+      return "Chờ duyệt";
     case "processing":
       return "Đang xử lý";
     case "refunded":

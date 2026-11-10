@@ -10,7 +10,7 @@ const accountLinks = [
   { href: "/profile", label: "Hồ sơ", icon: User },
   { href: "/my-registrations", label: "Vé của tôi", icon: Ticket },
   { href: "/registered-events", label: "Giải đã đăng ký", icon: Flag },
-  { href: "/payments", label: "Thanh toán", icon: CreditCard },
+  { href: "/payments", label: "Lịch sử thanh toán", icon: CreditCard },
   { href: "/certificates", label: "Chứng nhận", icon: Award },
 ];
 

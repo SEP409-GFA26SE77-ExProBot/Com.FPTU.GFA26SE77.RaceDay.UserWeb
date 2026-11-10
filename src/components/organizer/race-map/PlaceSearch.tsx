@@ -23,6 +23,8 @@ export default function PlaceSearch({
   const search = useCallback(async (term: string) => {
     if (term.trim().length < 2) {
       setHits([]);
+      setErr(null);
+      setOpen(false);
       return;
     }
     setLoading(true);
@@ -30,10 +32,12 @@ export default function PlaceSearch({
     try {
       const results = await searchGeocode(term.trim());
       setHits(results);
+      setErr(results.length === 0 ? "Không tìm thấy địa điểm" : null);
       setOpen(true);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Không tìm được");
       setHits([]);
+      setOpen(true);
     } finally {
       setLoading(false);
     }

@@ -10,6 +10,7 @@
     "test:auth": "node --test tests/auth-store.test.mjs tests/auth-http.test.mjs"
   },
   "dependencies": {
+    "@microsoft/signalr": "^10.0.11",
     "@yudiel/react-qr-scanner": "^2.6.0",
     "axios": "^1.20.0",
     "class-variance-authority": "^0.7.1",
