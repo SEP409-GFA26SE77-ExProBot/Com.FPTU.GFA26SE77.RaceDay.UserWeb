@@ -10,6 +10,23 @@ import type {
 
 const EVENT_API = "api/v1/event";
 
+export async function getOrganizerLeaderboardPdf(eventId: string, distanceId: string): Promise<Blob> {
+  const eventPath = encodeURIComponent(eventId);
+  const distancePath = encodeURIComponent(distanceId);
+  const pdf = await api.get<Blob, Blob>(
+    `${EVENT_API}/organizer/${eventPath}/distances/${distancePath}/leaderboard/pdf`,
+    {
+      headers: { Accept: "application/pdf" },
+      responseType: "blob",
+      timeout: 60_000,
+    },
+  );
+  if (pdf.type !== "application/pdf" || pdf.size === 0) {
+    throw new Error("Không nhận được file PDF bảng xếp hạng.");
+  }
+  return pdf;
+}
+
 /** Tạo giải (đã login — PublicUser; không bắt role ORGANIZER) */
 export async function createRaceEvent(
   payload: CreateRaceEventRequest
