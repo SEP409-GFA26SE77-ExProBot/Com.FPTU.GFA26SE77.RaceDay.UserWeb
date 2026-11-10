@@ -5,15 +5,26 @@
 import { getEventById } from "@/api/events";
 import { getEventCourse } from "@/api/race-map";
 import type { EventStaffRole, StaffStationDto } from "@/dto/event-staff.dto";
-import type { RaceCheckpointDto } from "@/dto/race-map.dto";
 
 /** Nhiệm vụ cố định — không bắt buộc điểm trên bản đồ */
 const DUTY_STATIONS: Record<EventStaffRole, StaffStationDto[]> = {
-  coordinator: [
+  "race-staff": [
     {
       id: "duty:ops",
       label: "Trung tâm điều hành",
       kind: "other",
+      source: "duty",
+    },
+    {
+      id: "duty:checkin",
+      label: "Quầy check-in",
+      kind: "check_in",
+      source: "duty",
+    },
+    {
+      id: "duty:kit",
+      label: "Quầy nhận kit / BIB",
+      kind: "kit",
       source: "duty",
     },
   ],
@@ -28,20 +39,6 @@ const DUTY_STATIONS: Record<EventStaffRole, StaffStationDto[]> = {
       id: "duty:static",
       label: "Cố định",
       kind: "photo_zone",
-      source: "duty",
-    }
-  ],
-  volunteer: [
-    {
-      id: "duty:checkin",
-      label: "Quầy check-in",
-      kind: "check_in",
-      source: "duty",
-    },
-    {
-      id: "duty:kit",
-      label: "Quầy nhận kit / BIB",
-      kind: "kit",
       source: "duty",
     },
   ],
@@ -66,15 +63,16 @@ function typeLabel(type: string) {
   }
 }
 
-function includeCheckpoint(role: EventStaffRole, cp: RaceCheckpointDto): boolean {
-  const t = (cp.type || "").toLowerCase();
-  if (role === "volunteer") return t === "aid";
-  // coordinator + photographer: điểm timing trên cung (không lấy aid)
-  return t === "start" || t === "cp" || t === "finish";
+function includeCheckpoint(role: EventStaffRole, type: string): boolean {
+  return (
+    type === "start" ||
+    type === "cp" ||
+    type === "finish" ||
+    (role === "race-staff" && type === "aid")
+  );
 }
 
 function stationKind(role: EventStaffRole, cpType: string): string {
-  if (role === "volunteer") return "aid";
   if (role === "photographer") return "photo_zone";
   return cpType === "aid" ? "aid" : "checkpoint";
 }
@@ -96,7 +94,8 @@ export async function buildStaffStationsForEvent(
           const course = await getEventCourse(eventId, d.id, d.name);
           const cps = Array.isArray(course.checkpoints) ? course.checkpoints : [];
           for (const cp of cps) {
-            if (!includeCheckpoint(role, cp)) continue;
+            const type = (cp.type || "").toLowerCase();
+            if (!includeCheckpoint(role, type)) continue;
             const distName = d.name || course.title || "Cự ly";
             const km =
               typeof cp.km === "number" && Number.isFinite(cp.km)
@@ -104,8 +103,8 @@ export async function buildStaffStationsForEvent(
                 : "";
             fromMap.push({
               id: mapStationId(d.id, cp.id),
-              label: `${distName} — ${cp.name || typeLabel(cp.type)}${km}`,
-              kind: stationKind(role, cp.type),
+              label: `${distName} — ${cp.name || typeLabel(type)}${km}`,
+              kind: stationKind(role, type),
               source: "map",
               mapCheckpointId: cp.id,
               distanceId: d.id,

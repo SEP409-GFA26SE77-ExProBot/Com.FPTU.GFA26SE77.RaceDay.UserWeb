@@ -39,26 +39,20 @@ const ROLE_TABS: {
   hint: string;
 }[] = [
   {
-    id: "coordinator",
-    label: "Coordinator",
-    hint: "Gán checkpoint từ bản đồ (start / CP / finish) hoặc nhiệm vụ không gắn map (Trung tâm điều hành).",
+    id: "race-staff",
+    label: "Race Staff",
+    hint: "Gán checkpoint hoặc điểm tiếp tế trên bản đồ, hoặc chọn nhiệm vụ tại trung tâm điều hành, quầy check-in hay quầy nhận kit / BIB.",
   },
   {
     id: "photographer",
     label: "Photographer",
     hint: "Gán điểm checkpoint trên cung đường để bố trí chụp — hoặc để di động / chưa gán map.",
   },
-  {
-    id: "volunteer",
-    label: "Volunteer",
-    hint: "Gán điểm tiếp tế (aid) đã setup trên map, hoặc quầy check-in / kit không gắn map.",
-  },
 ];
 
 const INVITE_ROLE_LABELS: Record<EventStaffRole, string> = {
-  coordinator: "Điều phối viên",
+  "race-staff": "Nhân viên giải",
   photographer: "Nhiếp ảnh gia",
-  volunteer: "Tình nguyện viên",
 };
 
 /** Mẫu điền form tạo tài khoản — không gọi API cho đến khi bấm gửi. */
@@ -66,11 +60,11 @@ const STAFF_FORM_PRESETS: Record<
   EventStaffRole,
   { fullName: string; email: string; phone: string; label: string }[]
 > = {
-  coordinator: [
+  "race-staff": [
     {
-      label: "Điều hành chính",
-      fullName: "Nguyễn Văn Điều Hành",
-      email: "coordinator@example.com",
+      label: "Nhân viên giải",
+      fullName: "Nguyễn Văn Giải",
+      email: "race-staff@example.com",
       phone: "0901000001",
     },
     {
@@ -79,18 +73,8 @@ const STAFF_FORM_PRESETS: Record<
       email: "medic@example.com",
       phone: "0901000002",
     },
-  ],
-  photographer: [
     {
-      label: "Photographer KM5",
-      fullName: "Lê Minh Ảnh",
-      email: "photo.km5@example.com",
-      phone: "0901000003",
-    },
-  ],
-  volunteer: [
-    {
-      label: "Tình nguyện viên kit",
+      label: "Hỗ trợ phát kit",
       fullName: "Phạm Quốc Tình Nguyện",
       email: "volunteer.kit@example.com",
       phone: "0901000004",
@@ -100,6 +84,14 @@ const STAFF_FORM_PRESETS: Record<
       fullName: "Hoàng Thị Check-in",
       email: "checkin@example.com",
       phone: "0901000005",
+    },
+  ],
+  photographer: [
+    {
+      label: "Photographer KM5",
+      fullName: "Lê Minh Ảnh",
+      email: "photo.km5@example.com",
+      phone: "0901000003",
     },
   ],
 };
@@ -137,11 +129,9 @@ function StationPicker({
   const mapStations = stations.filter((s) => s.source === "map");
   const dutyStations = stations.filter((s) => s.source !== "map");
   const mapGroup =
-    role === "volunteer"
-      ? "Điểm tiếp tế (map)"
-      : role === "photographer"
-        ? "Checkpoint / zone chụp (map)"
-        : "Checkpoint (map)";
+    role === "photographer"
+      ? "Checkpoint / zone chụp (map)"
+      : "Checkpoint / điểm tiếp tế (map)";
 
   const selected = stations.find((s) => s.id === value);
   const needle = q.trim().toLowerCase();
@@ -187,7 +177,7 @@ function StationPicker({
               autoFocus
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Tìm checkpoint / nhiệm vụ…"
+              placeholder="Tìm vị trí / nhiệm vụ…"
               className="w-full bg-transparent text-xs outline-none"
             />
           </div>
@@ -286,7 +276,7 @@ function statusClass(s: string) {
 }
 
 export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
-  const [role, setRole] = useState<EventStaffRole>("coordinator");
+  const [role, setRole] = useState<EventStaffRole>("race-staff");
   const [members, setMembers] = useState<EventStaffMemberDto[]>([]);
   const [stations, setStations] = useState<StaffStationDto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -511,8 +501,8 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
         <p className="rounded-xl border border-amber-200/80 bg-amber-50 px-3 py-2 text-xs text-amber-900">
           Chưa có điểm map phù hợp role này. Vào{" "}
           <span className="font-semibold">Thiết lập bản đồ</span> thêm{" "}
-          {role === "volunteer"
-            ? "điểm tiếp tế (aid)"
+          {role === "race-staff"
+            ? "checkpoint (start / CP / finish) hoặc điểm tiếp tế (aid)"
             : "checkpoint (start / CP / finish)"}
           — vẫn có thể gán nhiệm vụ không gắn map khi mời.
         </p>
@@ -676,9 +666,7 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-foreground">
-                  {role === "volunteer"
-                    ? "Điểm tiếp tế / nhiệm vụ"
-                    : "Checkpoint / nhiệm vụ"}
+                  Vị trí / nhiệm vụ
                 </label>
                 <StationPicker
                   role={role}
