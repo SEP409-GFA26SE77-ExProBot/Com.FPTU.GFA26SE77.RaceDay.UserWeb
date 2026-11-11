@@ -123,7 +123,7 @@ function CheckpointContent({ snapshot: s, connected }: { snapshot: StaffCheckpoi
         </div>}
       </section>
       <aside className="min-w-0 space-y-5">
-        <section className="overflow-hidden rounded-2xl border bg-card"><h2 className="p-4 font-bold">Mốc của bạn trên bản đồ</h2><div className="relative z-0 h-72"><CheckpointMap snapshot={s} /></div><p className="p-3 text-xs text-muted-foreground">Hiển thị tối đa 30 VĐV đang đến gần mốc nhất.</p></section>
+        <section className="overflow-hidden rounded-2xl border bg-card"><h2 className="p-4 font-bold">Mốc của bạn trên bản đồ</h2><div className="relative z-0 h-72"><CheckpointMap snapshot={s} /></div><p className="p-3 text-xs text-muted-foreground">Hiển thị tối đa 30 VĐV đang chạy gần mốc: xanh dương chưa qua, xanh lá đã qua.</p></section>
         <section className="rounded-2xl border bg-card p-4"><h2 className="font-bold">Lịch sử tại checkpoint</h2>
           <p className="mt-1 text-xs text-muted-foreground">Lịch sử nháp của lượt hiện tại; reset sẽ thay lượt.</p>
           {s.decisions.length === 0 ? <p className="mt-4 text-sm text-muted-foreground">Chưa có quyết định hoặc báo cáo.</p>
