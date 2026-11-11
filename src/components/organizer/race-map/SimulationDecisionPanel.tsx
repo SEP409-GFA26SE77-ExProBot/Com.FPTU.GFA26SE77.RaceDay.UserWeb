@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { recordOrganizerDecision, reviewSimulationDecision, type SimulationSnapshotDto, type SimulationDecisionDto } from "@/api/simulation";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -13,6 +14,7 @@ export default function SimulationDecisionPanel({ snapshot, selectedId, onSnapsh
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [expanded, setExpanded] = useState(false);
   const selected = snapshot.athletes.find(a => a.registrationId === selectedId);
   const decisions = snapshot.decisions ?? [];
   const pending = decisions.filter(d => d.resolution === "Pending");
@@ -30,26 +32,36 @@ export default function SimulationDecisionPanel({ snapshot, selectedId, onSnapsh
     } catch (e) { setError(getApiErrorMessage(e, "Không cập nhật được quyết định.")); }
     finally { setBusy(false); }
   };
-  return <section className="shrink-0 space-y-2 rounded-xl border bg-card p-3 text-sm">
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <div><h2 className="font-bold">Trạng thái thi đấu & báo cáo vi phạm</h2><p className="text-xs text-muted-foreground">Xử lý báo cáo trước khi ghi kết quả. Quyết định đã commit không sửa tại simulation.</p></div>
-      {selected && <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs">BIB {selected.bib}</span>
+  const orderedDecisions = [...pending].reverse().concat([...decisions].filter(d => d.resolution !== "Pending").reverse());
+  return <section className="shrink-0 rounded-xl border bg-card text-sm">
+    <button type="button" aria-expanded={expanded} aria-controls="simulation-decision-details"
+      onClick={() => setExpanded(value => !value)}
+      className="flex min-h-11 w-full flex-wrap items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-500">
+      <span className="font-bold">DNS / DNF / DQ</span>
+      {selected && <span className="text-xs text-muted-foreground">BIB {selected.bib}</span>}
+      <span className="text-xs text-muted-foreground">{decisions.length} quyết định</span>
+      {pending.length > 0 && <span role="status" className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900">{pending.length} chờ duyệt</span>}
+      <ChevronDown className={`ml-auto h-4 w-4 shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden="true" />
+    </button>
+    <div id="simulation-decision-details" hidden={!expanded} className="space-y-3 border-t px-3 py-3">
+      <p className="text-xs text-muted-foreground">Xử lý báo cáo trước khi ghi kết quả. Quyết định đã commit không sửa tại simulation.</p>
+      {selected ? <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold">BIB {selected.bib}</span>
         {["DNS", "DNF", "DQ"].map(status => <Button key={status} variant="outline" className="min-h-11" disabled={busy || locked || !!stopped
           || pending.some(d => d.registrationId === selected.registrationId)
           || (status === "DNS" && snapshot.phase !== "Ready")
           || (status === "DNF" && (snapshot.phase === "Ready" || selected.motion !== "Racing"))}
           onClick={() => open({ status, registrationId: selected.registrationId })}>{status}</Button>)}
-      </div>}
+      </div> : <p className="text-xs text-muted-foreground">Chọn VĐV trong danh sách để ghi trạng thái.</p>}
+      {pending.length > 0 && <p role="status" className="text-xs font-semibold text-amber-800">{pending.length} báo cáo đang chờ duyệt — chưa thể ghi kết quả.</p>}
+      {decisions.length > 0 && <div className="max-h-44 space-y-2 overflow-y-auto">{orderedDecisions.map(d => <div key={d.id} className="flex flex-wrap items-start justify-between gap-2 rounded-lg bg-muted/40 p-2">
+        <div className="min-w-0 flex-1 break-words"><p className="font-semibold">BIB {d.bib} · {d.status} · {snapshot.checkpoints.find(c => c.id === d.checkpointId)?.name || d.checkpointId}</p>
+          <p className="text-xs">{d.reason}</p>{d.evidence && <p className="text-xs">Bằng chứng: {d.evidence}</p>}
+          <p className="text-xs text-muted-foreground">{d.resolution === "Pending" ? "Chờ duyệt" : d.resolution === "Rejected" ? "Đã từ chối" : "Đã ghi nhận"} · {new Date(d.createdAtUtc).toLocaleString("vi-VN")}</p>
+          {d.reviewReason && <p className="text-xs">Phản hồi: {d.reviewReason}</p>}</div>
+        {d.resolution === "Pending" && <div className="flex gap-2"><Button variant="outline" disabled={busy || locked} className="min-h-11" onClick={() => open({ decision: d, approve: false })}>Từ chối</Button><Button variant="destructive" disabled={busy || locked} className="min-h-11" onClick={() => open({ decision: d, approve: true })}>Duyệt DQ</Button></div>}
+      </div>)}</div>}
     </div>
-    {pending.length > 0 && <p role="status" className="text-xs font-semibold text-amber-800">{pending.length} báo cáo đang chờ duyệt — chưa thể commit.</p>}
-    {decisions.length > 0 && <div className="max-h-44 space-y-2 overflow-y-auto">{[...decisions].reverse().map(d => <div key={d.id} className="flex flex-wrap items-start justify-between gap-2 rounded-lg bg-muted/40 p-2">
-      <div className="min-w-0 flex-1 break-words"><p className="font-semibold">BIB {d.bib} · {d.status} · {snapshot.checkpoints.find(c => c.id === d.checkpointId)?.name || d.checkpointId}</p>
-        <p className="text-xs">{d.reason}</p>{d.evidence && <p className="text-xs">Bằng chứng: {d.evidence}</p>}
-        <p className="text-xs text-muted-foreground">{d.resolution === "Pending" ? "Chờ duyệt" : d.resolution === "Rejected" ? "Đã từ chối" : "Đã ghi nhận"} · {new Date(d.createdAtUtc).toLocaleString("vi-VN")}</p>
-        {d.reviewReason && <p className="text-xs">Phản hồi: {d.reviewReason}</p>}</div>
-      {d.resolution === "Pending" && <div className="flex gap-2"><Button variant="outline" disabled={busy || locked} className="min-h-11" onClick={() => open({ decision: d, approve: false })}>Từ chối</Button><Button variant="destructive" disabled={busy || locked} className="min-h-11" onClick={() => open({ decision: d, approve: true })}>Duyệt DQ</Button></div>}
-    </div>)}</div>}
     <Dialog open={!!action} onOpenChange={value => { if (!value && !busy) setAction(null); }}>
       <DialogContent className="max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>{action?.decision ? action.approve ? "Duyệt DQ" : "Từ chối báo cáo" : `Ghi nhận ${action?.status || ""}`}</DialogTitle>
         <DialogDescription>BIB {action?.decision?.bib || snapshot.athletes.find(a => a.registrationId === action?.registrationId)?.bib}. Quyết định áp dụng cho lượt giả lập hiện tại.</DialogDescription></DialogHeader>
