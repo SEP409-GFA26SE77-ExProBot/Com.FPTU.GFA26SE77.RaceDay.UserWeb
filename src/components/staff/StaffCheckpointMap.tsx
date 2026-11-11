@@ -10,7 +10,7 @@ export default function StaffCheckpointMap({ snapshot }: { snapshot: StaffCheckp
   const cp = snapshot.checkpoint;
   const nearby = snapshot.athletes.filter(a => a.motion === "Racing" && a.remainingKm > 0)
     .sort((a, b) => a.remainingKm - b.remainingKm).slice(0, 30);
-  return <MapContainer center={[cp.lat, cp.lng]} zoom={14} className="h-full w-full" scrollWheelZoom={false}>
+  return <MapContainer center={[cp.lat, cp.lng]} zoom={14} className="h-full w-full" scrollWheelZoom>
     <BasemapTileLayer />
     <Polyline positions={snapshot.polyline.map(p => [p.lat, p.lng])} pathOptions={{ color: "#f97316", weight: 4 }} />
     <CircleMarker center={[cp.lat, cp.lng]} radius={12} pathOptions={{ color: checkpointMapColor(cp.type), fillOpacity: 0.9 }}>
