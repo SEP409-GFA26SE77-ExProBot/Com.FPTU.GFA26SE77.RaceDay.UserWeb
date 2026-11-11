@@ -1,6 +1,6 @@
 <!-- BEGIN:nextjs-agent-rules -->
 
-# This is NOT the Next.js you know
+## This is NOT the Next.js you know
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
 
@@ -80,6 +80,7 @@ These instructions apply throughout this repository. Keep UI work within the req
 | Runner/public layout and navigation | `src/app/(main)/layout.tsx`, `src/components/header/page.tsx`, `src/components/footer/Footer.tsx` |
 | Authentication layout and styles | `src/app/(auth)/layout.tsx`, `src/app/(auth)/auth.css` |
 | Organizer workspace and navigation | `src/app/(organizer)/organizer/layout.tsx`, `src/components/organizer/OrganizerShell.tsx` |
+| Staff checkpoint workspace | `src/app/(staff)/staff/layout.tsx`, `src/components/staff/`, `docs/staff-workspace.md` |
 | Runner content widths | `src/lib/page-shell.ts` |
 | Reusable UI primitives | `src/components/ui/`, `components.json` |
 | API contracts and requests | `src/dto/`, `src/api/`, `src/config/axios.ts` |

@@ -155,7 +155,7 @@ export default function MapView({
         );
       })}
       {markers.map((r) => {
-        const pos = positionAtCourseKm(polyline, r.courseKm, distanceKm);
+        const pos = positionAtCourseKm(polyline, r.courseKm);
         return (
           <Marker
             key={r.bib}

@@ -7,6 +7,8 @@ import { login } from "@/api/auth";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { getZodFieldErrors } from "@/lib/error";
 import { toastError } from "@/lib/toast";
+import { useAuthStore } from "@/stores/auth-store";
+import { mapAppRole } from "@/lib/role";
 import { LoginSchema } from "@/dto/auth.dto";
 
 function LoginForm() {
@@ -50,7 +52,7 @@ function LoginForm() {
         setMustChangePasswordHint(true);
         return;
       }
-      router.push(fromPath);
+      router.push(fromPath === "/" && mapAppRole(useAuthStore.getState().user?.roleName) === "RACE-STAFF" ? "/staff" : fromPath);
     } catch (err) {
       toastError(err, "Tên đăng nhập/email hoặc mật khẩu không chính xác.");
     } finally {
@@ -196,7 +198,7 @@ function LoginForm() {
                 className="rounded-full border border-zinc-600 px-4 py-2 text-xs font-bold text-zinc-200 hover:bg-zinc-800"
                 onClick={() => {
                   setMustChangePasswordHint(false);
-                  router.push(fromPath);
+                  router.push(fromPath === "/" && mapAppRole(useAuthStore.getState().user?.roleName) === "RACE-STAFF" ? "/staff" : fromPath);
                 }}
               >
                 Để sau

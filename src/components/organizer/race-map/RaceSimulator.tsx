@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -22,7 +22,6 @@ import {
   formatSimClock,
   getSimulationPreview,
   getSimulationSnapshot,
-  markAthleteDnf,
   markAthleteSos,
   pauseSimulationRun,
   resetSimulationRun,
@@ -35,6 +34,7 @@ import {
   type SimulationSnapshotDto,
 } from "@/api/simulation";
 import { useCourse } from "@/components/organizer/race-map/CourseContext";
+import SimulationDecisionPanel from "./SimulationDecisionPanel";
 import { useSimulationHub } from "@/hooks/useSimulationHub";
 import { checkpointDotClass } from "@/lib/race-map/map-colors";
 import type { RunnerLive } from "@/lib/race-map/timing";
@@ -109,7 +109,7 @@ function athleteToLive(
     const bibNum = bibMapKey(a.bib, index);
     let status: RunnerLive["status"] = "waiting";
     if (a.motion === "Finished") status = "finished";
-    else if (a.motion === "Dnf" || a.sos) status = "flagged";
+    else if (["Dnf", "Dns", "Dq"].includes(a.motion) || a.sos) status = "flagged";
     else if (a.courseKm > 0) status = "running";
     return {
       bib: bibNum,
@@ -144,7 +144,6 @@ export default function RaceSimulator() {
   const [athletePage, setAthletePage] = useState(0);
   const [rankingPage, setRankingPage] = useState(0);
   const [runnerCountPref, setRunnerCountPref] = useState<number | null>(null);
-  const autoCommitTriedRef = useRef<string | null>(null);
   const cursorRef = useRef<{ runId: string; generation: number; version: number } | null>(
     null
   );
@@ -330,7 +329,7 @@ export default function RaceSimulator() {
     if (
       needConfirm &&
       !window.confirm(
-        "Lượt đã có kết quả nháp chưa ghi. Reset sẽ bỏ kết quả nháp. Tiếp tục?"
+        "Reset sẽ thay lượt và bỏ kết quả, báo cáo nháp. Kết quả đã commit vẫn được giữ. Tiếp tục?"
       )
     ) {
       return;
@@ -338,10 +337,9 @@ export default function RaceSimulator() {
     await runAction("Reset", () =>
       resetSimulationRun(snapshot.runId, needConfirm)
     );
-    autoCommitTriedRef.current = null;
   };
 
-  const onCommit = async (silent = false) => {
+  const onCommit = async () => {
     if (!snapshot || snapshot.phase !== "Finished") return;
     setBusy(true);
     try {
@@ -353,41 +351,17 @@ export default function RaceSimulator() {
       }
       const ok = res.items.filter((i) => i.outcome === "CommittedThisRun").length;
       const skipped = res.items.length - ok;
-      if (!silent || ok > 0) {
-        toastSuccess(
-          `Đã ghi ${ok} kết quả lên server` +
-            (skipped ? ` · ${skipped} bỏ qua/retry` : "") +
-            ". Leaderboard organizer/user đọc từ registration Finished."
-        );
-      }
+      toastSuccess(
+        `Đã ghi ${ok} kết quả/trạng thái lên hệ thống` +
+          (skipped ? ` · ${skipped} bỏ qua hoặc cần thử lại` : "") +
+          ". Chỉ VĐV về đích hợp lệ được xếp hạng."
+      );
     } catch (e) {
       toastError(e, "Ghi kết quả thất bại.");
     } finally {
       setBusy(false);
     }
   };
-
-  /** Khi lượt Finished và còn kết quả nháp → tự commit 1 lần (có nút ghi lại nếu Partial). */
-  useEffect(() => {
-    if (!snapshot) return;
-    if (snapshot.phase !== "Finished") return;
-    if (
-      snapshot.commitState === "Committed" ||
-      snapshot.commitState === "Committing"
-    ) {
-      return;
-    }
-    if (!snapshot.discardRequired) return;
-    if (autoCommitTriedRef.current === snapshot.runId) return;
-    autoCommitTriedRef.current = snapshot.runId;
-    void onCommit(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    snapshot?.phase,
-    snapshot?.runId,
-    snapshot?.commitState,
-    snapshot?.discardRequired,
-  ]);
 
   const onSpeedSelected = async (kmh: number) => {
     if (!snapshot || !selected) return;
@@ -404,12 +378,6 @@ export default function RaceSimulator() {
     toastInfo("SOS chỉ gắn cờ trên lượt giả lập — không tạo SOS thiết bị.");
   };
 
-  const onDnf = async () => {
-    if (!snapshot || !selected) return;
-    await runAction("DNF", () =>
-      markAthleteDnf(snapshot.runId, selected.registrationId)
-    );
-  };
 
   const panel = "rounded-xl border border-border/60 bg-card shadow-sm";
   const polyline = snapshot?.polyline?.length
@@ -444,6 +412,9 @@ export default function RaceSimulator() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 text-foreground">
+      {snapshot && <SimulationDecisionPanel key={snapshot.runId} snapshot={snapshot} selectedId={selectedRegistrationId} onSnapshot={next => {
+        if (cursorRef.current?.runId === next.runId) applySnapshot(next);
+      }} />}
       {!snapshot ? (
         <div className={`${panel} flex flex-wrap items-center gap-3 p-4`}>
           <div className="min-w-0 flex-1 text-sm">
@@ -651,11 +622,11 @@ export default function RaceSimulator() {
                 type="button"
                 disabled={
                   busy ||
-                  phase !== "Finished" ||
+                  phase !== "Finished" || snapshot.decisions?.some(d => d.resolution === "Pending") ||
                   snapshot.commitState === "Committed" ||
                   snapshot.commitState === "Committing"
                 }
-                onClick={() => void onCommit(false)}
+                onClick={() => void onCommit()}
                 className="inline-flex items-center gap-1.5 rounded-full border border-emerald-600/40 bg-emerald-600/10 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-600/15 disabled:opacity-50"
               >
                 {busy && snapshot.commitState === "Committing" ? (
@@ -793,14 +764,7 @@ export default function RaceSimulator() {
                 >
                   <Siren className="h-3.5 w-3.5" /> SOS
                 </button>
-                <button
-                  type="button"
-                  disabled={busy || !selected || phase === "Finished"}
-                  onClick={() => void onDnf()}
-                  className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1.5 text-[11px] font-bold text-muted-foreground hover:bg-muted disabled:opacity-50"
-                >
-                  DNF
-                </button>
+
               </div>
             </div>
 
@@ -811,12 +775,12 @@ export default function RaceSimulator() {
                 <AlertTriangle className="h-4 w-4" /> Fraud / SOS
               </h2>
               <ul className="max-h-56 space-y-2 overflow-y-auto overscroll-contain text-[11px]">
-                {athletes.filter((a) => a.sos || a.motion === "Dnf").length ===
+                {athletes.filter((a) => a.sos || ["Dnf", "Dns", "Dq"].includes(a.motion)).length ===
                 0 ? (
                   <li className="text-muted-foreground">Chưa có cảnh báo.</li>
                 ) : null}
                 {athletes
-                  .filter((a) => a.sos || a.motion === "Dnf")
+                  .filter((a) => a.sos || ["Dnf", "Dns", "Dq"].includes(a.motion))
                   .map((a) => (
                     <li
                       key={a.registrationId}

@@ -12,7 +12,7 @@ export type SimulationCommitState =
   | "Committing"
   | "Partial"
   | "Committed";
-export type AthleteMotion = "Racing" | "Finished" | "Dnf";
+export type AthleteMotion = "Racing" | "Finished" | "Dnf" | "Dns" | "Dq";
 
 export type SimulationLatLng = { lat: number; lng: number };
 
@@ -92,6 +92,7 @@ export type SimulationSnapshotDto = {
   ranking: SimulationRankingRowDto[];
   checkpointLeaders: SimulationCheckpointLeaderDto[];
   log: SimulationLogLineDto[];
+  decisions?: SimulationDecisionDto[];
 };
 
 export type SimulationPreviewDto = {
@@ -231,8 +232,11 @@ export const setAthleteSpeed = (
 export const markAthleteSos = (runId: string, registrationId: string) =>
   postRun(runId, `athletes/${registrationId}/sos`);
 
-export const markAthleteDnf = (runId: string, registrationId: string) =>
-  postRun(runId, `athletes/${registrationId}/dnf`);
+export const recordOrganizerDecision = (runId: string, registrationId: string, status: string, reason: string) =>
+  postRun(runId, `athletes/${registrationId}/decisions`, { status, reason });
+
+export const reviewSimulationDecision = (runId: string, decisionId: string, approve: boolean, reason: string) =>
+  postRun(runId, `decisions/${decisionId}/review`, { approve, reason });
 
 export function simulationHubUrl(): string {
   const origin = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
@@ -276,3 +280,10 @@ export function bibMapKey(bib: string, fallback: number): number {
   for (let i = 0; i < bib.length; i++) h = (h * 31 + bib.charCodeAt(i)) >>> 0;
   return (h % 900000) + fallback + 1;
 }
+
+export type SimulationDecisionDto = {
+  id: string; registrationId: string; bib: string; previousStatus: string; status: string;
+  reason: string; evidence: string | null; actorId: string; checkpointId: string; createdAtUtc: string;
+  resolution: "Pending" | "Approved" | "Rejected"; reviewedBy: string | null;
+  reviewedAtUtc: string | null; reviewReason: string | null;
+};

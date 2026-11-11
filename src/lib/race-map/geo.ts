@@ -46,18 +46,12 @@ export function pointAtKmAlongPolyline(poly: LatLng[], courseKm: number): LatLng
   return poly[poly.length - 1];
 }
 
-/** Map course-km (0..distanceKm) — scale theo length polyline nếu lệch nhẹ */
+/** Checkpoint và runner cùng dùng km thực dọc polyline. */
 export function positionAtCourseKm(
   poly: LatLng[],
-  courseKm: number,
-  totalCourseKm: number
+  courseKm: number
 ): LatLng {
-  if (poly.length === 0) return { lat: 0, lng: 0 };
-  if (courseKm <= 0) return poly[0];
-  const cum = cumulativeDistances(poly);
-  const polyLen = cum[cum.length - 1] || 1;
-  const scale = totalCourseKm > 0 ? polyLen / totalCourseKm : 1;
-  return pointAtKmAlongPolyline(poly, courseKm * scale);
+  return pointAtKmAlongPolyline(poly, courseKm);
 }
 
 export function formatClock(totalSec: number): string {

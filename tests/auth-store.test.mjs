@@ -59,7 +59,7 @@ test('cookie settings enforce HttpOnly and production HTTPS without a shared dom
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
   for (const mode of ['development', 'production']) {
     const exports = {};
-    vm.runInNewContext(code, { exports, require: runtimeRequire, process: { env: { NODE_ENV: mode } } });
+    vm.runInNewContext(code, { exports, require: id => id === '@/config/global-config' ? { BASE_URL: 'http://localhost:5080' } : runtimeRequire(id), process: { env: { NODE_ENV: mode } } });
     assert.equal(exports.cookieOptions.httpOnly, true);
     assert.equal(exports.cookieOptions.secure, mode === 'production');
     assert.equal(exports.cookieOptions.sameSite, 'lax');

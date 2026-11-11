@@ -7,7 +7,7 @@ export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const permission = routePermission(pathname);
   const authPage = ["/login", "/register"].includes(pathname);
-  if (permission === null && !authPage) return NextResponse.next();
+  if (permission === null && !authPage && pathname !== "/") return NextResponse.next();
   try {
     const user = await userForRequest(request);
     if (!user && permission !== null) {
@@ -15,6 +15,8 @@ export async function proxy(request: NextRequest) {
       login.searchParams.set("from", pathname + search);
       return NextResponse.redirect(login);
     }
+    if (user && (authPage || pathname === "/") && mapAppRole(user.roleName) === "RACE-STAFF")
+      return NextResponse.redirect(new URL("/staff", request.url));
     if (user && authPage) return NextResponse.redirect(new URL("/", request.url));
     if (
       user &&
