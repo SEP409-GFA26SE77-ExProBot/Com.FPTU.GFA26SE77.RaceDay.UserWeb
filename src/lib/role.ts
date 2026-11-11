@@ -10,7 +10,6 @@ export function mapAppRole(raw: string | null | undefined): string {
     .trim()
     .toUpperCase();
   if (r === "USER") return Role.RUNNER;
-  if (["RACE-STAFF", "RACE_STAFF", "RACESTAFF", "COORDINATOR", "VOLUNTEER"].includes(r)) return Role.RACE_STAFF;
   if (r === "ORGANIZER") return Role.ORGANIZER;
   return r;
 }

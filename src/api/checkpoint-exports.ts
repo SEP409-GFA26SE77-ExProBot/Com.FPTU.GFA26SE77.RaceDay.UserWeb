@@ -28,11 +28,5 @@ export type CheckpointResultExport = {
 
 const base = "api/v1/simulation";
 
-export const getStaffCheckpointExport = (eventId: string): Promise<CheckpointResultExport | null> =>
-  api.get(`${base}/staff/events/${eventId}/checkpoint/export`);
-
-export const submitStaffCheckpointExport = (eventId: string, runId: string): Promise<CheckpointResultExport> =>
-  api.post(`${base}/staff/events/${eventId}/runs/${runId}/checkpoint/export`);
-
 export const listCheckpointExports = (eventId: string, distanceId: string): Promise<CheckpointResultExport[]> =>
   api.get(`${base}/events/${eventId}/distances/${distanceId}/checkpoint-exports`);

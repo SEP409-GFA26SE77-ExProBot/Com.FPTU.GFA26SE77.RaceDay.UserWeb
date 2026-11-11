@@ -24,7 +24,6 @@ const authenticated = [
  * (runner mua gói tạo draft trước khi JWT kịp có ORGANIZER).
  */
 export function routePermission(path: string): string[] | "*" | null {
-  if (path === "/staff" || path.startsWith("/staff/")) return ["RACE-STAFF"];
   if (path === "/organizer" || path.startsWith("/organizer/")) return "*";
   if (authenticated.some((base) => path === base || path.startsWith(`${base}/`))) {
     return "*";
