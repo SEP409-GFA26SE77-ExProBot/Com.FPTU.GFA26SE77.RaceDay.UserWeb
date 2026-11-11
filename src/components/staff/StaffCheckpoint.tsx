@@ -1,7 +1,7 @@
 "use client";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, Loader2, MapPin, RefreshCw } from "lucide-react";
 import { useStaffCheckpoint } from "@/hooks/useStaffCheckpoint";
 import { recordStaffDecision, type StaffAthlete, type StaffCheckpointSnapshot } from "@/api/staff-simulation";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { toastSuccess } from "@/lib/toast";
 import { getApiErrorMessage } from "@/lib/error";
+import { getStaffCheckpointExport, submitStaffCheckpointExport, type CheckpointResultExport } from "@/api/checkpoint-exports";
 
 const CheckpointMap = dynamic(() => import("./StaffCheckpointMap"), {
   ssr: false, loading: () => <p className="p-6 text-sm">Đang tải bản đồ…</p>,
@@ -45,6 +46,19 @@ function CheckpointContent({ snapshot: s, connected }: { snapshot: StaffCheckpoi
   const [evidence, setEvidence] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [exported, setExported] = useState<CheckpointResultExport | null>(null);
+  const [exportLoading, setExportLoading] = useState(!!s.runId);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportError, setExportError] = useState("");
+  useEffect(() => {
+    if (!s.runId) return;
+    let current = true;
+    getStaffCheckpointExport(s.eventId)
+      .then(result => { if (current) setExported(result); })
+      .catch(e => { if (current) setExportError(getApiErrorMessage(e, "Không tải được trạng thái gửi kết quả.")); })
+      .finally(() => { if (current) setExportLoading(false); });
+    return () => { current = false; };
+  }, [s.eventId, s.runId]);
   const passed = s.athletes.filter(a => a.passedAtSeconds != null);
   const stopped = s.athletes.filter(a => ["Dnf", "Dns", "Dq"].includes(a.motion));
   const rows = s.athletes.filter(a => {
@@ -73,6 +87,16 @@ function CheckpointContent({ snapshot: s, connected }: { snapshot: StaffCheckpoi
     } catch (e) { setError(getApiErrorMessage(e, "Không ghi nhận được. Vui lòng kiểm tra trạng thái mới nhất.")); }
     finally { setBusy(false); }
   };
+  const sendExport = async () => {
+    if (!s.runId || s.phase !== "Finished" || exportBusy) return;
+    setExportBusy(true); setExportError("");
+    try {
+      const result = await submitStaffCheckpointExport(s.eventId, s.runId);
+      setExported(result);
+      toastSuccess("Đã gửi kết quả checkpoint cho organizer.");
+    } catch (e) { setExportError(getApiErrorMessage(e, "Không gửi được kết quả checkpoint.")); }
+    finally { setExportBusy(false); }
+  };
   return <>
     <section className="rounded-2xl border bg-card p-5 shadow-sm">
       <p className="text-xs font-bold uppercase tracking-wider text-orange-700">Checkpoint được phân công · Giả lập</p>
@@ -89,6 +113,17 @@ function CheckpointContent({ snapshot: s, connected }: { snapshot: StaffCheckpoi
       {[["VĐV trong lượt", s.athletes.length], ["Đã qua mốc", passed.length], ["Chưa qua mốc", s.athletes.length - passed.length], ["DNF / DNS / DQ", stopped.length]].map(([label, count]) =>
         <div key={label} className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 text-2xl font-extrabold tabular-nums">{count}</p></div>)}
     </div>
+    <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4 shadow-sm">
+      <div>
+        <h2 className="font-bold">Gửi kết quả checkpoint</h2>
+        <p className="mt-1 text-xs text-muted-foreground">Gửi giờ qua mốc và trạng thái VĐV của lượt này sang trang Kết quả giải của organizer sau khi lượt kết thúc.</p>
+        {exported && <p className="mt-1 text-xs font-semibold text-emerald-700">Đã gửi lúc {new Date(exported.submittedAtUtc).toLocaleString("vi-VN")}</p>}
+        {exportError && <p role="alert" className="mt-1 text-xs text-red-700">{exportError}</p>}
+      </div>
+      <Button type="button" className="min-h-11" disabled={!s.runId || s.phase !== "Finished" || exportLoading || exportBusy || !!exported} onClick={() => void sendExport()}>
+        {exportBusy ? "Đang gửi…" : exported ? "Đã gửi kết quả" : "Gửi cho organizer"}
+      </Button>
+    </section>
     <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
       <section className="min-w-0 rounded-2xl border bg-card p-4 shadow-sm">
         <h2 className="text-lg font-bold">Vận động viên tại chặng</h2>

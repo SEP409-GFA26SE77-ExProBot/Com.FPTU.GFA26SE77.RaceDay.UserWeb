@@ -11,6 +11,8 @@ import {
   Trophy,
 } from "lucide-react";
 import { getOrganizerDistances } from "@/api/event-packages";
+import { listCheckpointExports, type CheckpointResultExport } from "@/api/checkpoint-exports";
+import { formatSimClock } from "@/api/simulation";
 import {
   getOrganizerDistanceLeaderboard,
   setDistanceResultsPublished,
@@ -28,6 +30,7 @@ type DistanceOption = {
 };
 
 const PAGE_SIZE = 20;
+const motionLabel: Record<string, string> = { Racing: "Đang chạy", Finished: "Về đích", Dnf: "DNF", Dns: "DNS", Dq: "DQ" };
 
 function formatUtc(iso: string | null): string {
   if (!iso) return "—";
@@ -48,8 +51,15 @@ export default function OrganizerEventResults({ eventId }: { eventId: string }) 
   const [gender, setGender] = useState<LeaderboardGender>("All");
   const [page, setPage] = useState(1);
   const [board, setBoard] = useState<OrganizerLeaderboardPageDto | null>(null);
+  const [boardRefresh, setBoardRefresh] = useState(0);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [exportState, setExportState] = useState<{ key: string; items: CheckpointResultExport[]; error: string }>({ key: "", items: [], error: "" });
+  const [exportsRefresh, setExportsRefresh] = useState(0);
+  const exportKey = `${eventId}:${distanceId}:${exportsRefresh}`;
+  const exportsLoading = !!distanceId && exportState.key !== exportKey;
+  const exports = exportsLoading ? [] : exportState.items;
+  const exportsError = exportsLoading ? "" : exportState.error;
 
   const selected = useMemo(
     () => distances.find((d) => d.id === distanceId) ?? null,
@@ -65,29 +75,8 @@ export default function OrganizerEventResults({ eventId }: { eventId: string }) 
     }));
     setDistances(rows);
     setDistanceId((prev) => prev || rows[0]?.id || "");
+    if (rows.length === 0) setLoading(false);
   }, [eventId]);
-
-  const loadBoard = useCallback(async () => {
-    if (!distanceId) {
-      setBoard(null);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    try {
-      const data = await getOrganizerDistanceLeaderboard(eventId, distanceId, {
-        gender,
-        page,
-        pageSize: PAGE_SIZE,
-      });
-      setBoard(data);
-    } catch (e) {
-      setBoard(null);
-      toastError(e, "Không tải kết quả.");
-    } finally {
-      setLoading(false);
-    }
-  }, [eventId, distanceId, gender, page]);
 
   useEffect(() => {
     void (async () => {
@@ -101,8 +90,23 @@ export default function OrganizerEventResults({ eventId }: { eventId: string }) 
   }, [loadDistances]);
 
   useEffect(() => {
-    void loadBoard();
-  }, [loadBoard]);
+    if (!distanceId) return;
+    let current = true;
+    void getOrganizerDistanceLeaderboard(eventId, distanceId, { gender, page, pageSize: PAGE_SIZE })
+      .then(data => { if (current) setBoard(data); })
+      .catch(e => { if (current) { setBoard(null); toastError(e, "Không tải kết quả."); } })
+      .finally(() => { if (current) setLoading(false); });
+    return () => { current = false; };
+  }, [eventId, distanceId, gender, page, boardRefresh]);
+
+  useEffect(() => {
+    if (!distanceId) return;
+    let current = true;
+    void listCheckpointExports(eventId, distanceId)
+      .then(items => { if (current) setExportState({ key: exportKey, items, error: "" }); })
+      .catch(e => { if (current) setExportState({ key: exportKey, items: [], error: e instanceof Error ? e.message : "Không tải được kết quả checkpoint." }); });
+    return () => { current = false; };
+  }, [eventId, distanceId, exportKey]);
 
   const onPublishToggle = async () => {
     if (!distanceId || !board) return;
@@ -166,6 +170,7 @@ export default function OrganizerEventResults({ eventId }: { eventId: string }) 
             <select
               value={distanceId}
               onChange={(e) => {
+                setLoading(true);
                 setPage(1);
                 setDistanceId(e.target.value);
               }}
@@ -186,6 +191,7 @@ export default function OrganizerEventResults({ eventId }: { eventId: string }) 
             <select
               value={gender}
               onChange={(e) => {
+                setLoading(true);
                 setPage(1);
                 setGender(e.target.value as LeaderboardGender);
               }}
@@ -199,7 +205,7 @@ export default function OrganizerEventResults({ eventId }: { eventId: string }) 
           <button
             type="button"
             disabled={loading || busy || !distanceId}
-            onClick={() => void loadBoard()}
+            onClick={() => { setLoading(true); setBoardRefresh(value => value + 1); setExportsRefresh(value => value + 1); }}
             className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-2.5 text-xs font-bold text-muted-foreground hover:bg-muted disabled:opacity-50"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
@@ -247,6 +253,27 @@ export default function OrganizerEventResults({ eventId }: { eventId: string }) 
             {board?.totalCount ?? 0} VĐV đã hoàn thành cự ly giải
           </span>
         </div>
+      </section>
+
+      <section className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm sm:p-5">
+        <h2 className="text-sm font-bold">Kết quả checkpoint staff đã gửi</h2>
+        <p className="mt-1 text-xs text-muted-foreground">Bản chốt theo từng lượt và mốc để organizer đối chiếu. Báo cáo này không tự ghi vào bảng xếp hạng; cần ghi kết quả simulation trước khi công bố.</p>
+        {exportsLoading ? <p role="status" className="mt-4 text-sm text-muted-foreground">Đang tải báo cáo checkpoint…</p>
+          : exportsError ? <p role="alert" className="mt-4 text-sm text-red-700">{exportsError} Bấm Tải lại để thử lại.</p>
+          : exports.length === 0 ? <p className="mt-4 text-sm text-muted-foreground">Chưa có staff gửi kết quả checkpoint cho cự ly này.</p>
+          : <div className="mt-4 space-y-3">{exports.map(report => {
+            const passed = report.rows.filter(row => row.passedAtSeconds != null).length;
+            return <details key={`${report.runId}:${report.checkpointId}`} className="rounded-xl border border-border/70 p-3">
+              <summary className="cursor-pointer text-sm font-semibold">{report.checkpointName} · km {report.checkpointKm} · {passed}/{report.rows.length} VĐV qua mốc <span className="font-normal text-muted-foreground">· gửi {formatUtc(report.submittedAtUtc)} · lượt {report.runId.slice(0, 8)}</span></summary>
+              <div className="mt-3 overflow-x-auto"><table className="w-full min-w-[480px] text-left text-xs">
+                <thead className="bg-muted/50 text-muted-foreground"><tr><th className="p-2">BIB</th><th className="p-2">VĐV</th><th className="p-2">Trạng thái lúc gửi</th><th className="p-2">Qua mốc</th></tr></thead>
+                <tbody>{[...report.rows].sort((a, b) => (a.passedAtSeconds ?? Infinity) - (b.passedAtSeconds ?? Infinity) || a.bib.localeCompare(b.bib)).map(row =>
+                  <tr key={row.registrationId} className="border-t"><td className="p-2 font-semibold">{row.bib}</td><td className="p-2">{row.fullName}</td><td className="p-2">{motionLabel[row.motion] ?? row.motion}</td><td className="p-2 tabular-nums">{formatSimClock(row.passedAtSeconds)}</td></tr>)}</tbody>
+              </table></div>
+              {report.decisions.length > 0 && <div className="mt-3 space-y-1 text-xs"><p className="font-semibold">Ghi nhận tại mốc</p>{report.decisions.map((decision, index) =>
+                <p key={`${decision.registrationId}:${index}`}>BIB {decision.bib} · {decision.status} · {decision.resolution}: {decision.reason}{decision.evidence && ` · Bằng chứng: ${decision.evidence}`}</p>)}</div>}
+            </details>;
+          })}</div>}
       </section>
 
       <section className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm">
@@ -328,7 +355,7 @@ export default function OrganizerEventResults({ eventId }: { eventId: string }) 
                 <button
                   type="button"
                   disabled={page <= 1 || loading}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  onClick={() => { setLoading(true); setPage((p) => Math.max(1, p - 1)); }}
                   className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border disabled:opacity-40"
                   aria-label="Trang trước"
                 >
@@ -337,7 +364,7 @@ export default function OrganizerEventResults({ eventId }: { eventId: string }) 
                 <button
                   type="button"
                   disabled={page >= totalPages || loading}
-                  onClick={() => setPage((p) => p + 1)}
+                  onClick={() => { setLoading(true); setPage((p) => p + 1); }}
                   className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border disabled:opacity-40"
                   aria-label="Trang sau"
                 >
