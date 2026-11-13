@@ -316,7 +316,8 @@ export default function OrganizerEventWallet({ eventId }: { eventId: string }) {
         <section className="space-y-3 rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
           <h2 className="text-sm font-bold">Xin rút từ giải này</h2>
           <p className="text-xs text-muted-foreground">
-            Số tiền ≤ khả dụng của túi giải đang mở
+            Manager duyệt lệnh → chuyển khoản ngoài hệ thống vào STK đã lưu →
+            xác nhận kèm biên nhận. Số tiền ≤ khả dụng của túi giải đang mở
             {ledger
               ? ` (${formatPrice(ledger.availableToWithdraw)})`
               : ""}

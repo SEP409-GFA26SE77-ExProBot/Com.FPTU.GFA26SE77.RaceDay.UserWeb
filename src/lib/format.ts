@@ -205,7 +205,7 @@ export function getPayoutStatusLabel(status: string): string {
     case "pending":
       return "Chờ duyệt";
     case "approved":
-      return "Đã duyệt";
+      return "Đã duyệt — chờ chuyển khoản";
     case "transferred":
       return "Đã chuyển khoản";
     case "rejected":
