@@ -252,10 +252,6 @@ export default function OrganizerEventResults({ eventId }: { eventId: string }) 
       <section className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm">
         <div className="border-b border-border/60 px-4 py-3 sm:px-5">
           <h2 className="text-sm font-bold text-foreground">Bảng xếp hạng (bản ghi)</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Thời gian total / pace sau commit giả lập hoặc nhập kết quả. Split checkpoint
-            chi tiết sẽ bổ sung khi BE lưu passage.
-          </p>
         </div>
 
         {loading ? (

@@ -8,6 +8,7 @@ import {
   normalizeDistanceType,
   type DistanceLeaderboardCode,
 } from "@/lib/distance-types";
+import { todayYmdLocal } from "@/lib/event-lifecycle";
 import { timeOnlyToInput } from "../_shared";
 
 /**
@@ -325,10 +326,15 @@ function validDate(value: string): boolean {
   );
 }
 
+export function maxYmd(a: string, b: string): string {
+  return a >= b ? a : b;
+}
+
 export function getPriceTypeDateError(
   type: PriceType,
   regular: PriceType,
-  regularDatesRequired: boolean
+  regularDatesRequired: boolean,
+  today = todayYmdLocal()
 ): string | null {
   const key = type.key.trim().toLowerCase();
   const isRegularType = key === "regular";
@@ -348,6 +354,12 @@ export function getPriceTypeDateError(
   }
   if (type.dateFrom > type.dateTo) {
     return "Ngày kết thúc phải từ ngày bắt đầu trở đi.";
+  }
+  if (type.dateFrom < today) {
+    return "Ngày bắt đầu không được trước hôm nay.";
+  }
+  if (type.dateTo < today) {
+    return "Ngày kết thúc không được trước hôm nay.";
   }
   if (!isRegularType && (key.includes("early") || key.includes("late"))) {
     if (

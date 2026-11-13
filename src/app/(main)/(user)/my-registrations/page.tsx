@@ -18,6 +18,7 @@ import { RegistrationDto, RaceEventDto } from "@/dto/event.dto";
 import {
   formatPrice,
   formatDate,
+  formatDateTime,
   getRegistrationStatusLabel,
   getRegistrationStatusColor,
 } from "@/lib/format";
@@ -272,13 +273,33 @@ export default function MyRegistrationsPage() {
                           <div className="flex flex-wrap gap-2">
                             {reg.status === "pending_payment" && (
                               <>
-                                <Link
-                                  href={`/events/${reg.eventId}/payment?regId=${reg.id}`}
-                                  className="inline-flex items-center gap-1.5 rounded-full bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white"
-                                >
-                                  <CreditCard className="h-3.5 w-3.5" />
-                                  Thanh toán
-                                </Link>
+                                {reg.slotHeldUntilUtc &&
+                                new Date(reg.slotHeldUntilUtc).getTime() > Date.now() ? (
+                                  <p className="w-full text-xs text-muted-foreground">
+                                    Giữ chỗ đến {formatDateTime(reg.slotHeldUntilUtc)}
+                                  </p>
+                                ) : reg.slotHeldUntilUtc ? (
+                                  <p className="w-full text-xs text-amber-800">
+                                    Hết giữ chỗ — đăng ký lại để giữ slot mới.
+                                  </p>
+                                ) : null}
+                                {reg.slotHeldUntilUtc &&
+                                new Date(reg.slotHeldUntilUtc).getTime() <= Date.now() ? (
+                                  <Link
+                                    href={`/events/${reg.eventId}`}
+                                    className="inline-flex items-center gap-1.5 rounded-full bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white"
+                                  >
+                                    Đăng ký lại
+                                  </Link>
+                                ) : (
+                                  <Link
+                                    href={`/events/${reg.eventId}/payment?regId=${reg.id}`}
+                                    className="inline-flex items-center gap-1.5 rounded-full bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white"
+                                  >
+                                    <CreditCard className="h-3.5 w-3.5" />
+                                    Thanh toán
+                                  </Link>
+                                )}
                                 <button
                                   type="button"
                                   disabled={cancellingId === reg.id}

@@ -29,6 +29,7 @@ import {
   createDistanceRows,
   getPriceTypeDateError,
   getPriceTypeError,
+  maxYmd,
   removeOtherDistanceRow,
   removeSharedPriceType,
   requiresRegularDates,
@@ -37,6 +38,7 @@ import {
   type DistanceRow,
   type PriceType,
 } from "./distances-form";
+import { todayYmdLocal } from "@/lib/event-lifecycle";
 
 export default function ProfileDistancesClient() {
   const params = useParams();
@@ -101,6 +103,7 @@ export default function ProfileDistancesClient() {
 
   const sharedTypes = rows[0]?.types ?? [];
   const regularDatesRequired = requiresRegularDates(sharedTypes);
+  const minSelectableDate = todayYmdLocal();
 
   const updateType = (
     index: number,
@@ -396,14 +399,26 @@ export default function ProfileDistancesClient() {
                     >
                       <input
                         type="date"
+                        min={minSelectableDate}
                         value={type.dateFrom}
                         disabled={disabled}
                         required={!regular || regularDatesRequired}
                         aria-invalid={!!dateError}
                         aria-describedby={dateDescription}
-                        onChange={(e) =>
-                          updateType(index, { dateFrom: e.target.value })
-                        }
+                        onChange={(e) => {
+                          const dateFrom = e.target.value;
+                          const patch: Partial<Omit<PriceType, "price">> = {
+                            dateFrom,
+                          };
+                          if (
+                            dateFrom &&
+                            type.dateTo &&
+                            type.dateTo < dateFrom
+                          ) {
+                            patch.dateTo = dateFrom;
+                          }
+                          updateType(index, patch);
+                        }}
                         className={inputClass}
                       />
                     </Field>
@@ -416,7 +431,10 @@ export default function ProfileDistancesClient() {
                     >
                       <input
                         type="date"
-                        min={type.dateFrom || undefined}
+                        min={maxYmd(
+                          type.dateFrom || minSelectableDate,
+                          minSelectableDate
+                        )}
                         value={type.dateTo}
                         disabled={disabled}
                         required={!regular || regularDatesRequired}

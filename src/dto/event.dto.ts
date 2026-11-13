@@ -227,6 +227,8 @@ export interface RegistrationDto {
   /** UTC khi staff quét QR check-in (confirmed) */
   checkedInAtUtc?: string | null;
   checkedInByUserId?: string | null;
+  /** UTC hết hạn giữ chỗ capacity khi pending_payment */
+  slotHeldUntilUtc?: string | null;
   // Populated by BE join
   eventName?: string;
   distanceName?: string;

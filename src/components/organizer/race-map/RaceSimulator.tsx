@@ -449,17 +449,15 @@ export default function RaceSimulator() {
           <div className="min-w-0 flex-1 text-sm">
             <p className="font-bold text-foreground">Chưa có lượt giả lập</p>
             <p className="text-xs text-muted-foreground">
-              Eligible = Confirmed + có BIB + chưa xuất phát + chưa có kết quả
-              (không phải capacity/slot cự ly). VĐV đã ghi finish không còn trong pool.
+              Chỉ lấy VĐV đã duyệt hồ sơ, đã có BIB và chưa chạy / chưa có kết quả.
               {preview && !preview.courseReady
-                ? ` Course: ${preview.courseError || "chưa sẵn sàng"}.`
+                ? ` Bản đồ cự ly: ${preview.courseError || "chưa sẵn sàng"}.`
                 : ""}
             </p>
             <p className="mt-1 text-xs font-medium text-orange-600 tabular-nums">
-              Còn {eligibleCount} VĐV đủ điều kiện giả lập
               {eligibleCount === 0
-                ? " — cần thêm registration Confirmed/BIB hoặc reset kết quả cũ."
-                : "."}
+                ? "Chưa có VĐV phù hợp — duyệt thêm đăng ký hoặc xóa kết quả cũ rồi thử lại."
+                : `Có ${eligibleCount} VĐV sẵn sàng giả lập.`}
             </p>
           </div>
           <label className="text-[11px] text-muted-foreground">

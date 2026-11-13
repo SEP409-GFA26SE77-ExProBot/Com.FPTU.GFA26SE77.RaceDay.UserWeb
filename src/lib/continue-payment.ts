@@ -42,7 +42,11 @@ export async function startContinuedPayment(
   const cancelUrl = `${origin}/payments/${encodeURIComponent(payment.id)}/continue?cancelled=true`;
   if (order.registration) {
     let registration = await getRegistrationById(order.registration.id);
-    if (registration.status === "cancelled") {
+    const holdExpired =
+      registration.status === "pending_payment" &&
+      !!registration.slotHeldUntilUtc &&
+      new Date(registration.slotHeldUntilUtc).getTime() <= Date.now();
+    if (registration.status === "cancelled" || holdExpired) {
       registration = await createRegistration(registration.eventId, {
         distanceId: registration.distanceId,
         fullName: registration.fullName,

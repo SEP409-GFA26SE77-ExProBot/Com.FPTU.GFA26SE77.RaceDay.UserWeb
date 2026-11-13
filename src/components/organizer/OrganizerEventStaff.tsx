@@ -2,12 +2,20 @@
 import { useOrganizerErrorState } from "@/lib/use-organizer-error-state";
 import { useOrganizerToastState } from "@/lib/use-organizer-toast-state";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
+  AlertTriangle,
   Check,
   ChevronDown,
+  KeyRound,
   Loader2,
+  Lock,
+  LockOpen,
   Mail,
+  MapPin,
+  Pencil,
   Phone,
   Plus,
   RefreshCw,
@@ -21,33 +29,46 @@ import {
   assignEventStaffStation,
   inviteEventStaff,
   listEventStaff,
-  listStaffStations,
-  revokeEventStaff,
+  listStaffMapData,
+  resetEventStaffPassword,
+  setEventStaffLock,
+  updateEventStaff,
 } from "@/api/event-staff";
 import type {
   EventStaffMemberDto,
   EventStaffRole,
+  StaffRouteDto,
   StaffStationDto,
+} from "@/dto/event-staff.dto";
+import {
+  PHOTOGRAPHER_MAX_STATIONS,
+  STAFF_DEFAULT_PASSWORD,
+  memberStationIds,
+  softWarnFarStations,
+  toStationItems,
 } from "@/dto/event-staff.dto";
 import { getApiErrorMessage } from "@/lib/error";
 import { PAGE_SHELL } from "@/lib/page-shell";
 import { toastError, toastSuccess } from "@/lib/toast";
 
+const StaffAssignmentMap = dynamic(
+  () => import("@/components/organizer/StaffAssignmentMap"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full min-h-[320px] items-center justify-center rounded-2xl border border-border/60 bg-muted/30 text-sm text-muted-foreground">
+        Đang tải bản đồ…
+      </div>
+    ),
+  }
+);
+
 const ROLE_TABS: {
   id: EventStaffRole;
   label: string;
-  hint: string;
 }[] = [
-  {
-    id: "race-staff",
-    label: "Race Staff",
-    hint: "Gán checkpoint hoặc điểm tiếp tế trên bản đồ, hoặc chọn nhiệm vụ tại trung tâm điều hành, quầy check-in hay quầy nhận kit / BIB.",
-  },
-  {
-    id: "photographer",
-    label: "Photographer",
-    hint: "Gán điểm checkpoint trên cung đường để bố trí chụp — hoặc để di động / chưa gán map.",
-  },
+  { id: "race-staff", label: "Race Staff" },
+  { id: "photographer", label: "Photographer" },
 ];
 
 const INVITE_ROLE_LABELS: Record<EventStaffRole, string> = {
@@ -55,7 +76,6 @@ const INVITE_ROLE_LABELS: Record<EventStaffRole, string> = {
   photographer: "Nhiếp ảnh gia",
 };
 
-/** Mẫu điền form tạo tài khoản — không gọi API cho đến khi bấm gửi. */
 const STAFF_FORM_PRESETS: Record<
   EventStaffRole,
   { fullName: string; email: string; phone: string; label: string }[]
@@ -103,37 +123,112 @@ function StationPicker({
   disabled,
   onChange,
   compact,
+  multi,
+  max,
+  /** inline = panel trong form (modal); popover = dropdown trên card list */
+  variant = "popover",
 }: {
   role: EventStaffRole;
-  value: string;
+  /** Single: 1 id; multi (photographer): nhiều id. */
+  value: string | string[];
   stations: StaffStationDto[];
   disabled?: boolean;
-  onChange: (id: string) => void;
+  onChange: (next: string | string[]) => void;
   compact?: boolean;
+  multi?: boolean;
+  max?: number;
+  variant?: "popover" | "inline";
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
-  const rootRef = useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+    openUp: boolean;
+  } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const selectedIds = Array.isArray(value)
+    ? value
+    : value
+      ? [value]
+      : [];
+  const limit = max ?? (multi ? PHOTOGRAPHER_MAX_STATIONS : 1);
+  const inline = variant === "inline";
+
+  const updateMenuPos = useCallback(() => {
+    const el = triggerRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const gap = 6;
+    const preferred = multi ? 280 : 240;
+    const spaceBelow = window.innerHeight - r.bottom - gap - 12;
+    const spaceAbove = r.top - gap - 12;
+    const openUp = spaceBelow < 200 && spaceAbove > spaceBelow;
+    const maxHeight = Math.max(
+      160,
+      Math.min(preferred, openUp ? spaceAbove : spaceBelow)
+    );
+    const width = Math.min(Math.max(r.width, 240), window.innerWidth - 16);
+    const left = Math.min(r.left, Math.max(8, window.innerWidth - width - 8));
+    setMenuPos({
+      top: openUp ? r.top - gap : r.bottom + gap,
+      left,
+      width,
+      maxHeight,
+      openUp,
+    });
+  }, [multi]);
+
+  useLayoutEffect(() => {
+    if (inline || !open) {
+      setMenuPos(null);
+      return;
+    }
+    updateMenuPos();
+    const onWin = () => updateMenuPos();
+    window.addEventListener("resize", onWin);
+    window.addEventListener("scroll", onWin, true);
+    return () => {
+      window.removeEventListener("resize", onWin);
+      window.removeEventListener("scroll", onWin, true);
+    };
+  }, [open, updateMenuPos, inline]);
 
   useEffect(() => {
-    if (!open) return;
+    if (inline || !open) return;
     const onDoc = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        setOpen(false);
+      const t = e.target as Node;
+      if (triggerRef.current?.contains(t) || menuRef.current?.contains(t)) {
+        return;
       }
+      setOpen(false);
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
-  }, [open]);
+  }, [open, inline]);
 
   const mapStations = stations.filter((s) => s.source === "map");
   const dutyStations = stations.filter((s) => s.source !== "map");
   const mapGroup =
     role === "photographer"
-      ? "Checkpoint / zone chụp (map)"
-      : "Checkpoint / điểm tiếp tế (map)";
+      ? "Checkpoint / zone chụp"
+      : "Checkpoint / điểm tiếp tế";
 
-  const selected = stations.find((s) => s.id === value);
+  const summary =
+    selectedIds.length === 0
+      ? "— Chưa gán —"
+      : selectedIds.length === 1
+        ? stations.find((s) => s.id === selectedIds[0])?.label ||
+          selectedIds[0]
+        : `${selectedIds.length} điểm đã chọn`;
+
+  const farWarn = multi
+    ? softWarnFarStations(selectedIds, stations)
+    : null;
+
   const needle = q.trim().toLowerCase();
   const filterList = (list: StaffStationDto[]) =>
     needle
@@ -146,15 +241,209 @@ function StationPicker({
   const filteredMap = filterList(mapStations);
   const filteredDuty = filterList(dutyStations);
 
-  const pick = (id: string) => {
-    onChange(id);
-    setOpen(false);
-    setQ("");
+  const toggle = (id: string) => {
+    if (!multi) {
+      onChange(id);
+      if (!inline) {
+        setOpen(false);
+        setQ("");
+      }
+      return;
+    }
+    if (!id) {
+      onChange([]);
+      return;
+    }
+    const has = selectedIds.includes(id);
+    if (has) {
+      onChange(selectedIds.filter((x) => x !== id));
+      return;
+    }
+    if (selectedIds.length >= limit) {
+      toastError(`Tối đa ${limit} điểm cho photographer.`);
+      return;
+    }
+    onChange([...selectedIds, id]);
   };
 
-  return (
-    <div className="relative" ref={rootRef}>
+  const row = (s: StaffStationDto) => {
+    const checked = selectedIds.includes(s.id);
+    const pointLabel = s.label.includes("—")
+      ? s.label.split("—").slice(1).join("—").trim()
+      : s.label;
+    return (
       <button
+        key={s.id}
+        type="button"
+        disabled={disabled}
+        onClick={() => toggle(s.id)}
+        className={`flex w-full items-start justify-between gap-2 px-3 py-2.5 text-left disabled:opacity-50 ${
+          checked
+            ? "bg-orange-500/10 text-orange-950"
+            : "hover:bg-muted"
+        } ${inline ? "text-sm" : "text-xs"}`}
+      >
+        <span className="min-w-0 space-y-0.5">
+          {s.distanceName ? (
+            <span
+              className={`block truncate font-bold tracking-tight text-orange-700 ${
+                inline ? "text-sm" : "text-xs"
+              }`}
+            >
+              {s.distanceName}
+            </span>
+          ) : null}
+          <span
+            className={`block truncate ${
+              s.distanceName
+                ? "text-muted-foreground"
+                : checked
+                  ? "font-semibold"
+                  : ""
+            } ${inline ? "text-xs" : "text-[11px]"}`}
+          >
+            {s.distanceName ? pointLabel || s.label : s.label}
+          </span>
+        </span>
+        {checked ? (
+          <Check className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
+        ) : (
+          <span className="mt-0.5 h-4 w-4 shrink-0 rounded-full border border-border" />
+        )}
+      </button>
+    );
+  };
+
+  const warnBanner = farWarn ? (
+    <div
+      className={`flex items-start gap-2 rounded-xl border border-amber-400/60 bg-amber-50 px-3 py-2.5 text-amber-950 ${
+        inline ? "text-sm" : "text-xs"
+      }`}
+      role="status"
+    >
+      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+      <div className="min-w-0">
+        <p className="font-bold">Cảnh báo phân bổ</p>
+        <p className={`${inline ? "text-xs" : "text-[11px]"} leading-snug`}>
+          {farWarn}
+        </p>
+      </div>
+    </div>
+  ) : null;
+
+  const listBody = (
+    <>
+      <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
+        <Search className="h-3.5 w-3.5 text-muted-foreground" />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          disabled={disabled}
+          placeholder="Tìm vị trí / nhiệm vụ…"
+          className="w-full bg-transparent text-xs outline-none disabled:opacity-50"
+        />
+      </div>
+      {multi ? (
+        <p className="shrink-0 border-b border-border px-3 py-1.5 text-[10px] text-muted-foreground">
+          Đã chọn {selectedIds.length}/{limit}
+          {selectedIds.length > 0 ? ` · ${summary}` : ""}
+        </p>
+      ) : null}
+      <div
+        className={`min-h-0 overflow-y-auto py-1 ${
+          inline ? "max-h-44" : "flex-1"
+        }`}
+      >
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => toggle("")}
+          className="flex w-full items-center justify-between px-3 py-2 text-left text-xs hover:bg-muted disabled:opacity-50"
+        >
+          <span className="text-muted-foreground">— Chưa gán —</span>
+          {selectedIds.length === 0 ? (
+            <Check className="h-3.5 w-3.5 text-orange-500" />
+          ) : null}
+        </button>
+        {filteredMap.length > 0 ? (
+          <>
+            <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              {mapGroup}
+            </p>
+            {filteredMap.map(row)}
+          </>
+        ) : null}
+        {filteredDuty.length > 0 ? (
+          <>
+            <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              Nhiệm vụ
+            </p>
+            {filteredDuty.map(row)}
+          </>
+        ) : null}
+        {filteredMap.length === 0 && filteredDuty.length === 0 ? (
+          <p className="px-3 py-4 text-center text-xs text-muted-foreground">
+            Không có kết quả.
+          </p>
+        ) : null}
+      </div>
+    </>
+  );
+
+  if (inline) {
+    return (
+      <div className="space-y-2">
+        {warnBanner}
+        <div className="overflow-hidden rounded-xl border border-border bg-background">
+          {listBody}
+        </div>
+      </div>
+    );
+  }
+
+  const menu =
+    open && menuPos
+      ? createPortal(
+          <div
+            ref={menuRef}
+            style={{
+              position: "fixed",
+              top: menuPos.openUp ? undefined : menuPos.top,
+              bottom: menuPos.openUp
+                ? window.innerHeight - menuPos.top
+                : undefined,
+              left: menuPos.left,
+              width: menuPos.width,
+              maxHeight: menuPos.maxHeight,
+              zIndex: 200,
+            }}
+            className="flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl"
+          >
+            {listBody}
+            {multi ? (
+              <div className="shrink-0 border-t border-border px-3 py-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    setQ("");
+                  }}
+                  className="w-full rounded-lg bg-orange-500/15 py-1.5 text-[11px] font-bold text-orange-700"
+                >
+                  Xong ({selectedIds.length}/{limit})
+                </button>
+              </div>
+            ) : null}
+          </div>,
+          document.body
+        )
+      : null;
+
+  return (
+    <div className="relative space-y-1.5">
+      {warnBanner}
+      <button
+        ref={triggerRef}
         type="button"
         disabled={disabled}
         onClick={() => setOpen((v) => !v)}
@@ -162,154 +451,76 @@ function StationPicker({
           compact ? "py-1.5 text-xs" : "py-2 text-sm"
         }`}
       >
-        <span className={`truncate ${selected ? "text-foreground" : "text-muted-foreground"}`}>
-          {selected?.label || "— Chưa gán —"}
+        <span
+          className={`truncate ${selectedIds.length ? "text-foreground" : "text-muted-foreground"}`}
+        >
+          {summary}
         </span>
         <ChevronDown
           className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition ${open ? "rotate-180" : ""}`}
         />
       </button>
-      {open ? (
-        <div className="absolute left-0 right-0 z-40 mt-1 overflow-hidden rounded-xl border border-border bg-card shadow-xl">
-          <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-            <Search className="h-3.5 w-3.5 text-muted-foreground" />
-            <input
-              autoFocus
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Tìm vị trí / nhiệm vụ…"
-              className="w-full bg-transparent text-xs outline-none"
-            />
-          </div>
-          <div className="max-h-56 overflow-y-auto py-1">
-            <button
-              type="button"
-              onClick={() => pick("")}
-              className="flex w-full items-center justify-between px-3 py-2 text-left text-xs hover:bg-muted"
-            >
-              <span className="text-muted-foreground">— Chưa gán —</span>
-              {!value ? <Check className="h-3.5 w-3.5 text-orange-500" /> : null}
-            </button>
-            {filteredMap.length > 0 ? (
-              <>
-                <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                  {mapGroup}
-                </p>
-                {filteredMap.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => pick(s.id)}
-                    className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs hover:bg-orange-500/10"
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate font-medium">{s.label}</span>
-                      {s.distanceName ? (
-                        <span className="text-[10px] text-muted-foreground">
-                          {s.distanceName}
-                        </span>
-                      ) : null}
-                    </span>
-                    {value === s.id ? (
-                      <Check className="h-3.5 w-3.5 shrink-0 text-orange-500" />
-                    ) : null}
-                  </button>
-                ))}
-              </>
-            ) : null}
-            {filteredDuty.length > 0 ? (
-              <>
-                <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-                  Nhiệm vụ
-                </p>
-                {filteredDuty.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => pick(s.id)}
-                    className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs hover:bg-orange-500/10"
-                  >
-                    <span className="truncate font-medium">{s.label}</span>
-                    {value === s.id ? (
-                      <Check className="h-3.5 w-3.5 shrink-0 text-orange-500" />
-                    ) : null}
-                  </button>
-                ))}
-              </>
-            ) : null}
-            {filteredMap.length === 0 && filteredDuty.length === 0 ? (
-              <p className="px-3 py-4 text-center text-xs text-muted-foreground">
-                Không có kết quả.
-              </p>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
+      {menu}
     </div>
   );
 }
 
-function statusLabel(s: string) {
-  switch (s) {
-    case "invited":
-      return "Chờ kích hoạt";
-    case "active":
-      return "Đã hoạt động";
-    case "revoked":
-      return "Đã gỡ";
-    default:
-      return s;
+/** Badge trên card: chỉ khóa / đang hoạt động (bỏ invited/active staff status). */
+function accountBadge(locked: boolean) {
+  if (locked) {
+    return {
+      label: "Đã khóa",
+      className: "border-red-300 bg-red-50 text-red-700",
+    };
   }
-}
-
-function statusClass(s: string) {
-  switch (s) {
-    case "invited":
-      return "bg-amber-500/15 text-amber-800 border-amber-500/30";
-    case "active":
-      return "bg-emerald-500/15 text-emerald-800 border-emerald-500/30";
-    case "revoked":
-      return "bg-slate-500/15 text-slate-600 border-slate-500/30";
-    default:
-      return "bg-muted text-muted-foreground border-border";
-  }
+  return {
+    label: "Đang hoạt động",
+    className: "border-emerald-500/30 bg-emerald-500/15 text-emerald-800",
+  };
 }
 
 export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
   const [role, setRole] = useState<EventStaffRole>("race-staff");
   const [members, setMembers] = useState<EventStaffMemberDto[]>([]);
   const [stations, setStations] = useState<StaffStationDto[]>([]);
+  const [routes, setRoutes] = useState<StaffRouteDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useOrganizerErrorState();
   const [, setToast] = useOrganizerToastState<string | null>(null);
 
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<EventStaffMemberDto | null>(
+    null
+  );
+  const [resetTarget, setResetTarget] = useState<EventStaffMemberDto | null>(
+    null
+  );
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [stationId, setStationId] = useState("");
+  const [password, setPassword] = useState(STAFF_DEFAULT_PASSWORD);
+  const [stationIds, setStationIds] = useState<string[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
-  const [revokeTarget, setRevokeTarget] = useState<EventStaffMemberDto | null>(
-    null
-  );
+  const [selectedMapStationId, setSelectedMapStationId] = useState<
+    string | null
+  >(null);
+  const [memberQuery, setMemberQuery] = useState("");
 
-  const roleMeta = useMemo(
-    () => ROLE_TABS.find((t) => t.id === role)!,
-    [role]
-  );
+  const roleMeta = useMemo(() => ROLE_TABS.find((t) => t.id === role)!, [role]);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [list, st] = await Promise.all([
+      const [list, mapData] = await Promise.all([
         listEventStaff(eventId, role),
-        listStaffStations(eventId, role),
+        listStaffMapData(eventId, role),
       ]);
       setMembers(list.filter((m) => m.status !== "revoked"));
-      setStations(st);
-      setStationId((prev) =>
-        prev && st.some((s) => s.id === prev) ? prev : ""
+      setStations(mapData.stations);
+      setRoutes(mapData.routes);
+      setStationIds((prev) =>
+        prev.filter((id) => mapData.stations.some((s) => s.id === id))
       );
     } catch (e) {
       setError(getApiErrorMessage(e, "Không tải được nhân sự."));
@@ -317,7 +528,7 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
     } finally {
       setLoading(false);
     }
-  }, [eventId, role]);
+  }, [eventId, role, setError]);
 
   useEffect(() => {
     setLoading(true);
@@ -335,8 +546,20 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
     setFullName("");
     setEmail("");
     setPhone("");
-    setStationId("");
+    setPassword(STAFF_DEFAULT_PASSWORD);
+    setStationIds([]);
     setFormError(null);
+  };
+
+  const isPhoto = role === "photographer";
+
+  const stationPayload = (ids: string[]) => {
+    const items = toStationItems(ids, stations);
+    return {
+      stationId: items[0]?.stationId ?? null,
+      stationLabel: items[0]?.stationLabel ?? null,
+      stations: items,
+    };
   };
 
   const closeInvite = () => {
@@ -345,56 +568,115 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
     resetForm();
   };
 
-  const stationLabelOf = (id: string) =>
-    stations.find((s) => s.id === id)?.label ?? undefined;
+  const closeEdit = () => {
+    if (busy) return;
+    setEditTarget(null);
+    resetForm();
+  };
+
+  const openEdit = (m: EventStaffMemberDto) => {
+    setEditTarget(m);
+    setFullName(m.fullName);
+    setEmail(
+      m.email?.endsWith("@staff.raceday.local") ? "" : m.email || ""
+    );
+    setPhone(m.phone || "");
+    setStationIds(memberStationIds(m));
+    setFormError(null);
+  };
 
   const onInvite = async () => {
     const name = fullName.trim();
     const mail = email.trim();
+    const pwd = password.trim();
     if (!name) {
       setFormError("Vui lòng nhập họ tên.");
       return;
     }
-    if (!mail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) {
+    if (mail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) {
       setFormError("Email không hợp lệ.");
+      return;
+    }
+    if (!pwd || pwd.length < 8) {
+      setFormError("Mật khẩu tối thiểu 8 ký tự.");
       return;
     }
     setBusy(true);
     setFormError(null);
     setError(null);
     try {
+      const st = stationPayload(stationIds);
       await inviteEventStaff(eventId, {
         role,
-        email: mail,
+        email: mail || undefined,
         fullName: name,
         phone: phone.trim() || undefined,
-        stationId: stationId || undefined,
-        stationLabel: stationId ? stationLabelOf(stationId) : undefined,
+        stationId: st.stationId || undefined,
+        stationLabel: st.stationLabel || undefined,
+        stations: st.stations,
+        password: pwd,
       });
       setInviteOpen(false);
       resetForm();
-      toastSuccess("Đã gửi tài khoản cho nhân sự.");
       await load();
       setToast("Đã thêm nhân sự vào giải.");
     } catch (e) {
       const message = getApiErrorMessage(e, "Tạo tài khoản thất bại.");
+      setFormError(message);
       setError(message);
     } finally {
       setBusy(false);
     }
   };
 
-  const onAssign = async (memberId: string, nextStation: string) => {
+  const onUpdate = async () => {
+    if (!editTarget) return;
+    const name = fullName.trim();
+    const mail = email.trim();
+    if (!name) {
+      setFormError("Vui lòng nhập họ tên.");
+      return;
+    }
+    if (mail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) {
+      setFormError("Email không hợp lệ.");
+      return;
+    }
+    setBusy(true);
+    setFormError(null);
+    try {
+      const st = stationPayload(stationIds);
+      await updateEventStaff(eventId, editTarget.id, {
+        fullName: name,
+        email: mail,
+        phone: phone.trim() || null,
+        stationId: st.stationId,
+        stationLabel: st.stationLabel,
+        stations: st.stations,
+      });
+      setEditTarget(null);
+      resetForm();
+      toastSuccess("Đã cập nhật nhân sự.");
+      await load();
+    } catch (e) {
+      setFormError(getApiErrorMessage(e, "Cập nhật thất bại."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onAssign = async (memberId: string, next: string | string[]) => {
+    const ids = Array.isArray(next) ? next : next ? [next] : [];
+    const st = stationPayload(ids);
     setBusy(true);
     try {
       await assignEventStaffStation(eventId, {
         memberId,
-        stationId: nextStation || null,
-        stationLabel: nextStation ? stationLabelOf(nextStation) ?? null : null,
+        stationId: st.stationId,
+        stationLabel: st.stationLabel,
+        stations: st.stations,
       });
       toastSuccess("Đã cập nhật vị trí.");
       await load();
-      setToast("Đã cập nhật vị trí nhân sự.");
     } catch (e) {
       toastError(e, "Gán vị trí thất bại.");
     } finally {
@@ -402,25 +684,69 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
     }
   };
 
-  const confirmRevoke = async () => {
-    if (!revokeTarget) return;
-    const memberId = revokeTarget.id;
+  const onResetPassword = (m: EventStaffMemberDto) => {
+    if (!m.userId) {
+      toastError(null, "Nhân sự chưa có tài khoản đăng nhập.");
+      return;
+    }
+    setResetTarget(m);
+  };
+
+  const confirmResetPassword = async () => {
+    if (!resetTarget) return;
     setBusy(true);
     try {
-      await revokeEventStaff(eventId, memberId);
-      setRevokeTarget(null);
-      toastSuccess("Đã gỡ nhân sự khỏi giải.");
-      await load();
-      setToast("Đã gỡ nhân sự khỏi giải.");
+      const result = await resetEventStaffPassword(eventId, resetTarget.id);
+      setResetTarget(null);
+      setToast(
+        result.passwordSentByEmail
+          ? `Đã khôi phục MK gốc và gửi email (${result.password}).`
+          : `Đã khôi phục MK gốc: ${result.password}`
+      );
     } catch (e) {
-      toastError(e, "Gỡ thất bại.");
+      toastError(e, "Khôi phục mật khẩu thất bại.");
     } finally {
       setBusy(false);
     }
   };
 
+  const onToggleLock = async (m: EventStaffMemberDto) => {
+    if (!m.userId) {
+      toastError(null, "Nhân sự chưa có tài khoản đăng nhập.");
+      return;
+    }
+    const next = !m.accountLocked;
+    setBusy(true);
+    try {
+      await setEventStaffLock(eventId, m.id, next);
+      toastSuccess(next ? "Đã khóa tài khoản." : "Đã mở khóa tài khoản.");
+      await load();
+    } catch (e) {
+      toastError(e, next ? "Khóa thất bại." : "Mở khóa thất bại.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const filteredMembers = useMemo(() => {
+    const q = memberQuery.trim().toLowerCase();
+    if (!q) return members;
+    return members.filter(
+      (m) =>
+        m.fullName.toLowerCase().includes(q) ||
+        m.email.toLowerCase().includes(q) ||
+        (m.stationLabel || "").toLowerCase().includes(q) ||
+        (m.phone || "").includes(q)
+    );
+  }, [members, memberQuery]);
+
+  const mapHighlightMembers = useMemo(() => {
+    if (!selectedMapStationId) return filteredMembers;
+    return filteredMembers;
+  }, [filteredMembers, selectedMapStationId]);
+
   return (
-    <div className={`${PAGE_SHELL} space-y-5 py-1`}>
+    <div className={`${PAGE_SHELL} space-y-4 py-1`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-orange-500">
@@ -430,10 +756,6 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
             <Users className="h-6 w-6 text-orange-500" />
             Quản lý nhân sự
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Tạo tài khoản theo role — mật khẩu mặc định chỉ gửi qua email. Sau
-            khi họ đăng nhập lần đầu sẽ chuyển sang Đã hoạt động.
-          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -472,41 +794,6 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
           </button>
         ))}
       </div>
-      <p className="text-xs text-muted-foreground">{roleMeta.hint}</p>
-      <div className="rounded-2xl border border-border/60 bg-card p-3 shadow-sm">
-        <p className="text-xs font-bold text-foreground">Mẫu sẵn có (điền form)</p>
-        <p className="mt-0.5 text-[11px] text-muted-foreground">
-          Chọn mẫu để mở form tạo tài khoản — chỉnh email thật trước khi gửi.
-        </p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {STAFF_FORM_PRESETS[role].map((p) => (
-            <button
-              key={p.email}
-              type="button"
-              onClick={() => {
-                setFullName(p.fullName);
-                setEmail(p.email);
-                setPhone(p.phone);
-                setFormError(null);
-                setInviteOpen(true);
-              }}
-              className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-[11px] font-bold text-orange-700 hover:bg-orange-100"
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-      </div>
-      {stations.filter((s) => s.source === "map").length === 0 ? (
-        <p className="rounded-xl border border-amber-200/80 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          Chưa có điểm map phù hợp role này. Vào{" "}
-          <span className="font-semibold">Thiết lập bản đồ</span> thêm{" "}
-          {role === "race-staff"
-            ? "checkpoint (start / CP / finish) hoặc điểm tiếp tế (aid)"
-            : "checkpoint (start / CP / finish)"}
-          — vẫn có thể gán nhiệm vụ không gắn map khi mời.
-        </p>
-      ) : null}
 
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -514,79 +801,195 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
         </div>
       ) : null}
 
-      <section className="space-y-3">
-        <h2 className="text-sm font-bold">
-          Danh sách {roleMeta.label} ({members.length})
-        </h2>
-        {loading ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
-            Đang tải…
+      <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+        {/* LEFT: CRUD */}
+        <section className="space-y-3 rounded-2xl border border-border/60 bg-card p-4 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-bold">
+              Danh sách {roleMeta.label} ({members.length})
+            </h2>
+            <div className="relative min-w-[10rem] flex-1 sm:max-w-[14rem]">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={memberQuery}
+                onChange={(e) => setMemberQuery(e.target.value)}
+                placeholder="Tìm tên / email…"
+                className="w-full rounded-xl border border-border bg-background py-1.5 pl-8 pr-3 text-xs outline-none focus:border-orange-500/50"
+              />
+            </div>
           </div>
-        ) : members.length === 0 ? (
-          <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-            Chưa có {INVITE_ROLE_LABELS[role].toLowerCase()} cho giải này. Bấm{" "}
-            <span className="font-semibold text-foreground">Tạo tài khoản</span> để
-            cấp tài khoản.
+
+          <div className="rounded-xl border border-border/50 bg-muted/20 p-2.5">
+            <p className="text-[11px] font-bold text-foreground">
+              Mẫu sẵn có (điền form)
+            </p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {STAFF_FORM_PRESETS[role].map((p) => (
+                <button
+                  key={p.email}
+                  type="button"
+                  onClick={() => {
+                    setFullName(p.fullName);
+                    setEmail(p.email);
+                    setPhone(p.phone);
+                    setFormError(null);
+                    setInviteOpen(true);
+                  }}
+                  className="rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-[10px] font-bold text-orange-700 hover:bg-orange-100"
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
           </div>
-        ) : (
-          <ul className="space-y-2">
-            {members.map((m) => (
-              <li
-                key={m.id}
-                className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-bold">{m.fullName}</p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {m.email}
-                    {m.phone ? ` · ${m.phone}` : ""}
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className={`rounded-full border px-2.5 py-1 text-[11px] font-bold ${statusClass(m.status)}`}
+
+          {loading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
+              Đang tải…
+            </div>
+          ) : mapHighlightMembers.length === 0 ? (
+            <div className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+              Chưa có {INVITE_ROLE_LABELS[role].toLowerCase()} cho giải này. Bấm{" "}
+              <span className="font-semibold text-foreground">
+                Tạo tài khoản
+              </span>
+              .
+            </div>
+          ) : (
+            <ul className="max-h-[min(60vh,560px)] space-y-2 overflow-y-auto pr-1">
+              {mapHighlightMembers.map((m) => {
+                const ids = memberStationIds(m);
+                const mapSelected =
+                  !!selectedMapStationId &&
+                  ids.includes(selectedMapStationId);
+                const badge = accountBadge(!!m.accountLocked);
+                return (
+                  <li
+                    key={m.id}
+                    className={`rounded-2xl border p-3 shadow-sm transition ${
+                      mapSelected
+                        ? "border-orange-400 bg-orange-50/60"
+                        : "border-border/60 bg-background"
+                    }`}
                   >
-                    {statusLabel(m.status)}
-                  </span>
-                  <div className="min-w-[14rem] flex-1 sm:max-w-xs">
-                    <StationPicker
-                      role={role}
-                      value={m.stationId || ""}
-                      stations={stations}
-                      disabled={busy}
-                      compact
-                      onChange={(id) => void onAssign(m.id, id)}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => setRevokeTarget(m)}
-                    className="text-xs font-semibold text-red-600 hover:underline disabled:opacity-40"
-                  >
-                    Gỡ
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold">{m.fullName}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {[
+                            m.email &&
+                            !m.email.endsWith("@staff.raceday.local")
+                              ? m.email
+                              : null,
+                            m.phone || null,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ") || "Chưa có email / SĐT"}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${badge.className}`}
+                        >
+                          {badge.label}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mt-2">
+                      <p className="mb-1 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        <MapPin className="h-3 w-3" /> Phân bổ vị trí
+                      </p>
+                      <StationPicker
+                        role={role}
+                        value={isPhoto ? ids : ids[0] || ""}
+                        stations={stations}
+                        disabled={busy}
+                        compact
+                        multi={isPhoto}
+                        max={PHOTOGRAPHER_MAX_STATIONS}
+                        onChange={(next) => void onAssign(m.id, next)}
+                      />
+                    </div>
+
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => openEdit(m)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] font-semibold hover:bg-muted disabled:opacity-40"
+                      >
+                        <Pencil className="h-3 w-3" /> Sửa
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy || !m.userId}
+                        onClick={() => onResetPassword(m)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] font-semibold hover:bg-muted disabled:opacity-40"
+                        title={
+                          m.userId
+                            ? `Khôi phục mật khẩu gốc (${STAFF_DEFAULT_PASSWORD})`
+                            : "Chưa có tài khoản IAM"
+                        }
+                      >
+                        <KeyRound className="h-3 w-3" /> MK gốc
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy || !m.userId}
+                        onClick={() => void onToggleLock(m)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[11px] font-semibold hover:bg-muted disabled:opacity-40"
+                      >
+                        {m.accountLocked ? (
+                          <>
+                            <LockOpen className="h-3 w-3" /> Mở khóa
+                          </>
+                        ) : (
+                          <>
+                            <Lock className="h-3 w-3" /> Khóa
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
+        {/* RIGHT: MAP */}
+        <section className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm lg:sticky lg:top-4">
+          <div className="mb-3">
+            <h2 className="text-sm font-bold">Bản đồ phân bổ</h2>
+          </div>
+          <div className="h-[min(70vh,640px)]">
+            <StaffAssignmentMap
+              role={role}
+              stations={stations}
+              routes={routes}
+              members={members}
+              selectedStationId={selectedMapStationId}
+              onSelectStation={setSelectedMapStationId}
+            />
+          </div>
+        </section>
+      </div>
 
       {inviteOpen ? (
         <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-zinc-950/50 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[80] flex items-end justify-center bg-zinc-950/50 p-0 backdrop-blur-sm sm:items-center sm:p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="invite-staff-title"
           onClick={closeInvite}
         >
           <div
-            className="w-full max-w-lg rounded-2xl border border-border bg-card p-5 shadow-2xl sm:p-6"
+            className="flex max-h-[92vh] w-full max-w-lg flex-col rounded-t-2xl border border-border bg-card shadow-2xl sm:rounded-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-5 py-4 sm:px-6">
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest text-orange-500">
                   {INVITE_ROLE_LABELS[role]}
@@ -597,9 +1000,8 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
                 >
                   Tạo tài khoản
                 </h2>
-                <p className="mt-1.5 text-sm text-muted-foreground">
-                  Tài khoản đăng nhập và mật khẩu mặc định sẽ được gửi qua email
-                  bên dưới.
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Email tuỳ chọn. Có thể gán vị trí sau trên danh sách / bản đồ.
                 </p>
               </div>
               <button
@@ -613,14 +1015,14 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
               </button>
             </div>
 
-            {formError ? (
-              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-                {formError}
-              </div>
-            ) : null}
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4 sm:px-6">
+              {formError ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                  {formError}
+                </div>
+              ) : null}
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="sm:col-span-2">
+              <div>
                 <label className="mb-1.5 block text-xs font-semibold text-foreground">
                   <User className="mr-1 inline h-3.5 w-3.5 text-orange-500" />
                   Họ tên *
@@ -633,52 +1035,77 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
                   placeholder="Nguyễn Văn A"
                 />
               </div>
-              <div className="sm:col-span-2">
-                <label className="mb-1.5 block text-xs font-semibold text-foreground">
-                  <Mail className="mr-1 inline h-3.5 w-3.5 text-orange-500" />
-                  Email *
-                </label>
-                <input
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  type="email"
-                  disabled={busy}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none transition-all focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20"
-                  placeholder="email@example.com"
-                />
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  Email nhận thông tin đăng nhập. Tài khoản tạo riêng, không
-                  trùng email VĐV.
-                </p>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-foreground">
+                    <Mail className="mr-1 inline h-3.5 w-3.5 text-orange-500" />
+                    Email
+                  </label>
+                  <input
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    type="email"
+                    disabled={busy}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none transition-all focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20"
+                    placeholder="tuỳ chọn"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-foreground">
+                    <Phone className="mr-1 inline h-3.5 w-3.5 text-orange-500" />
+                    Số điện thoại
+                  </label>
+                  <input
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    disabled={busy}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none transition-all focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20"
+                    placeholder="09xxxxxxxx"
+                  />
+                </div>
               </div>
+
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-foreground">
-                  <Phone className="mr-1 inline h-3.5 w-3.5 text-orange-500" />
-                  Số điện thoại
+                  <KeyRound className="mr-1 inline h-3.5 w-3.5 text-orange-500" />
+                  Mật khẩu *
                 </label>
                 <input
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   disabled={busy}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none transition-all focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20"
-                  placeholder="09xxxxxxxx"
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 font-mono text-sm outline-none transition-all focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20"
+                  placeholder={STAFF_DEFAULT_PASSWORD}
                 />
               </div>
+
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-foreground">
-                  Vị trí / nhiệm vụ
+                  <MapPin className="mr-1 inline h-3.5 w-3.5 text-orange-500" />
+                  Vị trí / nhiệm vụ{" "}
+                  <span className="font-normal text-muted-foreground">
+                    (tuỳ chọn)
+                  </span>
                 </label>
                 <StationPicker
                   role={role}
-                  value={stationId}
+                  variant="inline"
+                  value={isPhoto ? stationIds : stationIds[0] || ""}
                   stations={stations}
                   disabled={busy}
-                  onChange={setStationId}
+                  multi={isPhoto}
+                  max={PHOTOGRAPHER_MAX_STATIONS}
+                  onChange={(next) =>
+                    setStationIds(
+                      Array.isArray(next) ? next : next ? [next] : []
+                    )
+                  }
                 />
               </div>
             </div>
 
-            <div className="mt-5 flex justify-end gap-2">
+            <div className="flex shrink-0 justify-end gap-2 border-t border-border px-5 py-3 sm:px-6">
               <button
                 type="button"
                 disabled={busy}
@@ -698,23 +1125,23 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
                 ) : (
                   <Send className="h-3.5 w-3.5" />
                 )}
-                Gửi lời mời
+                Tạo tài khoản
               </button>
             </div>
           </div>
         </div>
       ) : null}
 
-      {revokeTarget ? (
+      {resetTarget ? (
         <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-zinc-950/50 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-zinc-950/50 p-4 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
-          aria-labelledby="revoke-staff-title"
-          onClick={() => !busy && setRevokeTarget(null)}
+          aria-labelledby="reset-pwd-title"
+          onClick={() => !busy && setResetTarget(null)}
         >
           <div
-            className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-2xl"
+            className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
@@ -723,34 +1150,38 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
                   Xác nhận
                 </p>
                 <h2
-                  id="revoke-staff-title"
+                  id="reset-pwd-title"
                   className="mt-1 text-lg font-extrabold tracking-tight"
                 >
-                  Gỡ nhân sự khỏi giải?
+                  Khôi phục mật khẩu gốc?
                 </h2>
                 <p className="mt-2 text-sm text-muted-foreground">
+                  Đặt lại MK của{" "}
                   <span className="font-semibold text-foreground">
-                    {revokeTarget.fullName}
+                    {resetTarget.fullName}
+                  </span>{" "}
+                  về{" "}
+                  <span className="font-mono font-semibold text-foreground">
+                    {STAFF_DEFAULT_PASSWORD}
                   </span>
-                  {revokeTarget.email ? ` · ${revokeTarget.email}` : ""} sẽ bị
-                  gỡ khỏi danh sách {roleMeta.label.toLowerCase()} của giải này.
+                  .
                 </p>
               </div>
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => setRevokeTarget(null)}
+                onClick={() => setResetTarget(null)}
                 className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted"
                 aria-label="Đóng"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="mt-5 flex justify-end gap-2">
+            <div className="mt-6 flex justify-end gap-2">
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => setRevokeTarget(null)}
+                onClick={() => setResetTarget(null)}
                 className="rounded-full border border-border px-4 py-2 text-xs font-bold hover:bg-muted disabled:opacity-40"
               >
                 Hủy
@@ -758,18 +1189,148 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => void confirmRevoke()}
-                className="inline-flex items-center gap-1.5 rounded-full bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-40"
+                onClick={() => void confirmResetPassword()}
+                className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-orange-500 to-red-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-40"
               >
                 {busy ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : null}
-                Gỡ khỏi giải
+                ) : (
+                  <KeyRound className="h-3.5 w-3.5" />
+                )}
+                Khôi phục
               </button>
             </div>
           </div>
         </div>
       ) : null}
+
+      {editTarget ? (
+        <div
+          className="fixed inset-0 z-[80] flex items-end justify-center bg-zinc-950/50 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="edit-staff-title"
+          onClick={closeEdit}
+        >
+          <div
+            className="flex max-h-[92vh] w-full max-w-lg flex-col rounded-t-2xl border border-border bg-card shadow-2xl sm:rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-5 py-4 sm:px-6">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-orange-500">
+                  Cập nhật
+                </p>
+                <h2
+                  id="edit-staff-title"
+                  className="mt-1 text-lg font-extrabold tracking-tight"
+                >
+                  Sửa nhân sự
+                </h2>
+              </div>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={closeEdit}
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted"
+                aria-label="Đóng"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4 sm:px-6">
+              {formError ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                  {formError}
+                </div>
+              ) : null}
+
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold">
+                  Họ tên *
+                </label>
+                <input
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  disabled={busy}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20"
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold">
+                    <Mail className="mr-1 inline h-3.5 w-3.5 text-orange-500" />
+                    Email
+                  </label>
+                  <input
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    type="email"
+                    disabled={busy}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20"
+                    placeholder="tuỳ chọn"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold">
+                    Số điện thoại
+                  </label>
+                  <input
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    disabled={busy}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold">
+                  <MapPin className="mr-1 inline h-3.5 w-3.5 text-orange-500" />
+                  Vị trí / nhiệm vụ
+                </label>
+                <StationPicker
+                  role={role}
+                  variant="inline"
+                  value={isPhoto ? stationIds : stationIds[0] || ""}
+                  stations={stations}
+                  disabled={busy}
+                  multi={isPhoto}
+                  max={PHOTOGRAPHER_MAX_STATIONS}
+                  onChange={(next) =>
+                    setStationIds(
+                      Array.isArray(next) ? next : next ? [next] : []
+                    )
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="flex shrink-0 justify-end gap-2 border-t border-border px-5 py-3 sm:px-6">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={closeEdit}
+                className="rounded-full border border-border px-4 py-2 text-xs font-bold hover:bg-muted disabled:opacity-40"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void onUpdate()}
+                className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-orange-500 to-red-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-40"
+              >
+                {busy ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : null}
+                Lưu
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
     </div>
   );
 }
