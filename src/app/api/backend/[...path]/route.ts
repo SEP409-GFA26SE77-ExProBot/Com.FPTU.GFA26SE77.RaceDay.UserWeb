@@ -16,6 +16,8 @@ async function forward(request: NextRequest, context: Context) {
   const endpoint = "/" + path.join("/");
   if (!(endpoint.startsWith("/api/v1/") || endpoint.startsWith("/admin/v1/"))) return NextResponse.json({ message: "Not found" }, { status: 404 });
   const isLogin = endpoint.toLowerCase() === "/api/v1/iam/auth/login";
+  const isPositionAlertStream = request.method === "GET" &&
+    /^\/api\/v1\/positioning\/events\/[\da-f-]{36}\/alerts$/i.test(endpoint);
   if (isLogin && request.method !== "POST") return new NextResponse(null, { status: 405 });
   const headers = new Headers();
   for (const name of ["content-type", "accept"]) {
@@ -28,7 +30,7 @@ async function forward(request: NextRequest, context: Context) {
     const upstream = await fetch(backendOrigin() + endpoint + request.nextUrl.search, {
       method: request.method, headers, cache: "no-store", redirect: "manual",
       body: ["GET", "HEAD"].includes(request.method) ? undefined : await request.arrayBuffer(),
-      signal: AbortSignal.timeout(60000),
+      signal: isPositionAlertStream ? request.signal : AbortSignal.timeout(60000),
     });
     if (isLogin && upstream.ok) {
       const result = await upstream.json();
@@ -49,6 +51,7 @@ async function forward(request: NextRequest, context: Context) {
     // Do not forward gateway redirects or cookies to the browser.
     if (upstream.status >= 300 && upstream.status < 400) return NextResponse.json({ message: "Unexpected API redirect" }, { status: 502 });
     const response = new NextResponse(upstream.body, { status: upstream.status, headers: { "Cache-Control": "no-store" } });
+    if (isPositionAlertStream) response.headers.set("X-Accel-Buffering", "no");
     for (const name of ["content-type", "content-disposition"]) {
       const value = upstream.headers.get(name);
       if (value) response.headers.set(name, value);
