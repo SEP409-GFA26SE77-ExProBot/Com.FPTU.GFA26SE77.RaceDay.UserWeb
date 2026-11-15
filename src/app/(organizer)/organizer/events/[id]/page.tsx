@@ -14,7 +14,6 @@ import {
   ExternalLink,
   Loader2,
   MapPin,
-  Users,
 } from "lucide-react";
 import { getEventById } from "@/api/events";
 import {
@@ -36,6 +35,7 @@ import { hasEventFinished } from "@/lib/event-lifecycle";
 import { mediaDisplayUrl } from "@/lib/media-url";
 import { toastError } from "@/lib/toast";
 import EventFinancePanel from "@/components/organizer/EventFinancePanel";
+import EventDashboard from "@/components/dashboard/EventDashboard";
 import RegistrationApprovalsPanel from "@/components/organizer/RegistrationApprovalsPanel";
 import { Button } from "@/components/ui/button";
 
@@ -57,6 +57,7 @@ function isManageableOrganizerStatus(status: string): boolean {
     key === "closed" ||
     key === "completed" ||
     key === "cancelled" ||
+    key === "suspended" ||
     key === "in-progress"
   );
 }
@@ -238,12 +239,6 @@ function MyEventDetailContent() {
       setDownloadingDistanceId(null);
     }
   };
-  const totalCap =
-    distances.reduce((s, d) => s + d.capacity, 0) || event.totalRunners || 0;
-  const totalReg = distances.reduce(
-    (s, d) => s + (d.registeredCount ?? 0),
-    0
-  );
 
   return (
     <div className="space-y-6">
@@ -320,19 +315,16 @@ function MyEventDetailContent() {
 
       {tab === "overview" && (
         <>
-          <div className="mt-6 grid gap-4 sm:grid-cols-3">
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
             <Info
               icon={Calendar}
               label="Ngày tổ chức"
               value={formatDate(event.date)}
             />
             <Info icon={MapPin} label="Địa điểm" value={event.location} />
-            <Info
-              icon={Users}
-              label="VĐV / quy mô"
-              value={`${totalReg.toLocaleString("vi-VN")} / ${totalCap.toLocaleString("vi-VN")}`}
-            />
           </div>
+
+          <EventDashboard key={eventId} eventId={eventId} />
 
           <section className="mt-6 rounded-2xl border border-border/60 bg-card p-5 shadow-sm sm:p-6">
             <h2 className="text-sm font-bold text-foreground">Cự ly</h2>

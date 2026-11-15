@@ -276,6 +276,14 @@ export default function Header() {
                     {isLoggedIn && role === Role.ORGANIZER && (
                       <>
                         <DropdownMenu.Item asChild><Link
+                          href="/organizer"
+                          className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+                          onClick={closeMenus}
+                        >
+                          <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
+                          Dashboard
+                        </Link></DropdownMenu.Item>
+                        <DropdownMenu.Item asChild><Link
                           href="/my-events"
                           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
                           onClick={closeMenus}
@@ -490,6 +498,9 @@ export default function Header() {
                 </>
                 {role === Role.ORGANIZER && (
                   <>
+                    <Link href="/organizer" onClick={closeMenus} className="flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted/70 hover:text-foreground">
+                      <LayoutDashboard className="h-4 w-4" />Dashboard
+                    </Link>
                     <Link
                       href="/my-events"
                       onClick={closeMenus}

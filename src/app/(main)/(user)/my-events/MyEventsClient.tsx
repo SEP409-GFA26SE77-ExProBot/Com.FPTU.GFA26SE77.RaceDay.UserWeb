@@ -24,6 +24,7 @@ import {
 import { getApiErrorMessage } from "@/lib/error";
 import { mediaDisplayUrl } from "@/lib/media-url";
 import { PAGE_SHELL } from "@/lib/page-shell";
+import { mapAppRole } from "@/lib/role";
 import PageLoading from "@/components/ui/PageLoading";
 import Pagination from "@/components/ui/Pagination";
 import { usePagedList } from "@/hooks/usePagedList";
@@ -279,6 +280,12 @@ export default function MyEventsClient() {
           Tạo giải mới
         </Link>
       </div>
+
+      {mapAppRole(getAuthUser()?.roleName) === "ORGANIZER" && (
+        <Link href="/organizer" className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-semibold text-foreground hover:border-primary focus-visible:outline-2 focus-visible:outline-primary">
+          <LayoutDashboard className="h-4 w-4" />Dashboard<ChevronRight className="h-4 w-4" />
+        </Link>
+      )}
 
       <div className="mt-6 flex flex-wrap gap-2">
         {filters.map((f) => (

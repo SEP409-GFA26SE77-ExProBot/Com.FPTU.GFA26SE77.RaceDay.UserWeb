@@ -206,6 +206,7 @@ function leafActive(
   eventId: string | null,
   activeTab: string | null
 ) {
+  if (item.href === "/organizer") return pathname === "/organizer";
   const isApprovals = item.tab === "approvals";
   const matchPath = item.matchPath ?? null;
   const onEventHome =
@@ -250,7 +251,7 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
     return complaintEventId && isComplaintId(complaintEventId) ? complaintEventId : null;
   }, [pathname, searchParams]);
   const groups = useMemo(
-    () => (eventId ? eventWorkspaceGroups(eventId) : [{
+    () => [{ heading: "Ban tổ chức", items: [{ label: "Dashboard", href: "/organizer", icon: LayoutDashboard }] }, ...(eventId ? eventWorkspaceGroups(eventId) : [{
       heading: "Vận hành",
       items: [{
         label: "Khiếu nại",
@@ -258,7 +259,7 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
         icon: MessageSquareText,
         matchPath: "/organizer/disputes",
       }],
-    }]),
+    }])],
     [eventId]
   );
   const activeTab = searchParams.get("tab");
@@ -524,17 +525,17 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
         }`}
       >
         <header className="sticky top-0 z-40 flex h-20 items-center justify-between border-b border-slate-200/80 bg-[#f7f5f1]/90 px-5 backdrop-blur-md sm:px-8">
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-3 pr-3">
             <button
               onClick={() => setMobileOpen(true)}
-              className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 lg:hidden"
+              className="shrink-0 rounded-xl border border-slate-200 bg-white p-2 text-slate-700 lg:hidden"
               aria-label="Mở menu"
             >
               <Menu className="h-5 w-5" />
             </button>
             <button
               onClick={() => setCollapsed((value) => !value)}
-              className="hidden rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:text-orange-600 lg:block"
+              className="hidden shrink-0 rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:text-orange-600 lg:block"
               aria-label="Thu gọn sidebar"
             >
               {collapsed ? (
@@ -549,8 +550,8 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
                 Quản lý giải
               </p>
               <p className="flex min-w-0 items-baseline gap-2 truncate text-sm">
-                <span className="shrink-0 font-bold tracking-tight text-slate-900">
-                  {eventName || "Chọn giải để quản lý"}
+                <span className="min-w-0 truncate font-bold tracking-tight text-slate-900">
+                  {eventName || (pathname === "/organizer" ? "Dashboard" : "Chọn giải để quản lý")}
                 </span>
                 {packageLabel && (
                   <span
