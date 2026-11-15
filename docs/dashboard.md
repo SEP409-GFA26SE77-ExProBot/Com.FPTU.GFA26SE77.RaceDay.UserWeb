@@ -1,5 +1,16 @@
 # Dashboard Organizer
 
+## Nhóm trạng thái và xuất báo cáo
+
+- Trạng thái giải gom 6 nhóm: đang chuẩn bị, chờ duyệt, đang mở đăng ký, đã đóng đăng ký, đã hoàn thành và cần chú ý.
+- Đăng ký gom 4 nhóm: chờ thanh toán, chờ duyệt, đã xác nhận (Confirmed + Finished), hủy/từ chối. DNS/DNF/DQ ở phần thi đấu vẫn tách riêng.
+- Ẩn nhóm 0; **Xem tất cả trạng thái** mở dữ liệu chi tiết. Các mã trạng thái backend giữ nguyên.
+- Dashboard tổng ưu tiên số giải đang mở đăng ký, đăng ký/khiếu nại chờ xử lý; vẫn có tổng giải và ví hiện tại.
+- **Xuất Excel / Xuất PDF** ở khu vực biểu đồ gọi `GET /api/v1/event/organizer/dashboard/export` hoặc `GET /api/v1/event/organizer/{eventId}/dashboard/export`.
+- Tham số `format=xlsx|pdf`, `from`, `to`; dashboard một giải truyền `distanceId` theo cự ly đang chọn. Cự ly chỉ lọc biểu đồ đăng ký, các chỉ số khác và dòng tiền vẫn tính toàn giải.
+- File là số liệu được backend tải lại khi xuất, theo quyền chủ giải. Mỗi phần ghi rõ số liệu hiện tại hoặc theo kỳ. Không hỗ trợ xuất khi dùng dữ liệu tài chính mô phỏng.
+- Chi tiết luồng, nội dung file và quyền: repo WebAPI `docs/dashboard-export.md`.
+
 ## Đường dẫn
 
 - `/organizer`: **Dashboard** toàn bộ giải đang sở hữu. Mở từ menu tài khoản, Giải của tôi hoặc sidebar Organizer.

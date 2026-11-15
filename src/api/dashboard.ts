@@ -32,3 +32,16 @@ export function getRevenueTrend(
     params: { ...range, eventId },
   });
 }
+
+export function exportOrganizerDashboard(
+  range: DateRange, format: "xlsx" | "pdf", eventId?: string, distanceId?: string,
+): Promise<Blob> {
+  const path = eventId
+    ? `api/v1/event/organizer/${encodeURIComponent(eventId)}/dashboard/export`
+    : "api/v1/event/organizer/dashboard/export";
+  return api.get(path, {
+    params: { ...range, format, distanceId: distanceId || undefined },
+    responseType: "blob",
+    timeout: 60000,
+  });
+}

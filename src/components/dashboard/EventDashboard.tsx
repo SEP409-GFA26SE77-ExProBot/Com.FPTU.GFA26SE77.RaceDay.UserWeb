@@ -2,15 +2,14 @@
 
 import Link from "next/link";
 import { useCallback, useId, useState } from "react";
-import { getEventDashboard, getRegistrationTrend } from "@/api/dashboard";
+import { exportOrganizerDashboard, getEventDashboard, getRegistrationTrend } from "@/api/dashboard";
 import { FINANCE_USE_MOCK, getEventFinanceSummary } from "@/api/finance";
 import { Button } from "@/components/ui/button";
 import { useDashboardResource } from "@/hooks/useDashboardResource";
 import { moneyLabel, numberLabel, recentRange } from "@/lib/dashboard";
-import { dashboardStatusLabel, documentLabel } from "@/lib/dashboard-labels";
+import { documentLabel } from "@/lib/dashboard-labels";
 import {
   DateFilter,
-  Distribution,
   Metric,
   Panel,
   RefreshButton,
@@ -19,6 +18,8 @@ import {
   Updated,
 } from "./DashboardUI";
 import RevenuePanel from "./RevenuePanel";
+import StatusBreakdown from "./StatusBreakdown";
+import DashboardExport from "./DashboardExport";
 
 export default function EventDashboard({ eventId }: { eventId: string }) {
   const distanceSelectId = useId();
@@ -74,9 +75,9 @@ export default function EventDashboard({ eventId }: { eventId: string }) {
               note="Bao gồm đơn chờ thanh toán, bị từ chối và đã hủy"
             />
             <Metric
-              label="Đã xác nhận / hoàn thành"
+              label="Đăng ký đã xác nhận"
               value={data.checkInSummary.eligible}
-              note="Đăng ký Confirmed và Finished"
+              note="Gồm cả đăng ký của VĐV đã hoàn thành"
             />
             <Metric
               label="Đã check-in"
@@ -85,7 +86,7 @@ export default function EventDashboard({ eventId }: { eventId: string }) {
                 " / " +
                 numberLabel(data.checkInSummary.eligible)
               }
-              note="Trên số đăng ký đã xác nhận / hoàn thành"
+              note="Trên tổng đăng ký đã xác nhận"
             />
             <Metric
               label="Khiếu nại chờ xử lý"
@@ -102,12 +103,7 @@ export default function EventDashboard({ eventId }: { eventId: string }) {
                 </Button>
               }
             >
-              <Distribution
-                items={data.registrationsByStatus.map((item) => ({
-                  label: dashboardStatusLabel(item.status),
-                  count: item.count,
-                }))}
-              />
+              <StatusBreakdown items={data.registrationsByStatus} kind="registration" />
             </Panel>
             <Panel
               title="Tình hình thi đấu"
@@ -118,12 +114,7 @@ export default function EventDashboard({ eventId }: { eventId: string }) {
                 </Button>
               }
             >
-              <Distribution
-                items={data.raceByStatus.map((item) => ({
-                  label: dashboardStatusLabel(item.status),
-                  count: item.count,
-                }))}
-              />
+              <StatusBreakdown items={data.raceByStatus} kind="race" />
             </Panel>
           </div>
           <Panel
@@ -252,7 +243,7 @@ export default function EventDashboard({ eventId }: { eventId: string }) {
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <Metric
-                label="Doanh thu vé"
+                label="Tiền vé theo sổ tài chính"
                 value={moneyLabel(
                   finance.data.grossRevenue,
                   finance.data.currency,
@@ -339,6 +330,14 @@ export default function EventDashboard({ eventId }: { eventId: string }) {
               )}{" "}
               đơn trong khoảng ngày đã chọn
             </p>
+            <DashboardExport
+              key={eventId + range.from + range.to + (selectedDistance?.distanceId ?? "")}
+              range={range}
+              download={(format) => exportOrganizerDashboard(range, format, eventId, selectedDistance?.distanceId)}
+              disabled={!data || dashboard.loading || FINANCE_USE_MOCK}
+            />
+            <p className="text-xs text-muted-foreground">Cự ly chỉ lọc biểu đồ đăng ký; các chỉ số khác và dòng tiền vẫn tính toàn giải.</p>
+            {FINANCE_USE_MOCK && <p className="text-sm text-muted-foreground">Xuất báo cáo chỉ hỗ trợ khi dashboard dùng dữ liệu tài chính thực.</p>}
             <TrendChart
               dates={days.map((day) => day.date)}
               series={[

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { ArrowUpRight, CalendarDays, Flag, Plus } from "lucide-react";
-import { getOrganizerDashboard } from "@/api/dashboard";
+import { exportOrganizerDashboard, getOrganizerDashboard } from "@/api/dashboard";
 import { FINANCE_USE_MOCK, getOrganizerWallet } from "@/api/finance";
 import { Button } from "@/components/ui/button";
 import { useDashboardResource } from "@/hooks/useDashboardResource";
@@ -16,7 +16,6 @@ import {
 import { dashboardStatusLabel } from "@/lib/dashboard-labels";
 import {
   DateFilter,
-  Distribution,
   Metric,
   Panel,
   RefreshButton,
@@ -24,6 +23,8 @@ import {
   Updated,
 } from "./DashboardUI";
 import RevenuePanel from "./RevenuePanel";
+import StatusBreakdown from "./StatusBreakdown";
+import DashboardExport from "./DashboardExport";
 
 export default function OrganizerDashboard() {
   const dashboard = useDashboardResource(getOrganizerDashboard);
@@ -74,9 +75,9 @@ export default function OrganizerDashboard() {
         <>
           <div className="grid gap-4 sm:grid-cols-3">
             <Metric
-              label="Giải của tôi"
-              value={data.totalEvents}
-              note="Tất cả trạng thái, bao gồm bản nháp"
+              label="Giải đang mở đăng ký"
+              value={data.eventsByStatus.find((item) => item.status === "registration-open")?.count ?? 0}
+              note={`Trên ${numberLabel(data.totalEvents)} giải của bạn, gồm cả bản nháp`}
             />
             <Metric
               label="Đăng ký chờ duyệt"
@@ -168,14 +169,9 @@ export default function OrganizerDashboard() {
             </Panel>
             <Panel
               title="Trạng thái các giải"
-              description="Toàn bộ giải của bạn ở thời điểm hiện tại"
+              description="Nhóm theo công việc hiện tại; mở chi tiết để xem từng trạng thái."
             >
-              <Distribution
-                items={data.eventsByStatus.map((item) => ({
-                  label: dashboardStatusLabel(item.status),
-                  count: item.count,
-                }))}
-              />
+              <StatusBreakdown items={data.eventsByStatus} kind="event" />
             </Panel>
           </div>
           <Panel
@@ -271,6 +267,13 @@ export default function OrganizerDashboard() {
           Theo dõi dòng tiền
         </h2>
         <DateFilter value={range} onChange={setRange} />
+        <DashboardExport
+          key={range.from + range.to}
+          range={range}
+          download={(format) => exportOrganizerDashboard(range, format)}
+          disabled={!data || dashboard.loading || FINANCE_USE_MOCK}
+        />
+        {FINANCE_USE_MOCK && <p className="text-sm text-muted-foreground">Xuất báo cáo chỉ hỗ trợ khi dashboard dùng dữ liệu tài chính thực.</p>}
         <RevenuePanel range={range} refresh={refresh} />
       </div>
     </div>

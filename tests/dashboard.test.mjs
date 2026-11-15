@@ -37,3 +37,34 @@ test("same day and inclusive leap-year range are valid", () => {
   assert.equal(rangeError({ from: "2024-01-01", to: "2024-12-31" }), null);
   assert.equal(dateLabel("2024-02-29"), "29/02/2024");
 });
+
+const labelCode = ts.transpileModule(
+  fs.readFileSync("src/lib/dashboard-labels.ts", "utf8"),
+  { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } },
+).outputText;
+const labelExports = {};
+vm.runInNewContext(labelCode, { exports: labelExports });
+const { groupedDashboardStatuses } = labelExports;
+
+test("registration grouping preserves all counts and combines confirmed with finished", () => {
+  const grouped = groupedDashboardStatuses([
+    { status: "confirmed", count: 10 }, { status: "finished", count: 4 },
+    { status: "pending_payment", count: 2 }, { status: "pending_approval", count: 0 },
+    { status: "cancelled", count: 1 }, { status: "rejected", count: 2 },
+  ], "registration");
+  assert.equal(grouped.find((item) => item.label === "Đăng ký đã xác nhận").count, 14);
+  assert.equal(grouped.find((item) => item.label === "Hủy / từ chối").count, 3);
+  assert.equal(grouped.reduce((sum, item) => sum + item.count, 0), 19);
+  assert.equal(grouped.some((item) => item.count === 0), false);
+});
+test("event grouping retains attention states, unknown statuses and empty data", () => {
+  const grouped = groupedDashboardStatuses([
+    { status: "draft", count: 2 }, { status: "approved", count: 1 },
+    { status: "suspended", count: 1 }, { status: "rejected", count: 2 },
+    { status: "cancelled", count: 3 }, { status: "future-status", count: 1 },
+  ], "event");
+  assert.equal(grouped.find((item) => item.label === "Đang chuẩn bị").count, 3);
+  assert.equal(grouped.find((item) => item.label === "Cần chú ý").count, 6);
+  assert.equal(grouped.reduce((sum, item) => sum + item.count, 0), 10);
+  assert.equal(groupedDashboardStatuses([], "event").length, 0);
+});
