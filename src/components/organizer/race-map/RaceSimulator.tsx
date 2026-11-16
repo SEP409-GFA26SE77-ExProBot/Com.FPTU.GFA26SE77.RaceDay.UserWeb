@@ -35,6 +35,7 @@ import {
   type SimulationSnapshotDto,
 } from "@/api/simulation";
 import { useCourse } from "@/components/organizer/race-map/CourseContext";
+import SimulationDqReviews from "@/components/organizer/race-map/SimulationDqReviews";
 import { useSimulationHub } from "@/hooks/useSimulationHub";
 import { checkpointDotClass } from "@/lib/race-map/map-colors";
 import type { RunnerLive } from "@/lib/race-map/timing";
@@ -109,7 +110,7 @@ function athleteToLive(
     const bibNum = bibMapKey(a.bib, index);
     let status: RunnerLive["status"] = "waiting";
     if (a.motion === "Finished") status = "finished";
-    else if (a.motion === "Dnf" || a.sos) status = "flagged";
+    else if (a.motion === "Dnf" || a.motion === "Dns" || a.motion === "Dq" || a.sos) status = "flagged";
     else if (a.courseKm > 0) status = "running";
     return {
       bib: bibNum,
@@ -138,13 +139,13 @@ export default function RaceSimulator() {
   const [snapshot, setSnapshot] = useState<SimulationSnapshotDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [realtimeReady, setRealtimeReady] = useState(false);
   const [selectedRegistrationId, setSelectedRegistrationId] = useState<
     string | null
   >(null);
   const [athletePage, setAthletePage] = useState(0);
   const [rankingPage, setRankingPage] = useState(0);
   const [runnerCountPref, setRunnerCountPref] = useState<number | null>(null);
-  const autoCommitTriedRef = useRef<string | null>(null);
   const cursorRef = useRef<{ runId: string; generation: number; version: number } | null>(
     null
   );
@@ -173,9 +174,35 @@ export default function RaceSimulator() {
     });
   }, []);
 
+  useEffect(() => {
+    const offline = () => setRealtimeReady(false);
+    const online = async () => {
+      const current = cursorRef.current;
+      if (!current) return;
+      try {
+        const fresh = await getSimulationSnapshot(current.runId);
+        if (!navigator.onLine || cursorRef.current?.runId !== fresh.runId || cursorRef.current.generation !== fresh.generation) return;
+        applySnapshot(fresh);
+        setRealtimeReady(true);
+      } catch (e) {
+        toastError(e, "Chưa nhận được dữ liệu mới sau khi kết nối lại.");
+      }
+    };
+    window.addEventListener("offline", offline);
+    window.addEventListener("online", online);
+    return () => {
+      window.removeEventListener("offline", offline);
+      window.removeEventListener("online", online);
+    };
+  }, [applySnapshot]);
+
   const { joinRun, leaveRun } = useSimulationHub({
-    onSnapshot: applySnapshot,
+    onSnapshot: (snap) => {
+      setRealtimeReady(true);
+      applySnapshot(snap);
+    },
     onRunReplaced: (notice) => {
+      setRealtimeReady(false);
       void (async () => {
         try {
           await leaveRun(notice.previousRunId);
@@ -189,11 +216,15 @@ export default function RaceSimulator() {
       })();
     },
     onError: (message) => toastError(message),
+    onStatus: (status) => {
+      if (status === "Đang kết nối lại hub…" || status === "Hub đã đóng.") setRealtimeReady(false);
+    },
   });
 
   const loadPreview = useCallback(async () => {
     if (!eventId || !distanceId) return;
     setLoading(true);
+    setRealtimeReady(false);
     try {
       const p = await getSimulationPreview(eventId, distanceId);
       setPreview(p);
@@ -225,6 +256,7 @@ export default function RaceSimulator() {
   const athletes = snapshot?.athletes ?? [];
   const ranking = snapshot?.ranking ?? [];
   const phase = snapshot?.phase ?? null;
+  const pendingDqCount = (snapshot?.decisions ?? []).filter((d) => d.status === "DQ" && d.resolution === "Pending").length;
   const selected =
     athletes.find((a) => a.registrationId === selectedRegistrationId) ??
     athletes[0] ??
@@ -338,11 +370,10 @@ export default function RaceSimulator() {
     await runAction("Reset", () =>
       resetSimulationRun(snapshot.runId, needConfirm)
     );
-    autoCommitTriedRef.current = null;
   };
 
-  const onCommit = async (silent = false) => {
-    if (!snapshot || snapshot.phase !== "Finished") return;
+  const onCommit = async () => {
+    if (!snapshot || snapshot.phase !== "Finished" || pendingDqCount > 0 || !realtimeReady) return;
     setBusy(true);
     try {
       const res = await commitSimulationRun(snapshot.runId);
@@ -353,41 +384,17 @@ export default function RaceSimulator() {
       }
       const ok = res.items.filter((i) => i.outcome === "CommittedThisRun").length;
       const skipped = res.items.length - ok;
-      if (!silent || ok > 0) {
-        toastSuccess(
-          `Đã ghi ${ok} kết quả lên server` +
-            (skipped ? ` · ${skipped} bỏ qua/retry` : "") +
-            ". Leaderboard organizer/user đọc từ registration Finished."
-        );
-      }
+      toastSuccess(
+        `Đã ghi ${ok} kết quả lên server` +
+          (skipped ? ` · ${skipped} bỏ qua/retry` : "") +
+          ". Leaderboard organizer/user đọc từ registration Finished."
+      );
     } catch (e) {
       toastError(e, "Ghi kết quả thất bại.");
     } finally {
       setBusy(false);
     }
   };
-
-  /** Khi lượt Finished và còn kết quả nháp → tự commit 1 lần (có nút ghi lại nếu Partial). */
-  useEffect(() => {
-    if (!snapshot) return;
-    if (snapshot.phase !== "Finished") return;
-    if (
-      snapshot.commitState === "Committed" ||
-      snapshot.commitState === "Committing"
-    ) {
-      return;
-    }
-    if (!snapshot.discardRequired) return;
-    if (autoCommitTriedRef.current === snapshot.runId) return;
-    autoCommitTriedRef.current = snapshot.runId;
-    void onCommit(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    snapshot?.phase,
-    snapshot?.runId,
-    snapshot?.commitState,
-    snapshot?.discardRequired,
-  ]);
 
   const onSpeedSelected = async (kmh: number) => {
     if (!snapshot || !selected) return;
@@ -536,6 +543,8 @@ export default function RaceSimulator() {
                           {a.fullName}
                           {a.sos ? " ·SOS" : ""}
                           {a.motion === "Dnf" ? " ·DNF" : ""}
+                          {a.motion === "Dns" ? " ·DNS" : ""}
+                          {a.motion === "Dq" ? " ·DQ" : ""}
                         </td>
                         <td className="p-2 text-right tabular-nums">
                           {a.courseKm.toFixed(1)}
@@ -614,7 +623,7 @@ export default function RaceSimulator() {
             </div>
           </aside>
 
-          <main className="flex min-h-[640px] flex-col gap-3">
+          <main className="flex min-w-0 flex-col gap-3 xl:min-h-[640px]">
             <div className={`${panel} flex flex-wrap items-center gap-2 p-3`}>
               <button
                 type="button"
@@ -649,11 +658,13 @@ export default function RaceSimulator() {
                 type="button"
                 disabled={
                   busy ||
+                  !realtimeReady ||
+                  pendingDqCount > 0 ||
                   phase !== "Finished" ||
                   snapshot.commitState === "Committed" ||
                   snapshot.commitState === "Committing"
                 }
-                onClick={() => void onCommit(false)}
+                onClick={() => void onCommit()}
                 className="inline-flex items-center gap-1.5 rounded-full border border-emerald-600/40 bg-emerald-600/10 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-600/15 disabled:opacity-50"
               >
                 {busy && snapshot.commitState === "Committing" ? (
@@ -665,6 +676,8 @@ export default function RaceSimulator() {
                   ? "Đã ghi kết quả"
                   : "Ghi kết quả"}
               </button>
+              <SimulationDqReviews key={`${snapshot.runId}-${snapshot.generation}`} snapshot={snapshot} busy={busy}
+                live={realtimeReady} onBusyChange={setBusy} onSnapshot={applySnapshot} />
               <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
                 Speed
                 <select
@@ -684,6 +697,16 @@ export default function RaceSimulator() {
                 {formatSimClock(snapshot.simulatedSeconds)}
               </span>
             </div>
+
+            <p className="px-1 text-sm text-muted-foreground">
+              {snapshot.commitState === "Committed"
+                ? "Đã ghi kết quả chính thức. Reset không hoàn tác kết quả đã ghi."
+                : snapshot.commitState === "Committing" || snapshot.commitState === "Partial"
+                  ? "Lượt đang ghi hoặc đã ghi một phần kết quả. Quyết định đã khóa; reset không hoàn tác kết quả đã ghi."
+                : pendingDqCount > 0
+                ? `Còn ${pendingDqCount} báo cáo DQ chờ duyệt. Xử lý hết trước khi ghi kết quả.`
+                : "Kết quả chưa được ghi chính thức cho đến khi bạn bấm Ghi kết quả. Có thể reset để thử lại trước khi ghi."}
+            </p>
 
             <div
               className={`${panel} relative min-h-[360px] flex-1 overflow-hidden`}

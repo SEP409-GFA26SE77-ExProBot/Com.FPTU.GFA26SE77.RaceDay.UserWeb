@@ -12,7 +12,7 @@ export type SimulationCommitState =
   | "Committing"
   | "Partial"
   | "Committed";
-export type AthleteMotion = "Racing" | "Finished" | "Dnf";
+export type AthleteMotion = "Racing" | "Finished" | "Dnf" | "Dns" | "Dq";
 
 export type SimulationLatLng = { lat: number; lng: number };
 
@@ -92,6 +92,29 @@ export type SimulationSnapshotDto = {
   ranking: SimulationRankingRowDto[];
   checkpointLeaders: SimulationCheckpointLeaderDto[];
   log: SimulationLogLineDto[];
+  decisions?: SimulationDecisionDto[] | null;
+  decisionsEditable?: boolean;
+};
+
+export type SimulationDecisionDto = {
+  id: string;
+  registrationId: string;
+  bib: string;
+  previousStatus: string;
+  status: string;
+  reason: string;
+  evidence: string | null;
+  actorId: string;
+  actorName?: string | null;
+  checkpointId: string;
+  createdAtUtc: string;
+  createdAtSimSeconds?: number | null;
+  resolution: "Pending" | "Approved" | "Rejected";
+  reviewedBy?: string | null;
+  reviewedByName?: string | null;
+  reviewedAtUtc?: string | null;
+  reviewedAtSimSeconds?: number | null;
+  reviewReason?: string | null;
 };
 
 export type SimulationPreviewDto = {
@@ -191,6 +214,12 @@ async function postRun(
 export const startSimulationRun = (runId: string) => postRun(runId, "start");
 export const pauseSimulationRun = (runId: string) => postRun(runId, "pause");
 export const resumeSimulationRun = (runId: string) => postRun(runId, "resume");
+
+export const reviewSimulationDecision = (
+  runId: string,
+  decisionId: string,
+  body: { approve: boolean; reason: string; operationId: string }
+) => postRun(runId, `decisions/${decisionId}/review`, body);
 
 export const setSimulationPlayback = (runId: string, rate: number) =>
   postRun(runId, "playback", { rate });
