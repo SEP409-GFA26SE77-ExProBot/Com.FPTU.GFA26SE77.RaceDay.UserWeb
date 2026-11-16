@@ -9,6 +9,7 @@ import { getEventById } from "@/api/events";
 import { getPackagePurchase } from "@/api/event-packages";
 import { mediaDisplayUrl } from "@/lib/media-url";
 import { isComplaintId } from "@/lib/complaints";
+import { usePositionAlerts } from "@/hooks/usePositionAlerts";
 import {
   ArrowLeft,
   ChevronDown,
@@ -249,6 +250,7 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
       : null;
     return complaintEventId && isComplaintId(complaintEventId) ? complaintEventId : null;
   }, [pathname, searchParams]);
+  usePositionAlerts(eventId);
   const groups = useMemo(
     () => (eventId ? eventWorkspaceGroups(eventId) : [{
       heading: "Vận hành",

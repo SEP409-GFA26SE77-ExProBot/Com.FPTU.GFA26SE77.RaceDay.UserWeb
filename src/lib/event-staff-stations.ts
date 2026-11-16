@@ -15,6 +15,12 @@ import type {
 const DUTY_STATIONS: Record<EventStaffRole, StaffStationDto[]> = {
   "race-staff": [
     {
+      id: "duty:float",
+      label: "Di động dọc đường chạy",
+      kind: "other",
+      source: "duty",
+    },
+    {
       id: "duty:ops",
       label: "Trung tâm điều hành",
       kind: "other",
@@ -36,7 +42,7 @@ const DUTY_STATIONS: Record<EventStaffRole, StaffStationDto[]> = {
   photographer: [
     {
       id: "duty:float",
-      label: "Di động / chưa gán điểm map",
+      label: "Di động dọc đường chạy",
       kind: "other",
       source: "duty",
     },

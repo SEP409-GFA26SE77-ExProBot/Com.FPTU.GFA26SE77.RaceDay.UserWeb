@@ -39,6 +39,7 @@ import { toastError } from "@/lib/toast";
 import { formatDateTime } from "@/lib/format";
 import { PAGE_SHELL } from "@/lib/page-shell";
 import { extractBibFromQrPayload } from "@/lib/registration-qr";
+import { usePositionAlerts } from "@/hooks/usePositionAlerts";
 
 type ActiveContext = {
   eventId: string;
@@ -85,6 +86,7 @@ export default function ScanQrPage() {
   const cooldownRef = useRef(false);
 
   const eventId = ctx?.eventId ?? "";
+  usePositionAlerts(eventId);
 
   const refreshPending = useCallback((eid: string) => {
     setPendingCount(eid ? readQueue(eid).length : 0);
