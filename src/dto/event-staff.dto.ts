@@ -4,8 +4,7 @@ export type EventStaffRole = "race-staff" | "photographer";
 
 export type EventStaffStatus = "invited" | "active" | "revoked";
 
-/** start | finish | cp | aid — loại điểm trên map (không gồm check-in desk) */
-export type StaffMapPointType = "start" | "finish" | "cp" | "aid";
+export type StaffMapPointType = "start" | "finish" | "cp";
 
 /** Photographer tối đa số điểm (khớp BE MaxPhotographerStations). */
 export const PHOTOGRAPHER_MAX_STATIONS = 5;
@@ -18,12 +17,12 @@ export interface StaffStationDto {
   label: string;
   /** check_in | kit | medical | checkpoint | photo_zone | aid | other */
   kind: string;
-  /** map = từ course checkpoint/aid; duty = nhiệm vụ không gắn map */
+  /** map = checkpoint từ course; duty = nhiệm vụ không gắn map */
   source?: "map" | "duty";
   mapCheckpointId?: string | null;
   distanceId?: string | null;
   distanceName?: string | null;
-  /** Loại điểm map gốc (start/cp/aid/finish) */
+  /** Loại checkpoint trên bản đồ. */
   mapType?: StaffMapPointType | null;
   lat?: number | null;
   lng?: number | null;

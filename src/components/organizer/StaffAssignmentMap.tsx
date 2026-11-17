@@ -25,12 +25,10 @@ import { MAP_COLORS } from "@/lib/race-map/map-colors";
 const KIND_FILTERS: {
   id: "all" | StaffMapPointType;
   label: string;
-  raceStaffOnly?: boolean;
 }[] = [
   { id: "all", label: "Tất cả" },
   { id: "start", label: "Xuất phát" },
   { id: "cp", label: "Checkpoint" },
-  { id: "aid", label: "Tiếp tế", raceStaffOnly: true },
   { id: "finish", label: "Đích" },
 ];
 
@@ -69,8 +67,6 @@ function mapTypeLabel(t?: StaffMapPointType | null) {
       return "Đích";
     case "cp":
       return "Checkpoint";
-    case "aid":
-      return "Tiếp tế";
     default:
       return "Điểm map";
   }
@@ -174,10 +170,6 @@ export default function StaffAssignmentMap({
     return `${filtered.length}-${routeLen}-${first.lat}-${first.lng}-${distanceId}-${kind}`;
   }, [fitPoints, filtered.length, visibleRoutes, distanceId, kind]);
 
-  const kindFilters = KIND_FILTERS.filter(
-    (f) => !f.raceStaffOnly || role === "race-staff"
-  );
-
   const assignedCount = filtered.filter((s) => assignedIds.has(s.id)).length;
   const unassignedCount = filtered.length - assignedCount;
 
@@ -194,11 +186,8 @@ export default function StaffAssignmentMap({
       <div className="flex h-full min-h-[320px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-amber-300 bg-amber-50/80 px-4 text-center text-sm text-amber-900">
         <p className="font-semibold">Chưa có điểm map có tọa độ</p>
         <p className="text-xs">
-          Vào <span className="font-semibold">Thiết lập bản đồ</span> thêm{" "}
-          {role === "race-staff"
-            ? "checkpoint / tiếp tế / xuất phát / đích"
-            : "checkpoint / xuất phát / đích"}
-          .
+          Vào <span className="font-semibold">Thiết lập bản đồ</span> để thêm
+          điểm xuất phát, checkpoint hoặc đích.
         </p>
       </div>
     );
@@ -229,7 +218,7 @@ export default function StaffAssignmentMap({
             ))
           )}
         </select>
-        {kindFilters.map((f) => (
+        {KIND_FILTERS.map((f) => (
           <button
             key={f.id}
             type="button"

@@ -117,7 +117,6 @@ const STAFF_FORM_PRESETS: Record<
 };
 
 function StationPicker({
-  role,
   value,
   stations,
   disabled,
@@ -128,7 +127,6 @@ function StationPicker({
   /** inline = panel trong form (modal); popover = dropdown trên card list */
   variant = "popover",
 }: {
-  role: EventStaffRole;
   /** Single: 1 id; multi (photographer): nhiều id. */
   value: string | string[];
   stations: StaffStationDto[];
@@ -212,10 +210,6 @@ function StationPicker({
 
   const mapStations = stations.filter((s) => s.source === "map");
   const dutyStations = stations.filter((s) => s.source !== "map");
-  const mapGroup =
-    role === "photographer"
-      ? "Checkpoint / zone chụp"
-      : "Checkpoint / điểm tiếp tế";
 
   const summary =
     selectedIds.length === 0
@@ -275,6 +269,7 @@ function StationPicker({
       <button
         key={s.id}
         type="button"
+        aria-pressed={checked}
         disabled={disabled}
         onClick={() => toggle(s.id)}
         className={`flex w-full items-start justify-between gap-2 px-3 py-2.5 text-left disabled:opacity-50 ${
@@ -339,6 +334,7 @@ function StationPicker({
           value={q}
           onChange={(e) => setQ(e.target.value)}
           disabled={disabled}
+          aria-label="Tìm vị trí hoặc nhiệm vụ"
           placeholder="Tìm vị trí / nhiệm vụ…"
           className="w-full bg-transparent text-xs outline-none disabled:opacity-50"
         />
@@ -365,20 +361,20 @@ function StationPicker({
             <Check className="h-3.5 w-3.5 text-orange-500" />
           ) : null}
         </button>
-        {filteredMap.length > 0 ? (
-          <>
-            <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-              {mapGroup}
-            </p>
-            {filteredMap.map(row)}
-          </>
-        ) : null}
         {filteredDuty.length > 0 ? (
           <>
             <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
               Nhiệm vụ
             </p>
             {filteredDuty.map(row)}
+          </>
+        ) : null}
+        {filteredMap.length > 0 ? (
+          <>
+            <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              Checkpoint
+            </p>
+            {filteredMap.map(row)}
           </>
         ) : null}
         {filteredMap.length === 0 && filteredDuty.length === 0 ? (
@@ -509,13 +505,16 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
 
   const roleMeta = useMemo(() => ROLE_TABS.find((t) => t.id === role)!, [role]);
 
+  const loadVersion = useRef(0);
   const load = useCallback(async () => {
+    const version = ++loadVersion.current;
     setError(null);
     try {
       const [list, mapData] = await Promise.all([
         listEventStaff(eventId, role),
         listStaffMapData(eventId, role),
       ]);
+      if (loadVersion.current !== version) return;
       setMembers(list.filter((m) => m.status !== "revoked"));
       setStations(mapData.stations);
       setRoutes(mapData.routes);
@@ -523,22 +522,19 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
         prev.filter((id) => mapData.stations.some((s) => s.id === id))
       );
     } catch (e) {
+      if (loadVersion.current !== version) return;
       setError(getApiErrorMessage(e, "Không tải được nhân sự."));
       setMembers([]);
     } finally {
-      setLoading(false);
+      if (loadVersion.current === version) setLoading(false);
     }
   }, [eventId, role, setError]);
 
   useEffect(() => {
     setLoading(true);
-    let cancelled = false;
-    (async () => {
-      await load();
-      if (cancelled) return;
-    })();
+    void load();
     return () => {
-      cancelled = true;
+      loadVersion.current += 1;
     };
   }, [load]);
 
@@ -783,7 +779,12 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
           <button
             key={t.id}
             type="button"
-            onClick={() => setRole(t.id)}
+            onClick={() => {
+              if (t.id === role) return;
+              setLoading(true);
+              setStations([]);
+              setRole(t.id);
+            }}
             className={`rounded-xl px-4 py-2 text-xs font-bold transition ${
               role === t.id
                 ? "bg-orange-500/15 text-orange-600"
@@ -902,7 +903,6 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
                         <MapPin className="h-3 w-3" /> Phân bổ vị trí
                       </p>
                       <StationPicker
-                        role={role}
                         value={isPhoto ? ids : ids[0] || ""}
                         stations={stations}
                         disabled={busy}
@@ -1089,7 +1089,6 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
                   </span>
                 </label>
                 <StationPicker
-                  role={role}
                   variant="inline"
                   value={isPhoto ? stationIds : stationIds[0] || ""}
                   stations={stations}
@@ -1290,7 +1289,6 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
                   Vị trí / nhiệm vụ
                 </label>
                 <StationPicker
-                  role={role}
                   variant="inline"
                   value={isPhoto ? stationIds : stationIds[0] || ""}
                   stations={stations}

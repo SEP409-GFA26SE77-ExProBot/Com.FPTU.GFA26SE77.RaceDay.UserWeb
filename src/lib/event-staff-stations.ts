@@ -1,5 +1,5 @@
 /**
- * Ghép điểm bố trí nhân sự từ course Map (checkpoint / aid) + nhiệm vụ không gắn map.
+ * Ghép checkpoint từ course Map với nhiệm vụ theo vai trò.
  * Không gọi cross-module BE — chỉ đọc `@/api/events` + `@/api/race-map`.
  */
 import { getEventById } from "@/api/events";
@@ -11,45 +11,20 @@ import type {
   StaffStationDto,
 } from "@/dto/event-staff.dto";
 
-/** Nhiệm vụ cố định — không bắt buộc điểm trên bản đồ (check-in chỉ ở đây, không lên map) */
 const DUTY_STATIONS: Record<EventStaffRole, StaffStationDto[]> = {
   "race-staff": [
     {
-      id: "duty:float",
-      label: "Di động dọc đường chạy",
+      id: "duty:broom",
+      label: "Xe khóa đuôi",
       kind: "other",
-      source: "duty",
-    },
-    {
-      id: "duty:ops",
-      label: "Trung tâm điều hành",
-      kind: "other",
-      source: "duty",
-    },
-    {
-      id: "duty:checkin",
-      label: "Quầy check-in",
-      kind: "check_in",
-      source: "duty",
-    },
-    {
-      id: "duty:kit",
-      label: "Quầy nhận kit / BIB",
-      kind: "kit",
       source: "duty",
     },
   ],
   photographer: [
     {
       id: "duty:float",
-      label: "Di động dọc đường chạy",
+      label: "Di động",
       kind: "other",
-      source: "duty",
-    },
-    {
-      id: "duty:static",
-      label: "Cố định",
-      kind: "photo_zone",
       source: "duty",
     },
   ],
@@ -59,7 +34,7 @@ function mapStationId(distanceId: string, checkpointId: string) {
   return `map:${distanceId}:${checkpointId}`;
 }
 
-function typeLabel(type: string) {
+function typeLabel(type: StaffMapPointType) {
   switch (type) {
     case "start":
       return "Xuất phát";
@@ -67,32 +42,11 @@ function typeLabel(type: string) {
       return "Đích";
     case "cp":
       return "Checkpoint";
-    case "aid":
-      return "Tiếp tế";
-    default:
-      return type;
   }
 }
 
-function includeCheckpoint(role: EventStaffRole, type: string): boolean {
-  return (
-    type === "start" ||
-    type === "cp" ||
-    type === "finish" ||
-    (role === "race-staff" && type === "aid")
-  );
-}
-
-function stationKind(role: EventStaffRole, cpType: string): string {
-  if (role === "photographer") return "photo_zone";
-  return cpType === "aid" ? "aid" : "checkpoint";
-}
-
-function asMapType(type: string): StaffMapPointType | null {
-  if (type === "start" || type === "finish" || type === "cp" || type === "aid") {
-    return type;
-  }
-  return null;
+function isAssignableCheckpoint(type: string): type is StaffMapPointType {
+  return type === "start" || type === "finish" || type === "cp";
 }
 
 export async function buildStaffMapDataForEvent(
@@ -131,7 +85,7 @@ export async function buildStaffMapDataForEvent(
           const cps = Array.isArray(course.checkpoints) ? course.checkpoints : [];
           for (const cp of cps) {
             const type = (cp.type || "").toLowerCase();
-            if (!includeCheckpoint(role, type)) continue;
+            if (!isAssignableCheckpoint(type)) continue;
             const km =
               typeof cp.km === "number" && Number.isFinite(cp.km)
                 ? ` · ${cp.km}km`
@@ -141,12 +95,12 @@ export async function buildStaffMapDataForEvent(
             fromMap.push({
               id: mapStationId(d.id, cp.id),
               label: `${distName} — ${cp.name || typeLabel(type)}${km}`,
-              kind: stationKind(role, type),
+              kind: role === "photographer" ? "photo_zone" : "checkpoint",
               source: "map",
               mapCheckpointId: cp.id,
               distanceId: d.id,
               distanceName: distName,
-              mapType: asMapType(type),
+              mapType: type,
               lat,
               lng,
             });
@@ -181,7 +135,7 @@ export function findStationLabel(
   return stations.find((s) => s.id === stationId)?.label ?? stationId;
 }
 
-/** Điểm map có tọa độ — không gồm check-in / duty */
+/** Checkpoint có tọa độ để hiển thị trên bản đồ phân bổ. */
 export function mapStationsWithCoords(stations: StaffStationDto[]): StaffStationDto[] {
   return stations.filter(
     (s) =>
