@@ -1,6 +1,6 @@
 /**
  * Nhân sự theo event — BE Event module.
- * Stations (checkpoint / aid): build FE từ Map course + duty cố định.
+ * Vị trí phân công lấy từ checkpoint và nhiệm vụ theo vai trò.
  */
 import api from "@/config/axios";
 import type {
@@ -22,7 +22,7 @@ import {
 
 const STAFF_API = "api/v1/event";
 
-/** Checkpoint từ map, điểm tiếp tế cho race-staff và nhiệm vụ không gắn map. */
+/** Checkpoint và nhiệm vụ phù hợp với vai trò được chọn. */
 export async function listStaffStations(
   eventId: string,
   role: EventStaffRole

@@ -39,6 +39,7 @@ import {
 
 const DEFAULT_GRADIENT =
   "linear-gradient(135deg, #f97316 0%, #ea580c 40%, #dc2626 100%)";
+const REGISTRATION_ORDER_ERROR = "Thời điểm đóng đăng ký phải sau thời điểm mở đăng ký.";
 
 export default function ProfileBasicClient() {
   const params = useParams();
@@ -75,6 +76,13 @@ export default function ProfileBasicClient() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
+  const opensIso = localInputToUtcIso(opensAt);
+  const closesIso = localInputToUtcIso(closesAt);
+  const closingTimeInvalid = Boolean(opensIso && closesIso && closesIso <= opensIso);
+  // Advance one calendar minute without shifting the picker's local date or time zone.
+  const minimumClosesAt = opensIso
+    ? new Date(Date.parse(`${opensAt}Z`) + 60_000).toISOString().slice(0, 16)
+    : undefined;
 
   useEffect(() => {
     if (!eventId) return;
@@ -244,10 +252,8 @@ export default function ProfileBasicClient() {
       }
     }
 
-    const opensIso = localInputToUtcIso(opensAt);
-    const closesIso = localInputToUtcIso(closesAt);
-    if (opensIso && closesIso && new Date(closesIso) <= new Date(opensIso)) {
-      toastError("Đóng ĐK phải sau thời điểm mở ĐK.");
+    if (closingTimeInvalid) {
+      toastError(REGISTRATION_ORDER_ERROR);
       return;
     }
     if (date) {
@@ -381,8 +387,9 @@ export default function ProfileBasicClient() {
     description,
     bannerImage,
     totalRunners,
-    opensAt,
-    closesAt,
+    opensIso,
+    closesIso,
+    closingTimeInvalid,
     orgName,
     orgEmail,
     orgPhone,
@@ -616,8 +623,9 @@ export default function ProfileBasicClient() {
             Mở/đóng ĐK phải trước ngày tổ chức; đóng sau mở; không sau hạn gói.
           </p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Field label="Mở đăng ký">
+            <Field label="Mở đăng ký" htmlFor="registration-opens-at">
               <input
+                id="registration-opens-at"
                 type="datetime-local"
                 value={opensAt}
                 onChange={(e) => setOpensAt(e.target.value)}
@@ -625,14 +633,23 @@ export default function ProfileBasicClient() {
                 className={inputClass}
               />
             </Field>
-            <Field label="Đóng đăng ký">
+            <Field label="Đóng đăng ký" htmlFor="registration-closes-at">
               <input
+                id="registration-closes-at"
                 type="datetime-local"
+                min={minimumClosesAt}
                 value={closesAt}
                 onChange={(e) => setClosesAt(e.target.value)}
                 disabled={!canEditWindow}
+                aria-invalid={closingTimeInvalid || undefined}
+                aria-describedby={closingTimeInvalid ? "registration-order-error" : undefined}
                 className={inputClass}
               />
+              {closingTimeInvalid && (
+                <p id="registration-order-error" className="mt-1 text-xs text-destructive">
+                  {REGISTRATION_ORDER_ERROR}
+                </p>
+              )}
             </Field>
           </div>
         </section>
@@ -784,18 +801,20 @@ function isValidVnMobile(phone: string): boolean {
 
 function Field({
   label,
+  htmlFor,
   required,
   icon: Icon,
   children,
 }: {
   label: string;
+  htmlFor?: string;
   required?: boolean;
   icon?: typeof Calendar;
   children: React.ReactNode;
 }) {
   return (
     <div>
-      <label className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+      <label htmlFor={htmlFor} className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
         {Icon && <Icon className="h-3 w-3" />}
         {label}
         {required && <span className="text-red-500">*</span>}
