@@ -205,7 +205,7 @@ function leafActive(
   item: NavLeaf,
   pathname: string,
   eventId: string | null,
-  activeTab: string | null
+  activeTab: string | null,
 ) {
   if (item.href === "/organizer") return pathname === "/organizer";
   const isApprovals = item.tab === "approvals";
@@ -224,7 +224,11 @@ function leafActive(
   return onEventHome && activeTab !== "approvals";
 }
 
-export default function OrganizerShell({ children }: { children: React.ReactNode }) {
+export default function OrganizerShell({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [collapsed, setCollapsed] = useState(false);
@@ -232,7 +236,7 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [eventName, setEventName] = useState<string | null>(null);
   const [packageExpiresAtUtc, setPackageExpiresAtUtc] = useState<string | null>(
-    null
+    null,
   );
   const [packageTitle, setPackageTitle] = useState<string | null>(null);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
@@ -249,28 +253,44 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
     const complaintEventId = pathname.startsWith("/organizer/disputes")
       ? searchParams.get("eventId")
       : null;
-    return complaintEventId && isComplaintId(complaintEventId) ? complaintEventId : null;
+    return complaintEventId && isComplaintId(complaintEventId)
+      ? complaintEventId
+      : null;
   }, [pathname, searchParams]);
   usePositionAlerts(eventId);
   const groups = useMemo(
-    () => [{ heading: "Ban tổ chức", items: [{ label: "Dashboard", href: "/organizer", icon: LayoutDashboard }] }, ...(eventId ? eventWorkspaceGroups(eventId) : [{
-      heading: "Vận hành",
-      items: [{
-        label: "Khiếu nại",
-        href: "/organizer/disputes",
-        icon: MessageSquareText,
-        matchPath: "/organizer/disputes",
-      }],
-    }])],
-    [eventId]
+    () => [
+      {
+        heading: "Ban tổ chức",
+        items: [
+          { label: "Dashboard", href: "/organizer", icon: LayoutDashboard },
+        ],
+      },
+      ...(eventId
+        ? eventWorkspaceGroups(eventId)
+        : [
+            {
+              heading: "Vận hành",
+              items: [
+                {
+                  label: "Khiếu nại",
+                  href: "/organizer/disputes",
+                  icon: MessageSquareText,
+                  matchPath: "/organizer/disputes",
+                },
+              ],
+            },
+          ]),
+    ],
+    [eventId],
   );
   const activeTab = searchParams.get("tab");
 
   const isMapWorkspace =
     !!eventId &&
-    (/\/(setup-map|race-simulation|staff|wallet|payout-history|profile)(\/|$)/.test(
-      pathname
-    ));
+    /\/(setup-map|race-simulation|staff|wallet|payout-history|profile)(\/|$)/.test(
+      pathname,
+    );
 
   const closeMobile = () => setMobileOpen(false);
   const closeUserMenu = () => setUserMenuOpen(false);
@@ -315,19 +335,19 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
             const months = purchase.durationMonths;
             const cap = purchase.participantCap;
             setPackageTitle(
-              `Gói ${months} tháng · ${cap.toLocaleString("vi-VN")} VĐV`
+              `Gói ${months} tháng · ${cap.toLocaleString("vi-VN")} VĐV`,
             );
           } catch {
             // Fallback: chỉ biết quy mô từ event
             if (event.totalRunners) {
               setPackageTitle(
-                `Gói · ${event.totalRunners.toLocaleString("vi-VN")} VĐV`
+                `Gói · ${event.totalRunners.toLocaleString("vi-VN")} VĐV`,
               );
             }
           }
         } else if (event.totalRunners) {
           setPackageTitle(
-            `Quy mô ${event.totalRunners.toLocaleString("vi-VN")} VĐV`
+            `Quy mô ${event.totalRunners.toLocaleString("vi-VN")} VĐV`,
           );
         }
       } catch {
@@ -350,15 +370,19 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
     if (packageExpiresAtUtc) {
       const end = new Date(packageExpiresAtUtc);
       if (!Number.isNaN(end.getTime())) {
-        const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+        const endDay = new Date(
+          end.getFullYear(),
+          end.getMonth(),
+          end.getDate(),
+        );
         const today = new Date();
         const todayDay = new Date(
           today.getFullYear(),
           today.getMonth(),
-          today.getDate()
+          today.getDate(),
         );
         const diffDays = Math.ceil(
-          (endDay.getTime() - todayDay.getTime()) / (24 * 60 * 60 * 1000)
+          (endDay.getTime() - todayDay.getTime()) / (24 * 60 * 60 * 1000),
         );
         const endLabel = end.toLocaleDateString("vi-VN");
         if (diffDays < 0) {
@@ -394,7 +418,9 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
       >
         <div
           className={`flex h-20 items-center border-b border-white/10 ${
-            collapsed ? "justify-between px-5 lg:justify-center lg:px-0" : "justify-between px-5"
+            collapsed
+              ? "justify-between px-5 lg:justify-center lg:px-0"
+              : "justify-between px-5"
           }`}
         >
           <Link
@@ -450,7 +476,9 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
                   className={`flex w-full items-center gap-1 px-3 pb-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 transition-colors hover:text-slate-300 ${
                     collapsed ? "lg:justify-center lg:px-0" : ""
                   }`}
-                  title={isOpen ? `Thu gọn ${group.heading}` : `Mở ${group.heading}`}
+                  title={
+                    isOpen ? `Thu gọn ${group.heading}` : `Mở ${group.heading}`
+                  }
                 >
                   <span className={collapsed ? "lg:hidden" : ""}>
                     {group.heading}
@@ -469,7 +497,7 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
                       leaf,
                       pathname,
                       eventId,
-                      activeTab
+                      activeTab,
                     );
                     const Icon = leaf.icon;
                     return (
@@ -553,7 +581,10 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
               </p>
               <p className="flex min-w-0 items-baseline gap-2 truncate text-sm">
                 <span className="min-w-0 truncate font-bold tracking-tight text-slate-900">
-                  {eventName || (pathname === "/organizer" ? "Dashboard" : "Chọn giải để quản lý")}
+                  {eventName ||
+                    (pathname === "/organizer"
+                      ? "Dashboard"
+                      : "Chọn giải để quản lý")}
                 </span>
                 {packageLabel && (
                   <span
@@ -581,7 +612,11 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
               {avatarSrc ? (
                 <span className="relative inline-flex h-7 w-7 overflow-hidden rounded-full border border-orange-500/30 bg-muted shadow-xs">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={avatarSrc} alt="" className="h-full w-full object-cover" />
+                  <img
+                    src={avatarSrc}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
                 </span>
               ) : (
                 <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 text-xs font-bold text-white shadow-xs">
@@ -634,7 +669,6 @@ export default function OrganizerShell({ children }: { children: React.ReactNode
                     <Wallet className="h-4 w-4 text-slate-400" />
                     Ví & giải ngân
                   </Link>
-
                 </div>
 
                 <div className="border-t border-slate-100 pt-1">
