@@ -44,6 +44,9 @@ function apiImageRemotePatterns(): ImageRemotePattern[] {
 const nextConfig: NextConfig = {
   /* config options here */
   output: "standalone",
+  experimental: {
+    agentUpgrade: "security",
+  },
   images: {
     // Banner API chạy localhost — cho phép next/image fetch private IP (dev)
     dangerouslyAllowLocalIP: true,
