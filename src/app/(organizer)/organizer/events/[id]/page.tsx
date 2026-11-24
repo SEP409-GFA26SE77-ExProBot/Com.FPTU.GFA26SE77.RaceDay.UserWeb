@@ -9,7 +9,6 @@ import Image from "next/image";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   Calendar,
-  ClipboardList,
   Download,
   ExternalLink,
   Loader2,
@@ -26,7 +25,6 @@ import type { EventDistanceDto, RaceEventDto } from "@/dto/event.dto";
 import type { ApiRegistration } from "@/dto/organizer.dto";
 import {
   formatDate,
-  formatPrice,
   getOrganizerStatusLabel,
   getStatusColor,
 } from "@/lib/format";
@@ -83,13 +81,6 @@ function MyEventDetailContent() {
   const eventId = String(params?.id || "");
   const rawTab = searchParams.get("tab");
   const tab: TabKey = rawTab === "approvals" ? "approvals" : "overview";
-  const setTab = (next: TabKey) => {
-    const url =
-      next === "overview"
-        ? `/organizer/events/${eventId}`
-        : `/organizer/events/${eventId}?tab=${next}`;
-    router.replace(url);
-  };
   const [event, setEvent] = useState<RaceEventDto | null>(null);
   const [regs, setRegs] = useState<ApiRegistration[]>([]);
   const [loading, setLoading] = useState(true);
@@ -234,7 +225,7 @@ function MyEventDetailContent() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-4">
       {toast && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900">
           {toast}
@@ -244,7 +235,7 @@ function MyEventDetailContent() {
       {/* Banner tổng quan; duyệt đăng ký truy cập qua sidebar. */}
       {tab !== "approvals" && (
         <div className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm">
-          <div className="relative h-44 sm:h-52">
+          <div className="relative p-4 sm:p-5">
             {event.bannerImage ? (
               <Image
                 src={mediaDisplayUrl(event.bannerImage)}
@@ -261,7 +252,7 @@ function MyEventDetailContent() {
               />
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/30 to-transparent" />
-            <div className="absolute bottom-4 left-4 right-4">
+            <div className="relative min-w-0">
               <span
                 className={`mb-2 inline-flex rounded-md border px-2.5 py-1 text-[11px] font-extrabold ${getStatusColor(
                   event.status
@@ -269,104 +260,29 @@ function MyEventDetailContent() {
               >
                 {getOrganizerStatusLabel(event.status)}
               </span>
-              <h1 className="text-2xl font-extrabold text-white sm:text-3xl">
+              <h1 className="break-words text-xl font-extrabold text-white sm:text-2xl">
                 {event.name}
               </h1>
-              {event.tagline ? (
-                <p className="mt-1 text-sm text-white/80">{event.tagline}</p>
-              ) : null}
+              <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-white/90">
+                <span className="flex min-w-0 items-start gap-2"><Calendar aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" /><span className="break-words">{formatDate(event.date)}</span></span>
+                <span className="flex min-w-0 items-start gap-2"><MapPin aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" /><span className="break-words">{event.location || "Chưa có địa điểm"}</span></span>
+                <Link href={"/events/" + event.id} className="inline-flex min-h-11 items-center gap-2 rounded-lg px-2 font-semibold underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-white"><ExternalLink aria-hidden="true" className="h-4 w-4" />Xem trang công khai</Link>
+              </div>
             </div>
           </div>
         </div>
       )}
 
       {tab === "overview" && (
-        <>
-          <div className="mt-6 grid gap-4 sm:grid-cols-2">
-            <Info
-              icon={Calendar}
-              label="Ngày tổ chức"
-              value={formatDate(event.date)}
-            />
-            <Info icon={MapPin} label="Địa điểm" value={event.location} />
-          </div>
-
-          <EventDashboard key={eventId} eventId={eventId} />
-
-          <section className="mt-6 rounded-2xl border border-border/60 bg-card p-5 shadow-sm sm:p-6">
-            <h2 className="text-sm font-bold text-foreground">Cự ly</h2>
-            {distances.length === 0 ? (
-              <p className="mt-3 text-sm text-muted-foreground">Chưa có cự ly.</p>
-            ) : (
-              <div className="mt-4 overflow-x-auto">
-                <table className="w-full min-w-[480px] text-left text-sm">
-                  <thead className="text-[11px] uppercase text-muted-foreground">
-                    <tr className="border-b border-border">
-                      <th className="pb-2 pr-3 font-bold">Tên</th>
-                      <th className="pb-2 pr-3 font-bold">Km</th>
-                      <th className="pb-2 pr-3 font-bold">Giá</th>
-                      <th className="pb-2 font-bold">Slot</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/60">
-                    {distances.map((d) => (
-                      <tr key={d.id}>
-                        <td className="py-3 pr-3 font-semibold">
-                          {d.name}
-                          {showLeaderboardDownload && (
-                            <div className="mt-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                className="min-h-11 cursor-pointer"
-                                disabled={downloadingDistanceId !== null}
-                                aria-label={downloadingDistanceId === d.id
-                                  ? `Đang tải bảng xếp hạng PDF cự ly ${d.name}`
-                                  : `Tải bảng xếp hạng PDF cự ly ${d.name}`}
-                                onClick={() => void downloadLeaderboard(d)}
-                              >
-                                <Download aria-hidden="true" />
-                                {downloadingDistanceId === d.id ? "Đang tải PDF…" : "Tải bảng xếp hạng PDF"}
-                              </Button>
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-3 pr-3 text-muted-foreground">
-                          {d.distanceKm}K
-                        </td>
-                        <td className="py-3 pr-3 font-bold text-orange-600">
-                          {formatPrice(d.price ?? d.basePrice ?? 0)}
-                        </td>
-                        <td className="py-3 text-muted-foreground">
-                          {(d.registeredCount ?? 0).toLocaleString("vi-VN")} /{" "}
-                          {d.capacity.toLocaleString("vi-VN")}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link
-              href={`/events/${event.id}`}
-              className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2.5 text-sm font-bold text-foreground hover:border-orange-300 hover:text-orange-600"
-            >
-              <ExternalLink className="h-4 w-4" />
-              Xem trang công khai
-            </Link>
-            <button
-              type="button"
-              onClick={() => setTab("approvals")}
-              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-orange-500 to-red-600 px-4 py-2.5 text-sm font-bold text-white"
-            >
-              <ClipboardList className="h-4 w-4" />
-              Duyệt đăng ký VĐV
-            </button>
-          </div>
-        </>
+        <EventDashboard key={eventId} eventId={eventId} distanceAction={showLeaderboardDownload ? (distanceId) => {
+          const distance = distances.find((item) => item.id === distanceId);
+          return distance ? <Button type="button" variant="outline" className="mt-2 min-h-11 max-w-full cursor-pointer whitespace-normal text-xs"
+            disabled={downloadingDistanceId !== null}
+            aria-label={(downloadingDistanceId === distance.id ? "Đang tải bảng xếp hạng PDF cự ly " : "Tải bảng xếp hạng PDF cự ly ") + distance.name}
+            onClick={() => void downloadLeaderboard(distance)}>
+            <Download aria-hidden="true" />{downloadingDistanceId === distance.id ? "Đang tải PDF…" : "Tải bảng xếp hạng PDF"}
+          </Button> : null;
+        } : undefined} />
       )}
 
       {tab === "approvals" && (
@@ -423,30 +339,6 @@ function MyEventDetailContent() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function Info({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof Calendar;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex gap-3 rounded-2xl border border-border/60 bg-card p-4 shadow-sm">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-500/10 text-orange-600">
-        <Icon className="h-4 w-4" />
-      </span>
-      <div>
-        <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-          {label}
-        </p>
-        <p className="mt-0.5 text-sm font-semibold text-foreground">{value}</p>
-      </div>
     </div>
   );
 }

@@ -243,11 +243,13 @@ export function TrendChart({
   series,
   format = numberLabel,
   compact = false,
+  showTable = !compact,
 }: {
   dates: string[];
   series: { label: string; values: number[] }[];
   format?: (value: number) => string;
   compact?: boolean;
+  showTable?: boolean;
 }) {
   const values = series.flatMap((item) => item.values);
   const max = Math.max(1, ...values);
@@ -281,7 +283,7 @@ export function TrendChart({
           viewBox="0 0 620 225"
           className={compact ? "h-auto w-full sm:h-[200px]" : "w-full"}
           role="img"
-          aria-label={compact ? "Biểu đồ theo ngày. Mở Xem chi tiết để đọc bảng số liệu." : "Biểu đồ theo ngày. Số liệu chi tiết ở bảng bên dưới."}
+          aria-label={showTable ? "Biểu đồ theo ngày. Số liệu chi tiết ở bảng bên dưới." : "Biểu đồ theo ngày. Mở Xem chi tiết để đọc bảng số liệu."}
         >
           {[min, (max + min) / 2, max].map((value, index) => (
             <g key={index}>
@@ -346,7 +348,7 @@ export function TrendChart({
           Chưa có phát sinh trong khoảng ngày này.
         </p>
       )}
-      {!compact && <details className="mt-4">
+      {showTable && <details className="mt-4">
         <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-primary">
           Xem bảng số liệu theo ngày
         </summary>
