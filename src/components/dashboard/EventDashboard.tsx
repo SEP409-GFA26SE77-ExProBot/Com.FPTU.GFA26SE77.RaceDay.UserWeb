@@ -61,7 +61,7 @@ export default function EventDashboard({ eventId, distanceAction }: {
         {[
           { label: "Đăng ký đã xác nhận", value: data.checkInSummary.eligible, note: "Gồm cả VĐV đã hoàn thành", href: base + "?tab=approvals" },
           { label: "Đăng ký chờ duyệt", value: pending, note: "Mở danh sách để xử lý", href: base + "?tab=approvals" },
-          { label: "Đã check-in", value: `${numberLabel(data.checkInSummary.checkedIn)} / ${numberLabel(data.checkInSummary.eligible)}`, note: "Trên đăng ký đã xác nhận", href: base + "?tab=approvals" },
+          { label: "Đã điểm danh", value: `${numberLabel(data.checkInSummary.checkedIn)} / ${numberLabel(data.checkInSummary.eligible)}`, note: "Trên đăng ký đã xác nhận", href: base + "?tab=approvals" },
           { label: "Khiếu nại chờ xử lý", value: data.pendingComplaints, note: "Chỉ khiếu nại của giải này", href: `/organizer/disputes?eventId=${eventId}` },
         ].map((item) => <Link key={item.label} href={item.href} className="min-w-0 rounded-2xl focus-visible:outline-2 focus-visible:outline-orange-600"><Metric compact label={item.label} value={item.value} note={item.note} /></Link>)}
       </div>}
@@ -108,7 +108,7 @@ export default function EventDashboard({ eventId, distanceAction }: {
               {revenue.data && !series && <p className="text-sm text-muted-foreground">Chưa có phát sinh trong khoảng ngày này.</p>}
             </Tabs.Content>
           </Tabs.Root>
-          <p className="mt-3 text-xs text-muted-foreground">Bộ lọc cự ly chỉ áp dụng cho đăng ký và phần đăng ký trong file xuất: {selectedDistance?.name ?? "Tất cả cự ly"}. Dòng tiền luôn tính toàn giải.</p>
+          <p className="mt-3 text-xs text-muted-foreground">Bộ lọc cự ly chỉ áp dụng cho đăng ký và phần đăng ký trong tệp xuất: {selectedDistance?.name ?? "Tất cả cự ly"}. Dòng tiền luôn tính toàn giải.</p>
         </Panel>
 
         {data && <>

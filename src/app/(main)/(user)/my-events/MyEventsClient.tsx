@@ -310,7 +310,7 @@ export default function MyEventsClient() {
           {isOrganizer && (
             <Tabs.Trigger value="dashboard" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold text-muted-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-orange-600 data-[state=active]:bg-orange-500/15 data-[state=active]:text-orange-700">
               <LayoutDashboard aria-hidden="true" className="h-4 w-4" />
-              Dashboard
+              Tổng quan
             </Tabs.Trigger>
           )}
           <Tabs.Trigger value="events" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold text-muted-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-orange-600 data-[state=active]:bg-orange-500/15 data-[state=active]:text-orange-700">

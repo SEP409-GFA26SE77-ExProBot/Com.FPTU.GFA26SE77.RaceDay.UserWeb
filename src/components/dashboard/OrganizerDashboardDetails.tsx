@@ -15,7 +15,7 @@ import RevenuePanel from "./RevenuePanel";
 
 function DetailHeader({ title, back = "/my-events" }: { title: string; back?: string }) {
   return <header className="space-y-3">
-    <Link href={back} className="inline-flex min-h-11 items-center text-sm font-semibold text-orange-700 hover:underline focus-visible:outline-2 focus-visible:outline-orange-600">← Quay lại Dashboard</Link>
+    <Link href={back} className="inline-flex min-h-11 items-center text-sm font-semibold text-orange-700 hover:underline focus-visible:outline-2 focus-visible:outline-orange-600">Quay lại tổng quan</Link>
     <h1 className="text-2xl font-extrabold tracking-tight text-foreground">{title}</h1>
   </header>;
 }
