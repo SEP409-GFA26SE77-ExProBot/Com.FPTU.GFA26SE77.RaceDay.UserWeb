@@ -207,7 +207,7 @@ function leafActive(
   eventId: string | null,
   activeTab: string | null,
 ) {
-  if (item.href === "/organizer") return pathname === "/organizer";
+  if (item.href === "/my-events") return pathname === "/my-events";
   const isApprovals = item.tab === "approvals";
   const matchPath = item.matchPath ?? null;
   const onEventHome =
@@ -263,7 +263,7 @@ export default function OrganizerShell({
       {
         heading: "Ban tổ chức",
         items: [
-          { label: "Dashboard", href: "/organizer", icon: LayoutDashboard },
+          { label: "Quản lý giải của tôi", href: "/my-events", icon: LayoutDashboard },
         ],
       },
       ...(eventId
@@ -581,10 +581,7 @@ export default function OrganizerShell({
               </p>
               <p className="flex min-w-0 items-baseline gap-2 truncate text-sm">
                 <span className="min-w-0 truncate font-bold tracking-tight text-slate-900">
-                  {eventName ||
-                    (pathname === "/organizer"
-                      ? "Dashboard"
-                      : "Chọn giải để quản lý")}
+                  {eventName || "Chọn giải để quản lý"}
                 </span>
                 {packageLabel && (
                   <span

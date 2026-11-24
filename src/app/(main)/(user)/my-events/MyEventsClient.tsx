@@ -4,6 +4,8 @@ import { getAuthUser } from "@/stores/auth-store";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
+import { Tabs } from "radix-ui";
 import {
   Calendar,
   Flag,
@@ -29,6 +31,8 @@ import PageLoading from "@/components/ui/PageLoading";
 import Pagination from "@/components/ui/Pagination";
 import { usePagedList } from "@/hooks/usePagedList";
 import OrganizerEventStatusModal from "@/components/events/OrganizerEventStatusModal";
+import OrganizerDashboard from "@/components/dashboard/OrganizerDashboard";
+import { recentRange } from "@/lib/dashboard";
 
 const PAGE_SIZE = 6;
 
@@ -42,6 +46,8 @@ type FilterKey =
   | "approved"
   | "rejected"
   | "started"
+  | "upcoming"
+  | "registration-open"
   | "ended";
 
 function statusKey(status: string): string {
@@ -79,6 +85,11 @@ function matchesFilter(event: RaceEventListItemDto, filter: FilterKey): boolean 
       return key === "pending" || key === "pending-approval";
     case "rejected":
       return key === "rejected";
+    case "registration-open":
+      return key === "registration-open";
+    case "upcoming":
+      return ["approved", "registration-open", "closed"].includes(key)
+        && (event.date || "").slice(0, 10) >= recentRange(1).to;
     case "ended":
       return eventEnded(event) || key === "closed" || key === "completed";
     case "started":
@@ -170,11 +181,26 @@ function distanceChipLabels(event: RaceEventListItemDto): string[] {
 }
 
 export default function MyEventsClient() {
+  const searchParams = useSearchParams();
+  const isOrganizer = mapAppRole(getAuthUser()?.roleName) === "ORGANIZER";
+  const tab = isOrganizer && searchParams.get("tab") !== "events" ? "dashboard" : "events";
+  const changeTab = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", value);
+    window.history.pushState(null, "", `/my-events?${params.toString()}`);
+  };
   const [list, setList] = useState<RaceEventListItemDto[]>([]);
   const [ready, setReady] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<FilterKey>("all");
+  const filterQuery = searchParams.get("filter");
+  const filter: FilterKey = ["all", "draft", "pending", "approved", "rejected", "started", "ended", "upcoming", "registration-open"].includes(filterQuery ?? "") ? filterQuery as FilterKey : "all";
+  const setFilter = (value: FilterKey) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", "events");
+    params.set("filter", value);
+    window.history.pushState(null, "", `/my-events?${params.toString()}`);
+  };
   const [statusModal, setStatusModal] = useState<{
     id: string;
     status: string;
@@ -212,7 +238,10 @@ export default function MyEventsClient() {
   }, []);
 
   const filtered = useMemo(
-    () => list.filter((e) => matchesFilter(e, filter)),
+    () => {
+      const items = list.filter((e) => matchesFilter(e, filter));
+      return filter === "upcoming" ? items.sort((a, b) => a.date.localeCompare(b.date)) : items;
+    },
     [list, filter]
   );
   const pager = usePagedList(filtered, PAGE_SIZE, filter);
@@ -249,6 +278,8 @@ export default function MyEventsClient() {
 
   const filters: { key: FilterKey; label: string }[] = [
     { key: "all", label: "Tất cả" },
+    { key: "upcoming", label: "Sắp diễn ra" },
+    { key: "registration-open", label: "Mở đăng ký" },
     { key: "draft", label: "Chưa duyệt" },
     { key: "pending", label: "Chờ duyệt" },
     { key: "approved", label: "Đã duyệt" },
@@ -258,19 +289,12 @@ export default function MyEventsClient() {
   ];
 
   return (
-    <div className={`${PAGE_SHELL} py-8 sm:py-10`}>
+    <div className={`${PAGE_SHELL} py-5 sm:py-6`}>
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-widest text-orange-500">
-            Quản lý giải
-          </p>
           <h1 className="text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
-            Giải của tôi
+            Quản lý giải của tôi
           </h1>
-          <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-            Theo tài khoản đang đăng nhập. Bấm vào giải để xem chi tiết và thao
-            tác quản lý.
-          </p>
         </div>
         <Link
           href="/events/create"
@@ -281,89 +305,105 @@ export default function MyEventsClient() {
         </Link>
       </div>
 
-      {mapAppRole(getAuthUser()?.roleName) === "ORGANIZER" && (
-        <Link href="/organizer" className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-semibold text-foreground hover:border-primary focus-visible:outline-2 focus-visible:outline-primary">
-          <LayoutDashboard className="h-4 w-4" />Dashboard<ChevronRight className="h-4 w-4" />
-        </Link>
-      )}
+      <Tabs.Root value={tab} onValueChange={changeTab} className="mt-4">
+        <Tabs.List aria-label="Quản lý giải của tôi" className="flex flex-wrap gap-2 border-b border-border pb-2">
+          {isOrganizer && (
+            <Tabs.Trigger value="dashboard" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold text-muted-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-orange-600 data-[state=active]:bg-orange-500/15 data-[state=active]:text-orange-700">
+              <LayoutDashboard aria-hidden="true" className="h-4 w-4" />
+              Dashboard
+            </Tabs.Trigger>
+          )}
+          <Tabs.Trigger value="events" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold text-muted-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-orange-600 data-[state=active]:bg-orange-500/15 data-[state=active]:text-orange-700">
+            <Flag aria-hidden="true" className="h-4 w-4" />
+            Danh sách giải
+          </Tabs.Trigger>
+        </Tabs.List>
+        {isOrganizer && (
+          <Tabs.Content value="dashboard" className="mt-4 min-w-0 focus-visible:outline-2 focus-visible:outline-orange-600">
+            <OrganizerDashboard />
+          </Tabs.Content>
+        )}
+        <Tabs.Content value="events" className="min-w-0 focus-visible:outline-2 focus-visible:outline-orange-600">
 
-      <div className="mt-6 flex flex-wrap gap-2">
-        {filters.map((f) => (
-          <button
-            key={f.key}
-            type="button"
-            onClick={() => setFilter(f.key)}
-            className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
-              filter === f.key
-                ? "bg-orange-500/15 text-orange-600"
-                : "bg-muted text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      {error && (
-        <div
-          role="alert"
-          className="mt-6 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-700"
-        >
-          {error}
-        </div>
-      )}
-
-      {filtered.length === 0 ? (
-        <div className="mt-10 rounded-2xl border border-dashed border-border p-12 text-center">
-          <Flag className="mx-auto h-10 w-10 text-orange-500" />
-          <h2 className="mt-3 text-lg font-bold text-foreground">
-            Chưa có giải nào
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Tạo giải mới hoặc đổi bộ lọc trạng thái.
-          </p>
-          <Link
-            href="/events/create"
-            className="mt-5 inline-flex items-center gap-2 rounded-full bg-orange-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-orange-600"
-          >
-            <PlusCircle className="h-4 w-4" />
-            Tạo giải
-          </Link>
-        </div>
-      ) : (
-        <>
-          <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-            {pager.pageItems.map((event) => (
-              <ManageEventCard
-                key={event.id}
-                event={event}
-                onOpenStatusModal={() =>
-                  setStatusModal({ id: event.id, status: event.status })
-                }
-              />
+          <div className="mt-6 flex flex-wrap gap-2">
+            {filters.map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setFilter(f.key)}
+                className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
+                  filter === f.key
+                    ? "bg-orange-500/15 text-orange-600"
+                    : "bg-muted text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {f.label}
+              </button>
             ))}
           </div>
-          <div className="mt-8 border-t border-border/60 pt-5">
-            <Pagination
-              page={pager.page}
-              totalPages={pager.totalPages}
-              totalItems={pager.totalItems}
-              pageSize={PAGE_SIZE}
-              onChange={pager.goTo}
-              disabled={pager.turning}
-            />
-          </div>
-        </>
-      )}
 
-      {statusModal ? (
-        <OrganizerEventStatusModal
-          eventId={statusModal.id}
-          listStatus={statusModal.status}
-          open
-          onClose={() => setStatusModal(null)}
-        />
-      ) : null}
+          {error && (
+            <div
+              role="alert"
+              className="mt-6 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-700"
+            >
+              {error}
+            </div>
+          )}
+
+          {filtered.length === 0 ? (
+            <div className="mt-10 rounded-2xl border border-dashed border-border p-12 text-center">
+              <Flag className="mx-auto h-10 w-10 text-orange-500" />
+              <h2 className="mt-3 text-lg font-bold text-foreground">
+                Chưa có giải nào
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Tạo giải mới hoặc đổi bộ lọc trạng thái.
+              </p>
+              <Link
+                href="/events/create"
+                className="mt-5 inline-flex items-center gap-2 rounded-full bg-orange-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-orange-600"
+              >
+                <PlusCircle className="h-4 w-4" />
+                Tạo giải
+              </Link>
+            </div>
+          ) : (
+            <>
+              <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                {pager.pageItems.map((event) => (
+                  <ManageEventCard
+                    key={event.id}
+                    event={event}
+                    onOpenStatusModal={() =>
+                      setStatusModal({ id: event.id, status: event.status })
+                    }
+                  />
+                ))}
+              </div>
+              <div className="mt-8 border-t border-border/60 pt-5">
+                <Pagination
+                  page={pager.page}
+                  totalPages={pager.totalPages}
+                  totalItems={pager.totalItems}
+                  pageSize={PAGE_SIZE}
+                  onChange={pager.goTo}
+                  disabled={pager.turning}
+                />
+              </div>
+            </>
+          )}
+
+          {statusModal ? (
+            <OrganizerEventStatusModal
+              eventId={statusModal.id}
+              listStatus={statusModal.status}
+              open
+              onClose={() => setStatusModal(null)}
+            />
+          ) : null}
+        </Tabs.Content>
+      </Tabs.Root>
     </div>
   );
 }

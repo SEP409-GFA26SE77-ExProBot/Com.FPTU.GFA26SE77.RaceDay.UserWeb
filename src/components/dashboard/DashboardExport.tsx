@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { getApiErrorMessage } from "@/lib/error";
 import type { DateRange } from "@/lib/dashboard";
 
-export default function DashboardExport({ range, download, disabled = false }: {
+export default function DashboardExport({ range, download, disabled = false, compact = false }: {
   range: DateRange;
   download: (format: "xlsx" | "pdf") => Promise<Blob>;
   disabled?: boolean;
+  compact?: boolean;
 }) {
   const lock = useRef(false);
   const [busy, setBusy] = useState<"xlsx" | "pdf" | null>(null);
@@ -46,19 +47,20 @@ export default function DashboardExport({ range, download, disabled = false }: {
     }
   }
   return (
-    <div className="space-y-2">
+    <div className={compact ? "space-y-1" : "space-y-2"}>
       <div className="flex flex-wrap gap-2" role="group" aria-label="Xuất báo cáo dashboard" aria-busy={busy !== null}>
         {(["xlsx", "pdf"] as const).map((format) => (
           <Button key={format} type="button" variant="outline" className="min-h-11 gap-2"
+            aria-label={compact ? busy === format ? "Đang xuất…" : `Xuất ${format === "xlsx" ? "Excel" : "PDF"}` : undefined}
             disabled={disabled || busy !== null} onClick={() => void exportFile(format)}>
             {busy === format ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <Download className="h-4 w-4" aria-hidden="true" />}
-            {busy === format ? "Đang xuất…" : `Xuất ${format === "xlsx" ? "Excel" : "PDF"}`}
+            {busy === format ? "Đang xuất…" : `${compact ? "" : "Xuất "}${format === "xlsx" ? "Excel" : "PDF"}`}
           </Button>
         ))}
       </div>
-      <p className="text-xs text-muted-foreground">Xuất toàn dashboard: biểu đồ theo kỳ đã áp dụng; chỉ số hiện tại được tải lại khi xuất.</p>
+      <p className={compact ? "sr-only" : "text-xs text-muted-foreground"}>Xuất toàn dashboard: biểu đồ theo kỳ đã áp dụng; chỉ số hiện tại được tải lại khi xuất.</p>
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      <p role="status" className="text-sm text-muted-foreground">{message}</p>
+      <p role="status" className={compact && !message ? "sr-only" : "text-sm text-muted-foreground"}>{message}</p>
     </div>
   );
 }

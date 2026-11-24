@@ -18,15 +18,17 @@ export function Panel({
   description,
   children,
   action,
+  compact = false,
 }: {
   title: string;
   description?: string;
   children: ReactNode;
   action?: ReactNode;
+  compact?: boolean;
 }) {
   return (
-    <section className="min-w-0 rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-sm sm:p-6">
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+    <section className={`min-w-0 rounded-2xl border border-border bg-card text-card-foreground shadow-sm ${compact ? "p-4" : "p-5 sm:p-6"}`}>
+      <div className={`${compact ? "mb-3" : "mb-5"} flex flex-wrap items-start justify-between gap-3`}>
         <div>
           <h2 className="text-base font-bold">{title}</h2>
           {description && (
@@ -44,18 +46,20 @@ export function Metric({
   label,
   value,
   note,
+  compact = false,
 }: {
   label: string;
   value: string | number;
-  note: string;
+  note?: string;
+  compact?: boolean;
 }) {
   return (
-    <div className="min-w-0 rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-sm">
+    <div className={`min-w-0 rounded-2xl border border-border bg-card text-card-foreground shadow-sm ${compact ? "p-3 sm:p-4" : "p-5"}`}>
       <p className="text-sm font-medium text-muted-foreground">{label}</p>
-      <p className="my-2 break-words text-2xl font-bold tracking-tight tabular-nums sm:text-3xl">
+      <p className={`${compact ? "mt-1 text-2xl" : "my-2 text-2xl sm:text-3xl"} break-words font-bold tracking-tight tabular-nums`}>
         {typeof value === "number" ? numberLabel(value) : value}
       </p>
-      <p className="text-xs leading-relaxed text-muted-foreground">{note}</p>
+      {note && <p className="text-xs leading-relaxed text-muted-foreground">{note}</p>}
     </div>
   );
 }
@@ -115,16 +119,18 @@ export function Updated({ at }: { at: string }) {
 export function DateFilter({
   value,
   onChange,
+  compact = false,
 }: {
   value: DateRange;
   onChange: (value: DateRange) => void;
+  compact?: boolean;
 }) {
   const [draft, setDraft] = useState(value);
   const [error, setError] = useState<string | null>(null);
   const id = useId();
   return (
     <form
-      className="space-y-3 rounded-2xl border border-border bg-card p-4 text-card-foreground"
+      className={compact ? "min-w-0 space-y-2" : "space-y-3 rounded-2xl border border-border bg-card p-4 text-card-foreground"}
       onSubmit={(event) => {
         event.preventDefault();
         const message = rangeError(draft);
@@ -133,7 +139,7 @@ export function DateFilter({
       }}
     >
       <div className="flex flex-wrap items-end gap-3">
-        <label className="w-full min-w-0 text-xs font-medium sm:w-44">
+        <label className={`min-w-0 text-xs font-medium ${compact ? "w-[calc(50%-0.375rem)] sm:w-36" : "w-full sm:w-44"}`}>
           Từ ngày
           <Input
             type="date"
@@ -149,7 +155,7 @@ export function DateFilter({
             aria-describedby={error ? id : undefined}
           />
         </label>
-        <label className="w-full min-w-0 text-xs font-medium sm:w-44">
+        <label className={`min-w-0 text-xs font-medium ${compact ? "w-[calc(50%-0.375rem)] sm:w-36" : "w-full sm:w-44"}`}>
           Đến ngày
           <Input
             type="date"
@@ -175,7 +181,7 @@ export function DateFilter({
               key={days}
               type="button"
               variant="outline"
-              className="min-h-11"
+              className={`min-h-11 ${compact ? "px-2.5" : ""}`}
               onClick={() => {
                 const next = recentRange(days);
                 setDraft(next);
@@ -193,7 +199,7 @@ export function DateFilter({
           {error}
         </p>
       )}
-      <p className="text-xs text-muted-foreground">
+      <p className={compact ? "sr-only" : "text-xs text-muted-foreground"}>
         Đang xem {dateLabel(value.from)} – {dateLabel(value.to)} · UTC+7 · Bao
         gồm cả hai ngày
       </p>
@@ -236,10 +242,12 @@ export function TrendChart({
   dates,
   series,
   format = numberLabel,
+  compact = false,
 }: {
   dates: string[];
   series: { label: string; values: number[] }[];
   format?: (value: number) => string;
+  compact?: boolean;
 }) {
   const values = series.flatMap((item) => item.values);
   const max = Math.max(1, ...values);
@@ -271,9 +279,9 @@ export function TrendChart({
       {values.some((value) => value !== 0) ? (
         <svg
           viewBox="0 0 620 225"
-          className="w-full"
+          className={compact ? "h-auto w-full sm:h-[200px]" : "w-full"}
           role="img"
-          aria-label="Biểu đồ theo ngày. Số liệu chi tiết ở bảng bên dưới."
+          aria-label={compact ? "Biểu đồ theo ngày. Mở Xem chi tiết để đọc bảng số liệu." : "Biểu đồ theo ngày. Số liệu chi tiết ở bảng bên dưới."}
         >
           {[min, (max + min) / 2, max].map((value, index) => (
             <g key={index}>
@@ -338,7 +346,7 @@ export function TrendChart({
           Chưa có phát sinh trong khoảng ngày này.
         </p>
       )}
-      <details className="mt-4">
+      {!compact && <details className="mt-4">
         <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-primary">
           Xem bảng số liệu theo ngày
         </summary>
@@ -382,7 +390,7 @@ export function TrendChart({
             </tbody>
           </table>
         </div>
-      </details>
+      </details>}
     </figure>
   );
 }
