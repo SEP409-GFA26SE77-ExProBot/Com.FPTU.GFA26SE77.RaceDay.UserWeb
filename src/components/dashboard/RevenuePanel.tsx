@@ -6,12 +6,12 @@ import { getRevenueTrend } from "@/api/dashboard";
 import { useDashboardResource } from "@/hooks/useDashboardResource";
 import { moneyLabel, type DateRange } from "@/lib/dashboard";
 import {
-  Metric,
   Panel,
   ResourceState,
   TrendChart,
   Updated,
 } from "./DashboardUI";
+import CashFlowBreakdown from "./CashFlowBreakdown";
 
 export default function RevenuePanel({
   range,
@@ -61,32 +61,8 @@ export default function RevenuePanel({
           </div>}
           {visibleSeries.map((series) => (
             <div key={series.currency} className="space-y-4">
-              {compact ? <dl className="grid grid-cols-3 gap-3 border-b border-border pb-3">
-                {[
-                  { label: "+ Đã thu", value: `${series.totalCollected > 0 ? "+" : ""}${moneyLabel(series.totalCollected, series.currency)}` },
-                  { label: "− Đã hoàn", value: `${series.totalRefunded > 0 ? "−" : ""}${moneyLabel(series.totalRefunded, series.currency)}` },
-                  { label: "Chênh lệch", value: `${series.netCashFlow > 0 ? "+" : ""}${moneyLabel(series.netCashFlow, series.currency)}` },
-                ].map((item) => <div key={item.label} className="min-w-0"><dt className="text-xs text-muted-foreground">{item.label}</dt><dd className="mt-1 break-words text-base font-bold tabular-nums sm:text-xl">{item.value}</dd></div>)}
-              </dl> : <>
-              <h3 className="text-sm font-semibold">{series.currency}</h3>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <Metric
-                  label="Đã thu"
-                  value={moneyLabel(series.totalCollected, series.currency)}
-                  note="Thanh toán vé thành công"
-                />
-                <Metric
-                  label="Đã hoàn"
-                  value={moneyLabel(series.totalRefunded, series.currency)}
-                  note="Hoàn tiền thành công"
-                />
-                <Metric
-                  label="Dòng tiền ròng"
-                  value={moneyLabel(series.netCashFlow, series.currency)}
-                  note="Đã thu trừ đã hoàn trong kỳ"
-                />
-              </div>
-              </>}
+              {!compact && <h3 className="text-sm font-semibold">{series.currency}</h3>}
+              <CashFlowBreakdown series={series} />
               <TrendChart
                 compact={compact}
                 dates={series.days.map((day) => day.date)}
@@ -104,7 +80,7 @@ export default function RevenuePanel({
               />
             </div>
           ))}
-          {compact ? <p className="text-xs text-muted-foreground">Thu − hoàn trong kỳ; chưa trừ phí, không phải lợi nhuận hoặc số dư ví.</p> : <Updated at={result.data.generatedAtUtc} />}
+          {!compact && <Updated at={result.data.generatedAtUtc} />}
         </div>
       )}
     </Panel>

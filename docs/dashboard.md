@@ -30,7 +30,18 @@
 3. Hai cột khoảng 60/40: **Dòng tiền vé** và **Việc cần xử lý**. Biểu đồ cao 200px từ tablet; mobile dùng tỷ lệ tự nhiên. Công việc tối đa 5 dòng, **Xem tất cả** mở trang đầy đủ.
 4. Hàng cuối: **Ví ban tổ chức** và **Trạng thái các giải**. Không lặp tiêu đề Dashboard hoặc khối lịch giải trên trang tổng quan.
 
-Dòng tiền hiển thị **+ Đã thu**, **− Đã hoàn** và chênh lệch có dấu. Đây là thu trừ hoàn thành công trong kỳ, chưa trừ phí. Ví là số dư hiện tại. Nhiều tiền tệ được chọn riêng trên tổng quan và hiển thị đầy đủ ở trang chi tiết; không cộng các tiền tệ với nhau. Bảng theo ngày chuyển sang **Xem chi tiết**; file xuất vẫn giữ đủ các sheet như trước.
+Dòng tiền hiển thị hai mục mở/thu gọn **+ Tiền vào**, **− Tiền ra** và chênh lệch có dấu. Đây là thu trừ hoàn thành công trong kỳ, chưa trừ phí. Ví là số dư hiện tại. Nhiều tiền tệ được chọn riêng trên tổng quan và hiển thị đầy đủ ở trang chi tiết; không cộng các tiền tệ với nhau. Bảng tổng hợp theo ngày nằm ở **Xem chi tiết**; file xuất vẫn giữ đủ các sheet như trước.
+
+### Mở/thu gọn tiền vào, tiền ra
+
+- Áp dụng cho khối dòng tiền ở tổng quan, trang chi tiết và dashboard một giải. Hai mục mặc định đóng; bấm tiêu đề hoặc nhấn Enter/Space để mở/đóng.
+- **+ Tiền vào**: tổng tiền vé đã thu thành công trong kỳ. Mở ra xem định nghĩa và các ngày có phát sinh, mỗi số tiền mang dấu `+`.
+- **− Tiền ra**: tổng tiền hoàn vé thành công trong kỳ. Mở ra xem các ngày hoàn, mỗi số tiền mang dấu `−`. Phí nền tảng và tiền rút ví được theo dõi riêng, không cộng vào con số hoàn vé này.
+- **Chênh lệch = tiền vào − tiền ra**: hiển thị cả phép tính bằng số. Ví dụ thu 100, hoàn 30 → `+70`; thu 100, hoàn 300 → `−200`. Số 0 hiển thị bình thường, không có `−0`.
+- Danh sách mở rộng chỉ hiện ngày có phát sinh; khu vực này cuộn riêng tối đa 160px. Số ngày không phải số giao dịch. Nếu chưa có thu/hoàn, hiển thị thông báo cụ thể.
+- Khi đổi tiền tệ, các mục thu gọn lại và dùng số liệu riêng của tiền tệ vừa chọn. API và số liệu Excel/PDF giữ nguyên; dấu trên giao diện biểu thị chiều dòng tiền.
+
+Đã đối chiếu tổng thu/hoàn với API thật, kiểm tra mở/đóng bằng bàn phím và chuột ở 375/768/1280px, số tiền từng ngày, trường hợp âm/0, nhiều tiền tệ, trang chi tiết và tải Excel thật. TypeScript, ESLint hai component dòng tiền và production build đạt. Khi thu gọn, phần tổng quan kết thúc khoảng 1.200px trên màn hình 1280×900.
 
 ## API
 
