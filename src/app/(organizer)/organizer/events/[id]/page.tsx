@@ -3,7 +3,7 @@ import { getAuthUser } from "@/stores/auth-store";
 import { useOrganizerToastState } from "@/lib/use-organizer-toast-state";
 import { useOrganizerErrorState } from "@/lib/use-organizer-error-state";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -34,7 +34,6 @@ import { getApiErrorMessage } from "@/lib/error";
 import { hasEventFinished } from "@/lib/event-lifecycle";
 import { mediaDisplayUrl } from "@/lib/media-url";
 import { toastError } from "@/lib/toast";
-import EventFinancePanel from "@/components/organizer/EventFinancePanel";
 import EventDashboard from "@/components/dashboard/EventDashboard";
 import RegistrationApprovalsPanel from "@/components/organizer/RegistrationApprovalsPanel";
 import { Button } from "@/components/ui/button";
@@ -42,7 +41,7 @@ import { Button } from "@/components/ui/button";
 const DEFAULT_GRADIENT =
   "linear-gradient(135deg, #f97316 0%, #ea580c 40%, #dc2626 100%)";
 
-type TabKey = "overview" | "approvals" | "finance";
+type TabKey = "overview" | "approvals";
 
 function isManageableOrganizerStatus(status: string): boolean {
   const key = (status || "").toLowerCase().replace(/_/g, "-");
@@ -83,8 +82,7 @@ function MyEventDetailContent() {
   const searchParams = useSearchParams();
   const eventId = String(params?.id || "");
   const rawTab = searchParams.get("tab");
-  const tab: TabKey =
-    rawTab === "approvals" || rawTab === "finance" ? rawTab : "overview";
+  const tab: TabKey = rawTab === "approvals" ? "approvals" : "overview";
   const setTab = (next: TabKey) => {
     const url =
       next === "overview"
@@ -154,11 +152,6 @@ function MyEventDetailContent() {
     if (!eventId || tab !== "approvals") return;
     void loadRegs();
   }, [eventId, tab, loadRegs]);
-
-  const pendingCount = useMemo(
-    () => regs.filter((r) => r.status === "pending_approval").length,
-    [regs]
-  );
 
   const onApprove = async (id: string) => {
     setBusyId(id);
@@ -248,7 +241,7 @@ function MyEventDetailContent() {
         </div>
       )}
 
-      {/* Banner + tab strip — chỉ overview / finance; approvals dùng sidebar + bảng */}
+      {/* Banner tổng quan; duyệt đăng ký truy cập qua sidebar. */}
       {tab !== "approvals" && (
         <div className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm">
           <div className="relative h-44 sm:h-52">
@@ -283,32 +276,6 @@ function MyEventDetailContent() {
                 <p className="mt-1 text-sm text-white/80">{event.tagline}</p>
               ) : null}
             </div>
-          </div>
-
-          <div className="flex flex-wrap gap-1 border-b border-border/60 p-2">
-            {(
-              [
-                { key: "overview", label: "Tổng quan" },
-                {
-                  key: "approvals",
-                  label: `Duyệt đăng ký${pendingCount ? ` (${pendingCount})` : ""}`,
-                },
-                { key: "finance", label: "Tài chính" },
-              ] as { key: TabKey; label: string }[]
-            ).map((t) => (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => setTab(t.key)}
-                className={`rounded-xl px-4 py-2 text-xs font-bold transition ${
-                  tab === t.key
-                    ? "bg-orange-500/15 text-orange-600"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
           </div>
         </div>
       )}
@@ -401,8 +368,6 @@ function MyEventDetailContent() {
           </div>
         </>
       )}
-
-      {tab === "finance" && <EventFinancePanel eventId={eventId} />}
 
       {tab === "approvals" && (
         <RegistrationApprovalsPanel

@@ -43,6 +43,27 @@ Dòng tiền hiển thị hai mục mở/thu gọn **+ Tiền vào**, **− Ti�
 
 Đã đối chiếu tổng thu/hoàn với API thật, kiểm tra mở/đóng bằng bàn phím và chuột ở 375/768/1280px, số tiền từng ngày, trường hợp âm/0, nhiều tiền tệ, trang chi tiết và tải Excel thật. TypeScript, ESLint hai component dòng tiền và production build đạt. Khi thu gọn, phần tổng quan kết thúc khoảng 1.200px trên màn hình 1280×900.
 
+## Điều hướng và đề xuất Tổng quan từng giải
+
+Đã bỏ thanh tab dưới banner gồm Tổng quan / Duyệt đăng ký / Tài chính. Trang giải mặc định hiển thị Tổng quan; Duyệt đăng ký vẫn truy cập qua sidebar và các liên kết xử lý đăng ký (`?tab=approvals`). Tài chính chi tiết truy cập **Ví & giải ngân** hoặc **Lịch sử giải ngân** ở sidebar; URL cũ `?tab=finance` hiển thị Tổng quan. Không thay đổi API hay nghiệp vụ duyệt, thu/hoàn tiền và giải ngân.
+
+Đề xuất bên dưới **chưa triển khai**, dành cho lần rút gọn nội dung Tổng quan:
+
+| Khối hiện tại | Đề xuất | Lý do |
+| --- | --- | --- |
+| Banner, tên, trạng thái, ngày và địa điểm | Giữ thông tin, giảm chiều cao banner và gộp ngày/địa điểm vào hàng thông tin | Nhận diện giải nhanh, ít chiếm chiều cao |
+| KPI đăng ký, check-in, khiếu nại | Giữ đăng ký xác nhận, chờ duyệt, check-in và khiếu nại chờ; chuyển tổng đơn sang chi tiết | Ưu tiên vé hợp lệ và việc cần xử lý; tổng đơn gồm cả hủy/chưa trả tiền |
+| Trạng thái đăng ký và tình hình thi đấu | Rút gọn trạng thái đăng ký; chuyển bảng thi đấu sang Kết quả giải | Tránh dàn nhiều nhóm trạng thái trên Tổng quan |
+| Sức chứa theo cự ly và bảng Cự ly cuối trang | Gộp thành một bảng ngắn tên cự ly / chỗ giữ / sức chứa / đăng ký xác nhận | Hiện đang lặp thông tin; giá vé xem tại Cự ly & giá vé |
+| Công tác chuẩn bị | Chỉ hiện việc còn thiếu kèm liên kết xử lý | Các mục đã hoàn tất không cần chiếm nhiều diện tích |
+| Tài chính tích lũy và dòng tiền theo ngày | Một khối tiền vào / tiền hoàn ra / chênh lệch theo kỳ, giữ collapse; chi tiết phí và có thể rút xem ở Ví & giải ngân | Hai phạm vi số liệu hiện tại dễ nhầm; chênh lệch chưa trừ phí, không phải lợi nhuận/số dư ví |
+| Hai biểu đồ và bảng theo ngày | Một biểu đồ gọn, chuyển đổi Đăng ký / Dòng tiền; bảng ngày chỉ mở khi cần | Giảm cuộn nhưng vẫn xem được số chính xác |
+| Xuất Excel/PDF, lọc ngày, làm mới | Đặt chung một thanh công cụ | Dễ tìm, nêu rõ kỳ áp dụng cho xu hướng/dòng tiền |
+
+Mục tiêu là Tổng quan vận hành của **một giải**, không lặp ví tổng hoặc thống kê toàn bộ giải ở Dashboard chung. Bỏ khối khỏi Tổng quan không có nghĩa xóa dữ liệu hay trạng thái nghiệp vụ.
+
+Kiểm tra bỏ tab: TypeScript và production build đạt; auth 20 đạt, 1 bỏ qua vì thiếu khóa ký cho ca JWT hết hạn. Trình duyệt với backend thật xác nhận mất thanh tab, sidebar duyệt đăng ký mở bằng bàn phím và tải lại được, link tài chính cũ về Tổng quan, trang ví vẫn mở được, khách chưa đăng nhập về đăng nhập. ESLint còn 1 lỗi `set-state-in-effect` và 2 cảnh báo dependency đã tồn tại trong cùng file ở HEAD. Kiểm tra 375/768/1280px phát hiện khối thông tin ngày/địa điểm chưa sửa có tràn ngang ở 375px (nội dung 432px); nên xử lý khi rút gọn Tổng quan. Next.js vẫn có cảnh báo bảo mật phiên bản đang cài, chưa thay dependency trong thay đổi này.
+
 ## API
 
 | Màn hình | GET API |
