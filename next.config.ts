@@ -63,7 +63,7 @@ const nextConfig: NextConfig = {
     ],
   },
   async rewrites() {
-    return [
+    const appRewrites = [
       {
         source: "/organizer/:id/profile/addition",
         destination: "/organizer/events/:id/profile/addition",
@@ -73,6 +73,10 @@ const nextConfig: NextConfig = {
         destination: "/organizer/events/:id/profile/supplies",
       },
     ];
+    // Local testing only: serve the API (SignalR hub, media) from this origin when DEV_PROXY_API_ORIGIN is set.
+    const devApi = process.env.DEV_PROXY_API_ORIGIN?.replace(/\/$/, "");
+    if (!devApi) return appRewrites;
+    return { beforeFiles: [], afterFiles: appRewrites, fallback: [{ source: "/:path*", destination: `${devApi}/:path*` }] };
   },
 };
 
