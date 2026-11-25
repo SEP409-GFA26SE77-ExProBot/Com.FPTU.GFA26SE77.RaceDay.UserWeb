@@ -7,7 +7,6 @@ import {
   Marker,
   Polyline,
   Popup,
-  TileLayer,
   ZoomControl,
   useMap,
   useMapEvents,
@@ -21,6 +20,23 @@ import {
   MAP_COLORS,
   checkpointMapColor,
 } from "@/lib/race-map/map-colors";
+import { BasemapTileLayer } from "@/components/maps/BasemapTileLayer";
+
+/** Layout flex/portal đôi khi init map khi container chưa có size → tiles xám. */
+function InvalidateSize() {
+  const map = useMap();
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      try {
+        map.invalidateSize();
+      } catch {
+        /* remount */
+      }
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [map]);
+  return null;
+}
 
 function FitBounds({ points, token }: { points: LatLng[]; token: string }) {
   const map = useMap();
@@ -198,10 +214,8 @@ export default function SetupMapCanvas({
     >
       {/* Zoom xuống dưới — tránh bị che bởi toolbar phía trên */}
       <ZoomControl position="bottomleft" />
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+      <BasemapTileLayer />
+      <InvalidateSize />
       <ClickCapture onClick={onMapClick} enabled={!isView} />
       <FlyToPlace target={focusTarget} />
       {/* Search đang active → không kéo map về route cũ (vd. Đà Nẵng) */}

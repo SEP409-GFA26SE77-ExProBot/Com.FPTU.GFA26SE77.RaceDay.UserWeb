@@ -75,6 +75,15 @@ export default function RegistrationDetailPage() {
     };
   }, [id]);
 
+  useEffect(() => {
+    if (!showQrFullscreen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowQrFullscreen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [showQrFullscreen]);
+
   if (reg === undefined) {
     return (
       <PageLoading
@@ -109,6 +118,8 @@ export default function RegistrationDetailPage() {
     distance.name || (distance.km != null ? `${distance.km} km` : "—");
 
   if (reg.status === "pending_payment") {
+    const holdUntil = reg.slotHeldUntilUtc ? new Date(reg.slotHeldUntilUtc) : null;
+    const holdExpired = holdUntil != null && holdUntil.getTime() <= Date.now();
     return (
       <div className={`${PAGE_SHELL_FORM} max-w-lg py-10 space-y-5`}>
         <Link
@@ -124,7 +135,9 @@ export default function RegistrationDetailPage() {
           </div>
           <h1 className="text-2xl font-extrabold">Chờ thanh toán</h1>
           <p className="text-sm text-muted-foreground">
-            Đơn đã tạo. Hoàn tất thanh toán để gửi hồ sơ cho BTC duyệt.
+            {holdExpired
+              ? "Hết giữ chỗ — đăng ký lại để giữ slot mới, rồi thanh toán."
+              : "Đơn đã tạo. Hoàn tất thanh toán để gửi hồ sơ cho BTC duyệt."}
           </p>
         </div>
         <div className="rounded-2xl border bg-card p-5 space-y-3 text-sm">
@@ -144,13 +157,28 @@ export default function RegistrationDetailPage() {
               {formatPrice(distance.price)}
             </span>
           </div>
+          {holdUntil && !holdExpired ? (
+            <div className="flex justify-between gap-3">
+              <span className="text-muted-foreground">Giữ chỗ đến</span>
+              <span className="font-semibold text-right">{formatDateTime(reg.slotHeldUntilUtc)}</span>
+            </div>
+          ) : null}
         </div>
-        <Link
-          href={`/events/${reg.eventId}/payment?regId=${reg.id}`}
-          className="flex w-full items-center justify-center rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white"
-        >
-          Thanh toán ngay
-        </Link>
+        {holdExpired ? (
+          <Link
+            href={`/events/${reg.eventId}`}
+            className="flex w-full items-center justify-center rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white"
+          >
+            Đăng ký lại
+          </Link>
+        ) : (
+          <Link
+            href={`/events/${reg.eventId}/payment?regId=${reg.id}`}
+            className="flex w-full items-center justify-center rounded-full bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white"
+          >
+            Thanh toán ngay
+          </Link>
+        )}
       </div>
     );
   }
@@ -256,7 +284,7 @@ export default function RegistrationDetailPage() {
           <div className="flex justify-between gap-3">
             <span className="text-muted-foreground">Trạng thái</span>
             <span className="font-semibold text-red-700">
-              {getRegistrationStatusLabel(reg.status)}
+              {getRegistrationStatusLabel(reg.status, reg.raceStatus)}
             </span>
           </div>
           <div className="flex justify-between gap-3">
@@ -366,7 +394,7 @@ export default function RegistrationDetailPage() {
           )}
           <div className="relative">
             <p className="text-white/80 text-xs uppercase tracking-wider font-medium">
-              Vé đăng ký · {getRegistrationStatusLabel(reg.status)}
+              Vé đăng ký · {getRegistrationStatusLabel(reg.status, reg.raceStatus)}
             </p>
             <h1 className="text-xl font-bold text-white mt-0.5">
               {reg.eventName || event?.name || "RaceDay"}
@@ -510,6 +538,7 @@ export default function RegistrationDetailPage() {
           <button
             type="button"
             onClick={() => setShowQrFullscreen(false)}
+            aria-keyshortcuts="Escape"
             className="rounded-full bg-zinc-900 px-6 py-2.5 text-sm font-bold text-white"
           >
             Đóng

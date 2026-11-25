@@ -104,7 +104,7 @@ export default function ResultsHubPage() {
                   <p className="text-xs text-muted-foreground">
                     {r.distanceName || "—"}
                     {r.bibNumber ? ` · BIB ${r.bibNumber}` : ""} ·{" "}
-                    {getRegistrationStatusLabel(r.status)}
+                    {getRegistrationStatusLabel(r.status, r.raceStatus)}
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <Link

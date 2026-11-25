@@ -1,6 +1,6 @@
 export default function EventCardSkeleton() {
   return (
-    <div className="rounded-2xl border border-border/60 bg-card overflow-hidden shadow-sm">
+    <div aria-hidden="true" className="h-full rounded-2xl border border-border/60 bg-card overflow-hidden shadow-sm">
       {/* Banner skeleton */}
       <div className="relative h-48 bg-muted overflow-hidden">
         <div className="skeleton-shimmer absolute inset-0" />
@@ -17,11 +17,11 @@ export default function EventCardSkeleton() {
       </div>
 
       {/* Content skeleton */}
-      <div className="p-4 space-y-3">
+      <div className="p-5 space-y-4">
         {/* Title */}
-        <div className="space-y-1.5">
-          <div className="h-4 w-4/5 rounded-md bg-muted skeleton-shimmer" />
-          <div className="h-4 w-3/5 rounded-md bg-muted skeleton-shimmer" />
+        <div className="min-h-12 space-y-2">
+          <div className="h-5 w-4/5 rounded-md bg-muted skeleton-shimmer" />
+          <div className="h-5 w-3/5 rounded-md bg-muted skeleton-shimmer" />
         </div>
 
         {/* Date & Location */}
@@ -46,13 +46,14 @@ export default function EventCardSkeleton() {
         </div>
 
         {/* Price & Tags */}
-        <div className="flex items-center justify-between pt-1">
+        <div className="flex items-center justify-between border-t border-border/70 pt-4">
           <div className="h-4 w-20 rounded-md bg-muted skeleton-shimmer" />
           <div className="flex gap-1">
             <div className="h-4 w-12 rounded-md bg-muted skeleton-shimmer" />
             <div className="h-4 w-12 rounded-md bg-muted skeleton-shimmer" />
           </div>
         </div>
+        <div className="h-11 rounded-xl bg-muted skeleton-shimmer" />
       </div>
     </div>
   );

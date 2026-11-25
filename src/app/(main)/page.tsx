@@ -3,19 +3,21 @@ import { getAuthUser } from "@/stores/auth-store";
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   ArrowRight,
   Flag,
   Search,
   CreditCard,
   Trophy,
-  MapPin,
-  Calendar,
-  Users,
-  TrendingUp,
+  Camera,
+  Ticket,
+  User,
   ChevronRight,
   Sparkles,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { getApiErrorMessage } from "@/lib/error";
 import { getEvents, getMyRegistrations } from "@/api/events";
 import { RaceEventListItemDto } from "@/dto/event.dto";
 import EventCard from "@/components/events/EventCard";
@@ -28,6 +30,8 @@ export default function Home() {
     new Map()
   );
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -35,14 +39,18 @@ export default function Home() {
       try {
         const events = await getEvents();
         if (isMounted) {
+          setError(null);
           // Prioritize open events or first 4
           const openEvents = events.filter(
             (e) => e.status?.toLowerCase() === "registration-open" || e.status?.toLowerCase() === "published"
           );
           setFeaturedEvents(openEvents.length >= 4 ? openEvents.slice(0, 4) : events.slice(0, 4));
         }
-      } catch {
-        if (isMounted) setFeaturedEvents([]);
+      } catch (e) {
+        if (isMounted) {
+          setFeaturedEvents([]);
+          setError(getApiErrorMessage(e, "Chưa thể tải các giải chạy. Vui lòng thử lại."));
+        }
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -51,7 +59,7 @@ export default function Home() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [loadAttempt]);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,85 +98,57 @@ export default function Home() {
     <div className="flex flex-col">
       {/* Hero Section */}
       <section className="relative overflow-hidden">
-        {/* Background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(249,115,22,0.15),transparent_50%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(239,68,68,0.10),transparent_50%)]" />
-
-        {/* Floating particles */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {[...Array(6)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute rounded-full opacity-20"
-              style={{
-                width: `${20 + i * 15}px`,
-                height: `${20 + i * 15}px`,
-                background: `radial-gradient(circle, ${i % 2 === 0 ? "#f97316" : "#ef4444"}, transparent)`,
-                top: `${15 + i * 14}%`,
-                left: `${10 + i * 16}%`,
-                animation: `float ${3 + i}s ease-in-out infinite alternate`,
-                animationDelay: `${i * 0.5}s`,
-              }}
-            />
-          ))}
-        </div>
-
-        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-24 sm:py-32 lg:py-40">
-          <div className="max-w-3xl">
+        <Image src="/race-auth-bg.jpg" alt="" fill preload sizes="100vw" className="object-cover object-[65%_center]" />
+        <div className="absolute inset-0 bg-gray-950/65 lg:bg-gradient-to-r lg:from-gray-950 lg:via-gray-950/90 lg:to-gray-950/20" />
+        <div className={`relative ${PAGE_SHELL} py-16 sm:py-24 lg:py-28`}>
+          <div className="max-w-2xl">
             {/* Badge */}
             <div className="inline-flex items-center gap-2 rounded-full border border-orange-500/30 bg-orange-500/10 px-4 py-1.5 mb-6">
-              <span className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
-              <span className="text-xs font-semibold text-orange-400 uppercase tracking-wider">
-                Nền tảng giải chạy marathon hàng đầu Việt Nam
+              <Flag aria-hidden="true" className="size-4 shrink-0 text-orange-300" />
+              <span className="text-xs font-semibold text-orange-200 tracking-wide">
+                Mỗi bước chạy, một hành trình mới
               </span>
             </div>
 
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.1]">
-              Hành Trình Chinh Phục{" "}
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.15] text-balance">
+              Đường đua tiếp theo. <br className="hidden sm:block" />{" "}
               <span className="bg-gradient-to-r from-orange-400 via-orange-500 to-red-500 bg-clip-text text-transparent">
-                Đường Đua Mới
+                Dấu ấn của bạn.
               </span>
             </h1>
 
-            <p className="mt-5 text-lg sm:text-xl text-gray-400 leading-relaxed max-w-2xl">
-              Khám phá và đăng ký các giải chạy marathon, trail đỉnh cao khắp Việt Nam. 
-              Thủ tục check-in thông minh qua mã QR, quản lý số BIB và thanh toán PayOS tức thì.
+            <p className="mt-5 max-w-xl text-base leading-relaxed text-gray-200 sm:text-lg">
+              Từ 5K đầu tiên đến marathon đầy thử thách. Khám phá giải chạy khắp Việt Nam, đăng ký và chuẩn bị cho ngày thi đấu cùng RaceDay.
             </p>
 
             {/* CTA buttons */}
-            <div className="mt-8 flex flex-wrap items-center gap-4">
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Button asChild className="h-12 rounded-xl bg-gradient-to-r from-orange-700 to-red-700 px-6 text-base font-semibold text-white shadow-lg hover:opacity-90">
               <Link
                 href="/events"
-                className="group inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-orange-500 to-red-600 px-7 py-3.5 text-sm font-bold text-white shadow-xl shadow-orange-500/25 transition-all duration-300 hover:shadow-orange-500/40 hover:scale-[1.03] active:scale-[0.98]"
               >
                 Khám phá giải chạy
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                <ArrowRight aria-hidden="true" className="size-4" />
               </Link>
+              </Button>
               <Link
                 href="#how-it-works"
-                className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-6 py-3.5 text-sm font-semibold text-white/80 backdrop-blur-sm transition-all hover:bg-white/10 hover:text-white hover:border-white/25"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-white/30 bg-white/5 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300"
               >
                 Quy trình tham gia
               </Link>
             </div>
 
-            {/* Stats mini row */}
-            <div className="mt-12 flex flex-wrap gap-8 sm:gap-12">
+            <div className="mt-10 flex flex-wrap gap-3 border-t border-white/15 pt-6">
               {[
-                { value: "50+", label: "Giải chạy toàn quốc", icon: Flag },
-                { value: "20K+", label: "Vận động viên", icon: Users },
-                { value: "100%", label: "Tự động hóa PayOS", icon: Trophy },
+                { label: "5K", href: "/events?tag=fun5" },
+                { label: "10K", href: "/events?tag=d10" },
+                { label: "Half marathon", href: "/events?tag=half" },
+                { label: "Marathon", href: "/events?tag=full" },
               ].map((stat) => (
-                <div key={stat.label} className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/5 border border-white/10">
-                    <stat.icon className="h-4.5 w-4.5 text-orange-400" />
-                  </div>
-                  <div>
-                    <p className="text-xl font-extrabold text-white">{stat.value}</p>
-                    <p className="text-xs text-gray-500 font-medium">{stat.label}</p>
-                  </div>
-                </div>
+                <Link key={stat.label} href={stat.href} className="inline-flex min-h-11 items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm text-gray-100 transition-colors hover:border-orange-300 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-orange-300">
+                  {stat.label}<ChevronRight aria-hidden="true" className="size-3.5" />
+                </Link>
               ))}
             </div>
           </div>
@@ -176,15 +156,15 @@ export default function Home() {
       </section>
 
       {/* Featured Events */}
-      <section className="py-16 sm:py-20 bg-background">
+      <section className="py-12 sm:py-16">
         <div className={PAGE_SHELL}>
-          <div className="flex items-end justify-between mb-10">
+          <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="text-xs font-bold text-orange-500 uppercase tracking-widest mb-2">
                 Nổi bật
               </p>
               <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
-                Giải Chạy Đang Mở Đăng Ký 🔥
+                Tìm giải chạy, bắt đầu hành trình
               </h2>
               <p className="mt-2 text-muted-foreground max-w-lg">
                 Đăng ký sớm để chọn cự ly yêu thích và nhận race kit đặc quyền.
@@ -192,7 +172,7 @@ export default function Home() {
             </div>
             <Link
               href="/events"
-              className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted transition-colors"
+              className="hidden min-h-11 items-center gap-1.5 rounded-xl border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-muted sm:inline-flex"
             >
               Xem tất cả
               <ChevronRight className="h-4 w-4" />
@@ -204,6 +184,11 @@ export default function Home() {
               {[...Array(4)].map((_, i) => (
                 <EventCardSkeleton key={i} />
               ))}
+            </div>
+          ) : error ? (
+            <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center">
+              <p className="text-sm text-red-800">{error}</p>
+              <Button type="button" variant="outline" onClick={() => { setLoading(true); setLoadAttempt((attempt) => attempt + 1); }} className="mt-4 min-h-11 bg-card">Thử lại</Button>
             </div>
           ) : featuredEvents.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-border p-12 text-center">
@@ -231,7 +216,7 @@ export default function Home() {
           <div className="mt-8 flex justify-center sm:hidden">
             <Link
               href="/events"
-              className="inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-orange-600 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-orange-800 transition-colors"
             >
               Xem tất cả giải chạy
               <ArrowRight className="h-4 w-4" />
@@ -241,14 +226,14 @@ export default function Home() {
       </section>
 
       {/* How It Works */}
-      <section id="how-it-works" className="py-16 sm:py-20 bg-muted/30">
+      <section id="how-it-works" className="scroll-mt-24 border-y border-border/60 bg-card py-12 sm:py-16">
         <div className={PAGE_SHELL}>
           <div className="text-center mb-14">
             <p className="text-xs font-bold text-orange-500 uppercase tracking-widest mb-2">
               Quy trình tham gia
             </p>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
-              3 Bước Dễ Dàng Để Sẵn Sàng Chạy
+              Sẵn sàng xuất phát với 3 bước
             </h2>
             <p className="mt-3 text-muted-foreground max-w-md mx-auto">
               Từ lúc đăng ký đến ngày thi đấu chỉ với vài cú nhấp chuột.
@@ -269,9 +254,9 @@ export default function Home() {
               {
                 step: 2,
                 icon: CreditCard,
-                title: "Đăng ký & Thanh toán PayOS",
+                title: "Đăng ký & thanh toán",
                 description:
-                  "Điền thông tin VĐV, cỡ áo thi đấu và quét mã VietQR PayOS an toàn, kích hoạt ngay lập tức.",
+                  "Điền thông tin VĐV, chọn cự ly và hoàn tất thanh toán theo hướng dẫn. Theo dõi trạng thái duyệt tại Vé của tôi.",
                 color: "from-orange-500 to-red-500",
                 shadow: "shadow-orange-500/20",
               },
@@ -287,7 +272,7 @@ export default function Home() {
             ].map(({ step, icon: Icon, title, description, color, shadow }) => (
               <div
                 key={step}
-                className="group relative rounded-2xl border border-border/60 bg-card p-7 transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
+                className="relative rounded-2xl border border-border/70 bg-background p-6 sm:p-7"
               >
                 {/* Step number */}
                 <div
@@ -310,40 +295,38 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Stats Section */}
+      {/* Runner shortcuts */}
       <section className="py-16 sm:py-20 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(249,115,22,0.08),transparent_60%)]" />
 
         <div className={`relative ${PAGE_SHELL}`}>
           <div className="text-center mb-14">
             <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Đồng Hành Cùng Cộng Đồng VĐV
+              Mọi thứ cho hành trình của bạn
             </h2>
             <p className="mt-3 text-gray-400 max-w-md mx-auto">
-              Hàng ngàn chân chạy phong trào và chuyên nghiệp tin tưởng lựa chọn RaceDay.
+              Chuẩn bị trước ngày đua và lưu giữ những cột mốc đáng nhớ sau vạch đích.
             </p>
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { value: "50+", label: "Giải chạy chất lượng", icon: Flag, suffix: "" },
-              { value: "20,000", label: "VĐV đăng ký", icon: Users, suffix: "+" },
-              { value: "25", label: "Tỉnh thành", icon: MapPin, suffix: "" },
-              { value: "99.8", label: "Giao dịch thành công", icon: TrendingUp, suffix: "%" },
-            ].map(({ value, label, icon: Icon, suffix }) => (
-              <div
+              { label: "Vé & mã QR", description: "Sẵn sàng cho ngày thi đấu", href: "/my-registrations", icon: Ticket },
+              { label: "Kết quả thi đấu", description: "Theo dõi thành tích của bạn", href: "/results", icon: Trophy },
+              { label: "Ảnh trên đường chạy", description: "Tìm khoảnh khắc theo BIB", href: "/photos", icon: Camera },
+              { label: "Hồ sơ cá nhân", description: "Cập nhật thông tin của bạn", href: "/profile", icon: User },
+            ].map(({ label, description, href, icon: Icon }) => (
+              <Link
                 key={label}
-                className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-6 text-center transition-all hover:bg-white/8 hover:border-white/15"
+                href={href}
+                className="rounded-2xl border border-white/15 bg-white/5 p-5 text-center transition-colors hover:bg-white/10 hover:border-orange-400/60 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-orange-300 sm:p-6"
               >
                 <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-orange-500/15 mb-4">
                   <Icon className="h-5 w-5 text-orange-400" />
                 </div>
-                <p className="text-3xl sm:text-4xl font-extrabold text-white">
-                  {value}
-                  <span className="text-orange-400">{suffix}</span>
-                </p>
-                <p className="mt-1 text-sm text-gray-500 font-medium">{label}</p>
-              </div>
+                <h3 className="text-base font-bold text-white">{label}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-gray-300">{description}</p>
+              </Link>
             ))}
           </div>
         </div>
@@ -364,7 +347,7 @@ export default function Home() {
               <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
                 <Link
                   href="/events"
-                  className="inline-flex items-center gap-2 rounded-full bg-white px-7 py-3.5 text-sm font-bold text-orange-600 shadow-lg transition-all hover:shadow-xl hover:scale-[1.03] active:scale-[0.98]"
+                  className="inline-flex items-center gap-2 rounded-full bg-white px-7 py-3.5 text-sm font-bold text-orange-700 shadow-lg transition-all hover:shadow-xl hover:scale-[1.03] active:scale-[0.98]"
                 >
                   Tìm giải chạy ngay
                   <ArrowRight className="h-4 w-4" />

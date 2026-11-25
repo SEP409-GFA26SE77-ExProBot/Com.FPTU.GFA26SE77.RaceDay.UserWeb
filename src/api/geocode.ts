@@ -1,5 +1,5 @@
 /**
- * Geocode VN — BE Map module proxy Nominatim.
+ * Geocode VN — BE Map module proxy Photon (Komoot).
  * GET /api/v1/map/geocode?q=
  */
 import api from "@/config/axios";

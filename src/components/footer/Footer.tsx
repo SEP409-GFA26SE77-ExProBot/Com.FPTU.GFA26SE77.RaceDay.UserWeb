@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { Flag, Globe, Heart, MessageCircle, Mail, MapPin } from "lucide-react";
+import { Flag, Ticket, Trophy, Mail, MapPin } from "lucide-react";
+import { PAGE_SHELL } from "@/lib/page-shell";
 
 export default function Footer() {
   return (
-    <footer className="border-t border-border/60 bg-gradient-to-b from-background to-muted/30">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <footer className="border-t border-border/60 bg-card">
+      <div className={PAGE_SHELL}>
         {/* Main footer content */}
         <div className="grid grid-cols-1 gap-8 py-12 sm:grid-cols-2 lg:grid-cols-4">
           {/* Brand column */}
@@ -21,30 +22,32 @@ export default function Footer() {
               Nền tảng hàng đầu để khám phá và đăng ký các sự kiện chạy bộ trên khắp Việt Nam.
               Từ Marathon đến chạy địa hình — tìm giải chạy tiếp theo của bạn.
             </p>
-            {/* Social links */}
+            {/* Useful links stay available at the end of every page. */}
             <div className="flex items-center gap-3 pt-2">
               {[
-                { icon: Globe, label: "Website" },
-                { icon: Heart, label: "Instagram" },
-                { icon: MessageCircle, label: "Twitter" },
-              ].map(({ icon: Icon, label }) => (
-                <button
+                { icon: Flag, label: "Khám phá giải chạy", href: "/events" },
+                { icon: Ticket, label: "Vé của tôi", href: "/my-registrations" },
+                { icon: Trophy, label: "Kết quả thi đấu", href: "/results" },
+              ].map(({ icon: Icon, label, href }) => (
+                <Link
                   key={label}
+                  href={href}
                   aria-label={label}
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-border/80 bg-background text-muted-foreground transition-all hover:border-orange-500/40 hover:text-orange-600 hover:bg-orange-500/5 hover:shadow-sm"
+                  title={label}
+                  className="flex size-11 items-center justify-center rounded-xl border border-border/80 bg-background text-muted-foreground transition-colors hover:border-orange-500/40 hover:text-orange-700 hover:bg-orange-50 focus-visible:outline-2 focus-visible:outline-orange-600"
                 >
                   <Icon className="h-4 w-4" />
-                </button>
+                </Link>
               ))}
             </div>
           </div>
 
           {/* Quick links */}
           <div>
-            <h4 className="text-sm font-bold text-foreground uppercase tracking-wider mb-4">
+            <h2 className="text-sm font-bold text-foreground uppercase tracking-wider mb-4">
               Khám phá
-            </h4>
-            <ul className="space-y-2.5">
+            </h2>
+            <ul className="space-y-1">
               {[
                 { label: "Tất cả sự kiện", href: "/events" },
                 { label: "Kết quả thi đấu", href: "/results" },
@@ -54,7 +57,7 @@ export default function Footer() {
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="text-sm text-muted-foreground transition-colors hover:text-orange-600"
+                    className="inline-flex min-h-11 items-center text-sm text-muted-foreground transition-colors hover:text-orange-700"
                   >
                     {link.label}
                   </Link>
@@ -65,10 +68,10 @@ export default function Footer() {
 
           {/* Support */}
           <div>
-            <h4 className="text-sm font-bold text-foreground uppercase tracking-wider mb-4">
+            <h2 className="text-sm font-bold text-foreground uppercase tracking-wider mb-4">
               Hỗ trợ
-            </h4>
-            <ul className="space-y-2.5">
+            </h2>
+            <ul className="space-y-1">
               {[
                 { label: "Câu hỏi thường gặp (FAQ)", href: "/#how-it-works" },
                 { label: "Liên hệ chúng tôi", href: "mailto:support@raceday.vn" },
@@ -78,7 +81,7 @@ export default function Footer() {
                 <li key={link.label}>
                   <Link
                     href={link.href}
-                    className="text-sm text-muted-foreground transition-colors hover:text-orange-600"
+                    className="inline-flex min-h-11 items-center text-sm text-muted-foreground transition-colors hover:text-orange-700"
                   >
                     {link.label}
                   </Link>
@@ -89,9 +92,9 @@ export default function Footer() {
 
           {/* Contact */}
           <div>
-            <h4 className="text-sm font-bold text-foreground uppercase tracking-wider mb-4">
+            <h2 className="text-sm font-bold text-foreground uppercase tracking-wider mb-4">
               Liên hệ
-            </h4>
+            </h2>
             <ul className="space-y-3">
               <li className="flex items-start gap-2.5 text-sm text-muted-foreground">
                 <MapPin className="h-4 w-4 text-orange-500 mt-0.5 shrink-0" />
@@ -99,7 +102,7 @@ export default function Footer() {
               </li>
               <li className="flex items-center gap-2.5 text-sm text-muted-foreground">
                 <Mail className="h-4 w-4 text-orange-500 shrink-0" />
-                <span>support@raceday.vn</span>
+                <a href="mailto:support@raceday.vn" className="inline-flex min-h-11 items-center break-all hover:text-orange-700">support@raceday.vn</a>
               </li>
             </ul>
           </div>
@@ -108,7 +111,7 @@ export default function Footer() {
         {/* Bottom bar */}
         <div className="border-t border-border/60 py-6 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs text-muted-foreground">
-            © {new Date().getFullYear()} RaceDay. Được phát triển với ❤️ dành cho cộng đồng chạy bộ Việt Nam.
+            © {new Date().getFullYear()} RaceDay. Đồng hành cùng cộng đồng chạy bộ Việt Nam.
           </p>
         </div>
       </div>

@@ -123,7 +123,7 @@ export default function RaceDayPage() {
                   <p className="text-sm text-muted-foreground">
                     {r.distanceName || "—"}
                     {r.bibNumber ? ` · BIB ${r.bibNumber}` : ""} ·{" "}
-                    {getRegistrationStatusLabel(r.status)}
+                    {getRegistrationStatusLabel(r.status, r.raceStatus)}
                   </p>
                 </div>
                 <Link

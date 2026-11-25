@@ -7,6 +7,7 @@ import {
   EventDocumentDto,
 } from "@/dto/event.dto";
 import { resolveStoredFileUrl } from "@/lib/media-url";
+import type { RunnerCertificateResponse } from "@/dto/certificate.dto";
 
 const EVENT_API = "api/v1/event";
 
@@ -129,6 +130,15 @@ export async function getRegistrationById(
     `${EVENT_API}/registrations/${registrationId}`
   )) as RegistrationDto;
   return withResolvedReg(reg);
+}
+
+/** Returns false until the runner has a recorded finish and race result. */
+export async function getRegistrationCertificate(
+  registrationId: string
+): Promise<RunnerCertificateResponse> {
+  return (await api.get(
+    `${EVENT_API}/registrations/${registrationId}/certificate`
+  )) as RunnerCertificateResponse;
 }
 
 /** Cancel a pending_payment registration */

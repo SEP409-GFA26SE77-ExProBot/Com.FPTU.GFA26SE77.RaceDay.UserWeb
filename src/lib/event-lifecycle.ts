@@ -31,6 +31,15 @@ export function isEventEnded(event: EventLifecycleDates, now = new Date()): bool
   return todayYmdLocal(now) > end;
 }
 
+/** A race can finish by status or by passing its scheduled end date. */
+export function hasEventFinished(event: EventLifecycleDates, now = new Date()): boolean {
+  const status = statusKey(event.status || "");
+  return (
+    ["completed", "approved", "published", "registration-open", "closed", "in-progress"].includes(status) &&
+    isEventEnded(event, now)
+  );
+}
+
 /** Đã tới/qua ngày tổ chức và chưa kết thúc. */
 export function isEventStarted(event: EventLifecycleDates, now = new Date()): boolean {
   if (isEventEnded(event, now)) return false;

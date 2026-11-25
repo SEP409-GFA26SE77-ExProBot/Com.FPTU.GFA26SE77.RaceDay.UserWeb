@@ -1,4 +1,5 @@
 // DTOs for organizer registration management (approve / reject)
+import type { RaceStatus } from "@/dto/race-status.dto";
 
 export interface ApiRegistration {
   id: string;
@@ -6,6 +7,7 @@ export interface ApiRegistration {
   distanceId: string;
   userId: string;
   status: string;
+  raceStatus?: RaceStatus | null;
   fullName: string;
   email: string;
   phone: string;
@@ -114,13 +116,6 @@ export interface CreateRaceEventRequest {
   distances: CreateRaceEventDistanceInput[];
   documents?: CreateRaceEventDocumentInput[] | null;
   submitForApproval: boolean;
-}
-
-/** Lựa chọn vật phẩm bổ sung (bib/áo/chip…) — lưu local / hồ sơ */
-export interface ProfileAdditionDto {
-  selectedItems?: string[];
-  notes?: string;
-  [key: string]: unknown;
 }
 
 /** Vật phẩm tiếp tế theo thùng */

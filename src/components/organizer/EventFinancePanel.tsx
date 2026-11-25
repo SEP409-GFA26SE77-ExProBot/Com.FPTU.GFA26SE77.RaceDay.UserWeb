@@ -98,6 +98,16 @@ export default function EventFinancePanel({ eventId }: { eventId: string }) {
         <p className="mt-2 rounded-xl bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
           {data.withdrawPolicyNote}
         </p>
+        {data.withdrawPhase ? (
+          <p className="mt-2 text-xs font-semibold text-orange-800">
+            Phase giải ngân: {data.withdrawPhase}
+            {typeof data.daysUntilEvent === "number"
+              ? ` · còn ${data.daysUntilEvent} ngày`
+              : ""}
+            {" · "}
+            Manager duyệt lệnh rút
+          </p>
+        ) : null}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

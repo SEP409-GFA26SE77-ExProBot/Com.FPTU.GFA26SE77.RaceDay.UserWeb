@@ -7,11 +7,6 @@ import type {
   LeaderboardPageDto,
 } from "@/dto/leaderboard.dto";
 import { normalizeLeaderboardPage, normalizeMyLeaderboard } from "@/lib/leaderboard";
-import {
-  leaderboardCacheKey,
-  readLeaderboardCache,
-  writeLeaderboardCache,
-} from "@/lib/leaderboard-cache";
 
 const EVENT_API = "api/v1/event";
 export const LEADERBOARD_PAGE_SIZE = 50;
@@ -32,9 +27,8 @@ export async function getEventLeaderboard(
   page = 1,
   pageSize = LEADERBOARD_PAGE_SIZE
 ): Promise<LeaderboardPageDto> {
-  const key = leaderboardCacheKey(eventId, distanceId, gender, page, pageSize);
-  const cached = readLeaderboardCache(key);
-  if (cached) return cached;
+  // Share in-flight requests only. Race results can change after a DQ decision.
+  const key = JSON.stringify([eventId, distanceId, gender, page, pageSize]);
   const pending = pendingPages.get(key);
   if (pending) return pending;
 
@@ -43,9 +37,7 @@ export async function getEventLeaderboard(
       `${EVENT_API}/${encodeURIComponent(eventId)}/distances/${encodeURIComponent(distanceId)}/leaderboard`,
       { params: { gender, page, pageSize } }
     );
-    const result = normalizeLeaderboardPage(response, page, pageSize);
-    writeLeaderboardCache(key, result);
-    return result;
+    return normalizeLeaderboardPage(response, page, pageSize);
   })();
   pendingPages.set(key, request);
   try {

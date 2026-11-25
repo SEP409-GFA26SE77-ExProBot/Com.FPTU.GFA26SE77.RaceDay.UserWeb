@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import {
   MapContainer,
-  TileLayer,
   Polyline,
   CircleMarker,
   Popup,
@@ -13,6 +12,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { CourseConfigDto, LatLngDto } from "@/dto/race-map.dto";
 import { MAP_COLORS, checkpointMapColor } from "@/lib/race-map/map-colors";
+import { BasemapTileLayer } from "@/components/maps/BasemapTileLayer";
 
 function FitBounds({ points, token }: { points: LatLngDto[]; token: string }) {
   const map = useMap();
@@ -75,10 +75,7 @@ export default function PublicCourseMapCanvas({
       className="h-full w-full z-0"
       scrollWheelZoom
     >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+      <BasemapTileLayer />
       <FitBounds points={polyline} token={fitToken} />
       <Polyline
         positions={polyline.map((p) => [p.lat, p.lng] as [number, number])}
