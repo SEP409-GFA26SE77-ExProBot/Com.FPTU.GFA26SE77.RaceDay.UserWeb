@@ -18,6 +18,7 @@ import {
   Pencil,
   Phone,
   Plus,
+  QrCode,
   RefreshCw,
   Search,
   Send,
@@ -48,6 +49,7 @@ import {
   toStationItems,
 } from "@/dto/event-staff.dto";
 import { getApiErrorMessage } from "@/lib/error";
+import StaffCheckInQrDialog from "@/components/organizer/StaffCheckInQrDialog";
 import { PAGE_SHELL } from "@/lib/page-shell";
 import { toastError, toastSuccess } from "@/lib/toast";
 
@@ -486,6 +488,7 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
   const [, setToast] = useOrganizerToastState<string | null>(null);
 
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [checkInQrOpen, setCheckInQrOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<EventStaffMemberDto | null>(
     null
   );
@@ -763,6 +766,13 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
           </button>
           <button
             type="button"
+            onClick={() => setCheckInQrOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-orange-500/40 px-3 py-2 text-xs font-bold text-orange-600 transition-colors duration-150 hover:bg-orange-500/10 active:scale-95"
+          >
+            <QrCode className="h-3.5 w-3.5" /> QR check-in nhân sự
+          </button>
+          <button
+            type="button"
             onClick={() => {
               resetForm();
               setInviteOpen(true);
@@ -773,6 +783,8 @@ export default function OrganizerEventStaff({ eventId }: { eventId: string }) {
           </button>
         </div>
       </div>
+
+      <StaffCheckInQrDialog eventId={eventId} open={checkInQrOpen} onOpenChange={setCheckInQrOpen} />
 
       <div className="flex flex-wrap gap-1 border-b border-border/60 pb-px">
         {ROLE_TABS.map((t) => (
