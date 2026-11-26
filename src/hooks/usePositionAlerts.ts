@@ -18,7 +18,8 @@ export function usePositionAlerts(eventId?: string | null) {
         occurredAtUtc: string;
       };
       if (alert.eventId.toLowerCase() !== eventId.toLowerCase() || !alert.staffName) return;
-      toastError(`${alert.staffName} đã rời vùng hoạt động.`, undefined, {
+      // The server only sends this to the staff member who left the zone.
+      toastError("Bạn đang ở ngoài vùng hoạt động được phân công.", undefined, {
         autoClose: 8000,
         toastId: `${alert.assignmentId}:${alert.occurredAtUtc}`,
       });
