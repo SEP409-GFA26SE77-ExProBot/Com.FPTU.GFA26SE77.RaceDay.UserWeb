@@ -35,6 +35,7 @@ import {
   Boxes,
   Hash,
   MessageSquareText,
+  ShieldAlert,
   Trophy,
 } from "lucide-react";
 
@@ -105,6 +106,12 @@ function eventWorkspaceGroups(eventId: string): NavGroup[] {
           href: `${base}/staff`,
           icon: Users,
           matchPath: `${base}/staff`,
+        },
+        {
+          label: "Sự cố nhân viên",
+          href: `${base}/staff-incidents`,
+          icon: ShieldAlert,
+          matchPath: `${base}/staff-incidents`,
         },
       ],
     },
